@@ -56,6 +56,46 @@ export class Editor2D {
     this.draw();
   }
 
+  // 도면 전체를 화면 상태와 무관하게 고해상도 PNG(dataURL)로 렌더 (인쇄/내보내기용)
+  toImage(w = 1600, h = 1100) {
+    const d = store.design;
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    const octx = off.getContext('2d');
+
+    // 현재 상태 백업
+    const saved = { ctx: this.ctx, scale: this.scale, ox: this.ox, oy: this.oy, cssW: this.cssW, cssH: this.cssH };
+    const sel = [store.selectedRoom, store.selectedFurniture, store.selectedOpening];
+    store.selectedRoom = store.selectedFurniture = store.selectedOpening = null;
+
+    this.ctx = octx; this.cssW = w; this.cssH = h; this._export = true;
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // 도면을 캔버스에 맞춤
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of d.rooms) {
+      minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
+    }
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1000; maxY = 1000; }
+    const pad = 1500;
+    const bw = (maxX - minX) + pad * 2, bh = (maxY - minY) + pad * 2;
+    this.scale = Math.min(w / bw, h / bh);
+    this.ox = -minX * this.scale + (w - (maxX - minX) * this.scale) / 2;
+    this.oy = -minY * this.scale + (h - (maxY - minY) * this.scale) / 2;
+
+    this.draw();
+    const url = off.toDataURL('image/png');
+
+    // 복원
+    Object.assign(this, saved);
+    this._export = false;
+    [store.selectedRoom, store.selectedFurniture, store.selectedOpening] = sel;
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.draw();
+    return url;
+  }
+
   // ---- 그리기 ----
   draw() {
     const ctx = this.ctx, d = store.design;
@@ -81,11 +121,11 @@ export class Editor2D {
   _drawGrid() {
     const ctx = this.ctx;
     ctx.save();
-    ctx.fillStyle = '#f4f5f7';
+    ctx.fillStyle = this._export ? '#ffffff' : '#f4f5f7';
     ctx.fillRect(0, 0, this.cssW, this.cssH);
     const step = 1000 * this.scale; // 1m 격자
     if (step > 6) {
-      ctx.strokeStyle = '#e3e5e9';
+      ctx.strokeStyle = this._export ? '#eceef1' : '#e3e5e9';
       ctx.lineWidth = 1;
       const startX = this.ox % step, startY = this.oy % step;
       ctx.beginPath();

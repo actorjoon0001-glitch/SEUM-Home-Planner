@@ -10,6 +10,7 @@ class Store {
     this.selectedRoom = null;     // room id
     this.selectedFurniture = null; // furniture id
     this.selectedOpening = null;  // opening id
+    this.cloudId = null;          // 현재 도면의 클라우드 저장 id (있으면)
     this._subs = new Set();
     this._history = [];
     this._future = [];
@@ -99,6 +100,16 @@ class Store {
     const entry = this.savedList().find((e) => e.name === name);
     if (!entry) return;
     this.design = normalize(JSON.parse(JSON.stringify(entry.data)));
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null;
+    this._history = []; this._future = [];
+    this.persist();
+    this.emit();
+  }
+
+  // 도면 객체를 통째로 적용 (템플릿/클라우드 불러오기 공용)
+  loadInto(designObj, { cloudId = null } = {}) {
+    this.design = normalize(JSON.parse(JSON.stringify(designObj)));
+    this.cloudId = cloudId;
     this.selectedRoom = this.selectedFurniture = this.selectedOpening = null;
     this._history = []; this._future = [];
     this.persist();

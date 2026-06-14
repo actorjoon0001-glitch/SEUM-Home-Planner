@@ -5,13 +5,17 @@ import {
   WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
   ROOF_TYPES, ROOF_PALETTE,
 } from './data.js';
+import { listTemplates, instantiateTemplate } from './templates.js';
+import { cloud } from './cloud.js';
 
 export function buildUI({ editor, viewer, onModeChange }) {
   buildLibrary();
   buildRoomPalette();
   buildToolbar({ editor, viewer, onModeChange });
+  buildCloud();
   store.subscribe(() => renderProperties(editor));
   renderProperties(editor);
+  handleShareLink();
 }
 
 // ---------------------------------------------------------------------------
@@ -362,6 +366,8 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   };
 
   $('tb-open').onclick = () => openLoadDialog();
+  $('tb-templates').onclick = () => openTemplateDialog();
+  $('tb-cloud').onclick = () => openCloudDialog();
 
   $('tb-export').onclick = () => {
     const blob = new Blob([store.exportJSON()], { type: 'application/json' });
@@ -442,6 +448,257 @@ function openLoadDialog() {
   }
   dlg.showModal();
   document.getElementById('load-close').onclick = () => dlg.close();
+}
+
+// ---------------------------------------------------------------------------
+// 공통 모달 헬퍼 (동적 생성)
+// ---------------------------------------------------------------------------
+function modal(title, contentEl) {
+  let dlg = document.getElementById('seum-modal');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.id = 'seum-modal';
+    dlg.className = 'dialog';
+    document.body.appendChild(dlg);
+  }
+  dlg.innerHTML = `<div class="dialog-head"><span id="m-title"></span><button id="m-close">✕</button></div><div id="m-body" class="m-body"></div>`;
+  dlg.querySelector('#m-title').textContent = title;
+  dlg.querySelector('#m-body').appendChild(contentEl);
+  dlg.querySelector('#m-close').onclick = () => dlg.close();
+  if (!dlg.open) dlg.showModal();
+  return dlg;
+}
+
+// ---------------------------------------------------------------------------
+// 템플릿(단지/평형) 라이브러리
+// ---------------------------------------------------------------------------
+async function openTemplateDialog() {
+  const body = document.createElement('div');
+  const builtin = listTemplates();
+  body.innerHTML = `<p class="m-sub">상담 시작용 도면을 선택하면 현재 화면에 불러옵니다.</p>
+    <div class="tpl-grid" id="tpl-builtin"></div>
+    <div id="tpl-cloud-wrap" style="display:none">
+      <p class="m-sub" style="margin-top:14px">공용 템플릿 (클라우드)</p>
+      <div class="tpl-grid" id="tpl-cloud"></div>
+    </div>`;
+  const dlg = modal('단지 · 평형 템플릿', body);
+
+  const grid = body.querySelector('#tpl-builtin');
+  for (const t of builtin) {
+    const card = document.createElement('button');
+    card.className = 'tpl-card';
+    card.innerHTML = `<div class="tpl-ico">🏠</div><div class="tpl-name">${esc(t.title)}</div>
+      <div class="tpl-tags">${t.tags.map((x) => `#${esc(x)}`).join(' ')}</div>`;
+    card.onclick = () => {
+      if (!confirm(`'${t.title}' 템플릿을 불러올까요? 현재 작업은 사라집니다.`)) return;
+      const d = instantiateTemplate(t.id);
+      if (d) { store.loadInto(d); dlg.close(); flash(`'${t.title}' 불러옴`); }
+    };
+    grid.appendChild(card);
+  }
+
+  // 클라우드 공용 템플릿 (설정+가능 시)
+  if (cloud.configured()) {
+    try {
+      await cloud.init();
+      const cloudTpls = await cloud.listTemplates();
+      if (cloudTpls.length) {
+        body.querySelector('#tpl-cloud-wrap').style.display = '';
+        const cg = body.querySelector('#tpl-cloud');
+        for (const t of cloudTpls) {
+          const card = document.createElement('button');
+          card.className = 'tpl-card';
+          card.innerHTML = `<div class="tpl-ico">☁</div><div class="tpl-name">${esc(t.name)}</div><div class="tpl-tags">공용 템플릿</div>`;
+          card.onclick = async () => {
+            try {
+              const row = await cloud.getDesign(t.id);
+              store.loadInto(row.data, { cloudId: null });
+              dlg.close(); flash(`'${t.name}' 불러옴`);
+            } catch (e) { alert('불러오기 실패: ' + e.message); }
+          };
+          cg.appendChild(card);
+        }
+      }
+    } catch (e) { /* 클라우드 미가용 → 내장 템플릿만 */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 클라우드 (Supabase): 로그인 / 저장 / 목록 / 공유 링크
+// ---------------------------------------------------------------------------
+function buildCloud() {
+  // 로그인 상태가 바뀌면 버튼 라벨 갱신
+  cloud.onChange(() => updateCloudBtn());
+  if (cloud.configured()) cloud.init().then(() => updateCloudBtn());
+  updateCloudBtn();
+}
+
+function updateCloudBtn() {
+  const btn = document.getElementById('tb-cloud');
+  if (!btn) return;
+  if (!cloud.configured()) { btn.textContent = '☁ 클라우드'; btn.title = '클라우드 미설정'; return; }
+  btn.textContent = cloud.user ? `☁ ${cloud.user.email.split('@')[0]}` : '☁ 로그인';
+}
+
+async function openCloudDialog() {
+  const body = document.createElement('div');
+  if (!cloud.configured()) {
+    body.innerHTML = `<p class="m-sub">클라우드가 아직 설정되지 않았습니다.</p>
+      <p class="hint">관리자가 <code>config.js</code>에 Supabase URL/anon key를 넣으면 활성화됩니다. (설정 방법: <code>supabase/README.md</code>)<br><br>그 전까지는 <b>내보내기/가져오기(.json)</b>와 <b>브라우저 저장</b>으로 도면을 주고받을 수 있습니다.</p>`;
+    modal('클라우드', body);
+    return;
+  }
+  await cloud.init();
+  if (!cloud.user) { renderLogin(body); modal('클라우드 로그인', body); return; }
+  renderCloudHome(body);
+  modal('클라우드', body);
+}
+
+function renderLogin(body) {
+  body.innerHTML = `
+    <p class="m-sub">영업사원 계정으로 로그인하세요.</p>
+    <label class="fld"><span>이메일</span><input id="cl-email" type="email" autocomplete="username"></label>
+    <label class="fld"><span>비밀번호</span><input id="cl-pw" type="password" autocomplete="current-password"></label>
+    <div class="btn-row">
+      <button class="mini" id="cl-signin" style="flex:2;background:#c8102e;color:#fff;border-color:#c8102e">로그인</button>
+      <button class="mini" id="cl-signup">회원가입</button>
+    </div>
+    <p id="cl-msg" class="hint" style="color:#c8102e"></p>`;
+  const msg = body.querySelector('#cl-msg');
+  const email = () => body.querySelector('#cl-email').value.trim();
+  const pw = () => body.querySelector('#cl-pw').value;
+  body.querySelector('#cl-signin').onclick = async () => {
+    msg.textContent = '로그인 중...';
+    try { await cloud.signIn(email(), pw()); reopenCloud(); flash('로그인됨'); }
+    catch (e) { msg.textContent = '로그인 실패: ' + e.message; }
+  };
+  body.querySelector('#cl-signup').onclick = async () => {
+    msg.textContent = '가입 중...';
+    try { await cloud.signUp(email(), pw()); msg.style.color = '#2a7'; msg.textContent = '가입 완료. 로그인해 주세요. (이메일 확인이 필요할 수 있음)'; }
+    catch (e) { msg.style.color = '#c8102e'; msg.textContent = '가입 실패: ' + e.message; }
+  };
+}
+
+function renderCloudHome(body) {
+  body.innerHTML = `
+    <div class="cl-bar">
+      <span class="m-sub">${esc(cloud.user.email)}</span>
+      <button class="mini" id="cl-out" style="flex:0 0 auto">로그아웃</button>
+    </div>
+    <div class="btn-row">
+      <button class="mini" id="cl-save" style="flex:1;background:#c8102e;color:#fff;border-color:#c8102e">현재 도면 클라우드 저장</button>
+    </div>
+    <div class="cl-tabs">
+      <button class="cl-tab active" data-t="mine">내 도면</button>
+      <button class="cl-tab" data-t="shared">공유 도면</button>
+    </div>
+    <div id="cl-list" class="cl-list"><p class="hint">불러오는 중...</p></div>`;
+  body.querySelector('#cl-out').onclick = async () => { await cloud.signOut(); reopenCloud(); };
+  body.querySelector('#cl-save').onclick = () => openSaveForm(body);
+  const tabs = body.querySelectorAll('.cl-tab');
+  tabs.forEach((tb) => tb.onclick = () => {
+    tabs.forEach((x) => x.classList.toggle('active', x === tb));
+    loadCloudList(body, tb.dataset.t);
+  });
+  loadCloudList(body, 'mine');
+}
+
+async function loadCloudList(body, which) {
+  const list = body.querySelector('#cl-list');
+  list.innerHTML = `<p class="hint">불러오는 중...</p>`;
+  try {
+    const rows = which === 'mine' ? await cloud.listMine() : await cloud.listShared();
+    if (!rows.length) { list.innerHTML = `<p class="hint">도면이 없습니다.</p>`; return; }
+    list.innerHTML = '';
+    for (const r of rows) {
+      const row = document.createElement('div');
+      row.className = 'cl-row';
+      const badges = `${r.is_shared ? '<span class="bdg">공유</span>' : ''}${r.is_template ? '<span class="bdg tpl">템플릿</span>' : ''}`;
+      row.innerHTML = `<div class="cl-row-main"><b>${esc(r.name)}</b> ${badges}<small>${new Date(r.updated_at).toLocaleString('ko-KR')}</small></div>
+        <div class="cl-row-act">
+          <button class="mini" data-a="open">열기</button>
+          <button class="mini" data-a="link">공유링크</button>
+          ${which === 'mine' ? '<button class="mini danger" data-a="del">삭제</button>' : ''}
+        </div>`;
+      row.querySelector('[data-a=open]').onclick = async () => {
+        try { const full = await cloud.getDesign(r.id); store.loadInto(full.data, { cloudId: r.id }); flash(`'${r.name}' 불러옴`); closeModal(); }
+        catch (e) { alert('실패: ' + e.message); }
+      };
+      row.querySelector('[data-a=link]').onclick = async () => {
+        const link = cloud.shareLink(r.id);
+        try { await navigator.clipboard.writeText(link); flash('공유 링크 복사됨'); }
+        catch (e) { prompt('공유 링크', link); }
+        if (which === 'mine' && !r.is_shared) flash('※ 고객 열람하려면 저장 시 "공유"를 켜세요');
+      };
+      const del = row.querySelector('[data-a=del]');
+      if (del) del.onclick = async () => {
+        if (!confirm(`'${r.name}' 삭제할까요?`)) return;
+        try { await cloud.removeDesign(r.id); loadCloudList(body, which); flash('삭제됨'); }
+        catch (e) { alert('실패: ' + e.message); }
+      };
+      list.appendChild(row);
+    }
+  } catch (e) {
+    list.innerHTML = `<p class="hint" style="color:#c8102e">목록 오류: ${esc(e.message)}<br>DB 스키마(supabase/schema.sql)가 적용됐는지 확인하세요.</p>`;
+  }
+}
+
+function openSaveForm(body) {
+  const d = store.design;
+  const wrap = document.createElement('div');
+  wrap.className = 'cl-saveform';
+  wrap.innerHTML = `
+    <label class="fld"><span>도면 이름</span><input id="cs-name" value="${esc(d.name)}"></label>
+    <label class="ck"><input type="checkbox" id="cs-shared"> 영업사원 간 공유 (동료 목록·고객 링크 열람 허용)</label>
+    <label class="ck"><input type="checkbox" id="cs-tpl"> 공용 템플릿으로 등록 (모두의 템플릿 갤러리)</label>
+    <div class="btn-row">
+      <button class="mini" id="cs-go" style="flex:2;background:#c8102e;color:#fff;border-color:#c8102e">저장</button>
+      <button class="mini" id="cs-cancel">취소</button>
+    </div>
+    <p id="cs-msg" class="hint"></p>`;
+  const list = body.querySelector('#cl-list');
+  list.replaceChildren(wrap);
+  wrap.querySelector('#cs-cancel').onclick = () => loadCloudList(body, 'mine');
+  wrap.querySelector('#cs-go').onclick = async () => {
+    const msg = wrap.querySelector('#cs-msg');
+    msg.textContent = '저장 중...';
+    try {
+      const saved = await cloud.saveDesign({
+        id: store.cloudId || undefined,
+        name: wrap.querySelector('#cs-name').value || '무제 도면',
+        data: store.design,
+        isShared: wrap.querySelector('#cs-shared').checked,
+        isTemplate: wrap.querySelector('#cs-tpl').checked,
+      });
+      store.cloudId = saved.id;
+      store.design.name = saved.name;
+      flash('클라우드에 저장됨');
+      loadCloudList(body, 'mine');
+    } catch (e) { msg.style.color = '#c8102e'; msg.textContent = '저장 실패: ' + e.message; }
+  };
+}
+
+function reopenCloud() {
+  closeModal();
+  setTimeout(openCloudDialog, 50);
+}
+function closeModal() {
+  const dlg = document.getElementById('seum-modal');
+  if (dlg && dlg.open) dlg.close();
+}
+
+// 공유 링크(?id=)로 진입 시 해당 도면 자동 로드
+async function handleShareLink() {
+  const id = new URLSearchParams(window.location.search).get('id');
+  if (!id || !cloud.configured()) return;
+  try {
+    await cloud.init();
+    const row = await cloud.getDesign(id);
+    store.loadInto(row.data, { cloudId: cloud.user && row.owner === cloud.user.id ? id : null });
+    flash(`'${row.name}' (공유 도면) 불러옴`);
+  } catch (e) {
+    console.warn('공유 링크 로드 실패:', e);
+  }
 }
 
 // ---------------------------------------------------------------------------

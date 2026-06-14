@@ -1,0 +1,12 @@
+{
+  "name": "seum-home-planner",
+  "version": "0.1.0",
+  "description": "세움 홈플래너 - 영업 상담용 3D 주택 설계 도구",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["home-planner", "3d", "floorplan", "interior", "seum"],
+  "license": "UNLICENSED"
+}

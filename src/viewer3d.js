@@ -1,0 +1,252 @@
+// 세움 홈플래너 - 3D 뷰어 (Three.js)
+// 2D 도면을 실시간 3D로 변환. 고객 상담 시 회전/줌으로 공간을 보여줍니다.
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { store } from './store.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT } from './data.js';
+
+const WALL_T = 100; // 벽 두께 mm
+
+export class Viewer3D {
+  constructor(container) {
+    this.container = container;
+    this.active = false;
+    this.dirty = true;
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color('#eef1f4');
+
+    this.camera = new THREE.PerspectiveCamera(50, 1, 100, 200000);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(this.renderer.domElement);
+
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.maxPolarAngle = Math.PI / 2.05;
+
+    this._lights();
+
+    this.modelGroup = new THREE.Group();
+    this.scene.add(this.modelGroup);
+
+    this.showRoof = false;
+
+    store.subscribe(() => { this.dirty = true; });
+    window.addEventListener('resize', () => this._resize());
+    this._animate();
+  }
+
+  _lights() {
+    this.scene.add(new THREE.HemisphereLight('#ffffff', '#9aa1ab', 0.9));
+    const sun = new THREE.DirectionalLight('#fff6e8', 1.1);
+    sun.position.set(8000, 14000, 6000);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const s = 16000;
+    sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
+    sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
+    sun.shadow.camera.far = 60000;
+    this.scene.add(sun);
+    const fill = new THREE.DirectionalLight('#dce6ff', 0.35);
+    fill.position.set(-6000, 8000, -4000);
+    this.scene.add(fill);
+  }
+
+  setActive(on) {
+    this.active = on;
+    if (on) {
+      this._resize();
+      if (this.dirty) this.rebuild();
+    }
+  }
+
+  _resize() {
+    const r = this.container.getBoundingClientRect();
+    if (r.width === 0) return;
+    this.renderer.setPixelRatio(window.devicePixelRatio || 1);
+    this.renderer.setSize(r.width, r.height, false);
+    this.camera.aspect = r.width / r.height;
+    this.camera.updateProjectionMatrix();
+  }
+
+  // 도면 중심/크기 계산
+  _bounds() {
+    const d = store.design;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of d.rooms) {
+      minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
+    }
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 8000; maxY = 8000; }
+    return { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cz: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY };
+  }
+
+  // 평면 좌표(mm) → 3D 좌표 (중심 원점). x→x, y(plan)→z
+  _p(x, y, b) { return [x - b.cx, y - b.cz]; }
+
+  rebuild() {
+    this.dirty = false;
+    // 기존 제거
+    this.modelGroup.clear();
+    const d = store.design;
+    const b = this._bounds();
+    const H = d.ceilingHeight || 2400;
+
+    // 바닥 그라운드
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(b.w + 8000, b.h + 8000),
+      new THREE.MeshStandardMaterial({ color: '#dfe3e8' })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -2;
+    ground.receiveShadow = true;
+    this.modelGroup.add(ground);
+
+    for (const room of d.rooms) this._buildRoom(room, b, H);
+    for (const f of d.furniture) this._buildFurniture(f, b);
+
+    if (this._firstFrame === undefined) { this._firstFrame = false; this.resetCamera(b); }
+    else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
+  }
+
+  resetCamera(b) {
+    b = b || this._bounds();
+    const dist = Math.max(b.w, b.h) * 1.1 + 5000;
+    this.camera.position.set(dist * 0.65, dist * 0.8, dist * 0.85);
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+  }
+
+  _buildRoom(room, b, ceilH) {
+    const t = ROOM_TYPES[room.type] || ROOM_TYPES.hall;
+    const isAttic = room.type === 'attic';
+    const isOpen = room.type === 'balcony';
+    const wallH = isAttic ? ATTIC_HEIGHT : ceilH;
+    const [px, pz] = this._p(room.x, room.y, b);
+
+    // 바닥
+    const floor = new THREE.Mesh(
+      new THREE.BoxGeometry(room.w, 60, room.d),
+      new THREE.MeshStandardMaterial({ color: t.color })
+    );
+    floor.position.set(px + room.w / 2, 30, pz + room.d / 2);
+    floor.receiveShadow = true;
+    this.modelGroup.add(floor);
+
+    if (isOpen) return; // 발코니는 벽 생략(난간 느낌)
+
+    const wallMat = new THREE.MeshStandardMaterial({ color: '#f6f5f2' });
+    const mk = (w, h, depth, cx, cy, cz) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, depth), wallMat);
+      m.position.set(cx, cy, cz);
+      m.castShadow = true; m.receiveShadow = true;
+      this.modelGroup.add(m);
+    };
+    const x0 = px, x1 = px + room.w, z0 = pz, z1 = pz + room.d;
+    const cy = wallH / 2 + 60;
+    // 북/남 (z방향 끝)
+    mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z0);
+    mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z1);
+    // 동/서 (x방향 끝)
+    mk(WALL_T, wallH, room.d + WALL_T, x0, cy, pz + room.d / 2);
+    mk(WALL_T, wallH, room.d + WALL_T, x1, cy, pz + room.d / 2);
+
+    // 다락은 경사 지붕 표현
+    if (isAttic) {
+      const roof = new THREE.Mesh(
+        new THREE.ConeGeometry(Math.max(room.w, room.d) * 0.62, 900, 4),
+        new THREE.MeshStandardMaterial({ color: '#caa987' })
+      );
+      roof.rotation.y = Math.PI / 4;
+      roof.position.set(px + room.w / 2, wallH + 60 + 450, pz + room.d / 2);
+      roof.castShadow = true;
+      this.modelGroup.add(roof);
+    }
+  }
+
+  _buildFurniture(f, b) {
+    const c = catalogOf(f.catalogId); if (!c) return;
+    const [px, pz] = this._p(f.x, f.y, b);
+    const g = new THREE.Group();
+    g.position.set(px, 60, pz);
+    g.rotation.y = -(f.rotation || 0) * Math.PI / 180;
+    const mat = (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 });
+
+    const addBox = (w, h, dd, y, col, z = 0, x = 0) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dd), mat(col));
+      m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+      g.add(m); return m;
+    };
+
+    switch (c.kind) {
+      case 'sofa': {
+        addBox(c.w, c.h * 0.45, c.d, c.h * 0.225, c.color);            // 좌석
+        addBox(c.w, c.h * 0.7, c.d * 0.25, c.h * 0.35, c.color, -c.d * 0.37); // 등받이
+        addBox(c.w * 0.12, c.h * 0.55, c.d, c.h * 0.27, c.color, 0, -c.w / 2 + c.w * 0.06);
+        addBox(c.w * 0.12, c.h * 0.55, c.d, c.h * 0.27, c.color, 0, c.w / 2 - c.w * 0.06);
+        break;
+      }
+      case 'bed': {
+        addBox(c.w, c.h * 0.5, c.d, c.h * 0.25, c.color);              // 매트리스 베이스
+        addBox(c.w, c.h * 0.35, c.d * 0.85, c.h * 0.62, '#ece4d8', c.d * 0.06); // 이불
+        addBox(c.w, c.h * 0.9, c.d * 0.12, c.h * 0.45, '#bfa988', -c.d / 2 + c.d * 0.05); // 헤드보드
+        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, -c.w * 0.22);
+        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, c.w * 0.22);
+        break;
+      }
+      case 'table': {
+        addBox(c.w, c.h * 0.08, c.d, c.h - c.h * 0.04, c.color);       // 상판
+        const legC = '#6f5a3f', lh = c.h * 0.92, ly = lh / 2;
+        const ox = c.w / 2 - 60, oz = c.d / 2 - 60;
+        addBox(60, lh, 60, ly, legC, oz, ox); addBox(60, lh, 60, ly, legC, oz, -ox);
+        addBox(60, lh, 60, ly, legC, -oz, ox); addBox(60, lh, 60, ly, legC, -oz, -ox);
+        break;
+      }
+      case 'chair': {
+        addBox(c.w, 60, c.d, c.h * 0.45, c.color);
+        addBox(c.w, c.h * 0.5, 60, c.h * 0.72, c.color, -c.d / 2 + 30);
+        break;
+      }
+      case 'tv': {
+        addBox(c.w, c.h, c.d, c.h / 2 + 350, c.color);                // 패널
+        addBox(c.w * 0.3, 40, 250, 20, '#444');                        // 받침
+        break;
+      }
+      case 'rug': {
+        const m = addBox(c.w, 12, c.d, 6, c.color); m.castShadow = false;
+        break;
+      }
+      case 'plant': {
+        addBox(c.w * 0.6, c.h * 0.25, c.d * 0.6, c.h * 0.12, '#9c7b52');
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(c.w * 0.55, 12, 10), mat(c.color));
+        leaf.position.y = c.h * 0.62; leaf.scale.y = 1.4; leaf.castShadow = true;
+        g.add(leaf);
+        break;
+      }
+      default: // box
+        addBox(c.w, c.h, c.d, c.h / 2, c.color);
+    }
+    this.modelGroup.add(g);
+  }
+
+  _animate() {
+    requestAnimationFrame(() => this._animate());
+    if (!this.active) return;
+    if (this.dirty) this.rebuild();
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  // 외부에서 카메라 프리셋
+  view(type) {
+    const b = this._bounds();
+    const d = Math.max(b.w, b.h) * 1.1 + 5000;
+    if (type === 'top') this.camera.position.set(0, d * 1.4, 1);
+    else if (type === 'front') this.camera.position.set(0, d * 0.4, d);
+    else this.camera.position.set(d * 0.65, d * 0.8, d * 0.85);
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+  }
+}

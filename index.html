@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>세움 홈플래너 — SEUM Home Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles/app.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 상단바 -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">SEUM</span>
+      <span class="brand-sub">홈플래너 · 영업 상담용 3D 설계</span>
+    </div>
+    <div class="tb-group">
+      <button id="tb-new" class="tb-btn">새 도면</button>
+      <button id="tb-save" class="tb-btn">저장</button>
+      <button id="tb-open" class="tb-btn">불러오기</button>
+      <span class="sep"></span>
+      <button id="tb-undo" class="tb-btn" title="실행 취소 (Ctrl+Z)">↶ 취소</button>
+      <button id="tb-redo" class="tb-btn" title="다시 실행 (Ctrl+Y)">↷ 다시</button>
+      <span class="sep"></span>
+      <button id="tb-fit" class="tb-btn">화면맞춤</button>
+      <button id="tb-export" class="tb-btn">내보내기</button>
+      <button id="tb-import" class="tb-btn">가져오기</button>
+      <button id="tb-shot" class="tb-btn">📷 캡처</button>
+    </div>
+    <div class="mode-toggle">
+      <button id="tb-2d" class="mode-btn active">2D 도면</button>
+      <button id="tb-3d" class="mode-btn">3D 입체</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- 좌측 라이브러리 -->
+    <aside class="left">
+      <section class="panel">
+        <h3>공간 추가</h3>
+        <p class="panel-sub">클릭하면 방이 추가됩니다</p>
+        <div id="room-palette" class="room-palette"></div>
+      </section>
+      <section class="panel grow">
+        <h3>가구 · 가전 라이브러리</h3>
+        <div id="lib-tabs" class="lib-tabs"></div>
+        <div id="lib-grid" class="lib-grid"></div>
+        <p class="panel-sub small">도면으로 드래그하거나 더블클릭으로 배치</p>
+      </section>
+    </aside>
+
+    <!-- 중앙 스테이지 -->
+    <main class="stage">
+      <div id="stage-2d" class="stage-pane">
+        <canvas id="canvas2d"></canvas>
+        <div class="stage-hint">마우스 휠: 확대/축소 · 빈 곳 드래그(또는 Alt): 화면 이동 · 핸들 드래그: 크기 조절</div>
+      </div>
+      <div id="stage-3d" class="stage-pane hidden">
+        <div id="view3d" class="view3d"></div>
+        <div id="view-presets" class="view-presets hidden">
+          <button id="view-iso" class="vp">입체</button>
+          <button id="view-top" class="vp">평면</button>
+          <button id="view-front" class="vp">정면</button>
+          <button id="tb-roof" class="vp">천장 보기</button>
+        </div>
+        <div class="stage-hint">드래그: 회전 · 휠: 줌 · 우클릭 드래그: 이동</div>
+      </div>
+    </main>
+
+    <!-- 우측 속성 패널 -->
+    <aside class="right">
+      <div class="prop-head">속성</div>
+      <div id="prop-body" class="prop-body"></div>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <dialog id="load-dialog" class="dialog">
+    <div class="dialog-head">저장된 도면 불러오기 <button id="load-close">✕</button></div>
+    <div id="load-list" class="load-list"></div>
+  </dialog>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

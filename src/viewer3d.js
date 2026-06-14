@@ -17,7 +17,7 @@ export class Viewer3D {
     this.scene.background = new THREE.Color('#eef1f4');
 
     this.camera = new THREE.PerspectiveCamera(50, 1, 100, 200000);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
@@ -374,6 +374,22 @@ export class Viewer3D {
     if (this.dirty) this.rebuild();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // 현재 3D 화면을 PNG dataURL 로 캡처 (인쇄/저장용). 3D 미진입 시에도 한 번 렌더해서 캡처
+  toImage() {
+    const wasActive = this.active;
+    if (!wasActive) {
+      // 숨겨진 상태면 임시 크기 부여 후 렌더
+      this.renderer.setSize(1200, 800, false);
+      this.camera.aspect = 1200 / 800;
+      this.camera.updateProjectionMatrix();
+      this.rebuild();
+    }
+    this.renderer.render(this.scene, this.camera);
+    const url = this.renderer.domElement.toDataURL('image/png');
+    if (!wasActive) this._resize();
+    return url;
   }
 
   // 외부에서 카메라 프리셋

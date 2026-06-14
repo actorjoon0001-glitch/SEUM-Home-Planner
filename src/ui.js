@@ -384,13 +384,13 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   };
 
   $('tb-shot').onclick = () => {
-    const cv = viewer.renderer.domElement;
-    if (!viewer.active) { alert('3D 보기에서 캡처할 수 있습니다.'); return; }
     const a = document.createElement('a');
-    a.href = cv.toDataURL('image/png');
-    a.download = (store.design.name || 'seum') + '-3D.png';
+    a.href = viewer.active ? viewer.toImage() : editor.toImage();
+    a.download = (store.design.name || 'seum') + (viewer.active ? '-3D' : '-도면') + '.png';
     a.click();
   };
+
+  $('tb-print').onclick = () => printDesign(editor, viewer);
 
   $('tb-roof').onclick = (e) => {
     viewer.controls.maxPolarAngle = viewer.controls.maxPolarAngle > 1.4 ? Math.PI / 2.05 : Math.PI;
@@ -442,6 +442,97 @@ function openLoadDialog() {
   }
   dlg.showModal();
   document.getElementById('load-close').onclick = () => dlg.close();
+}
+
+// ---------------------------------------------------------------------------
+// 인쇄: 도면 + 3D 외관 + 면적표 + 외장/지붕/창호 사양을 견적 도면 형태로 출력
+// ---------------------------------------------------------------------------
+function printDesign(editor, viewer) {
+  const d = store.design;
+  let planImg = '', threeImg = '';
+  try { planImg = editor.toImage(1700, 1150); } catch (e) {}
+  try { threeImg = viewer.toImage(); } catch (e) {}
+
+  const totalArea = d.rooms.reduce((s, r) => s + r.w * r.d, 0) / 1e6;
+  const sideLabel = { n: '북(상)', s: '남(하)', e: '동(우)', w: '서(좌)' };
+
+  const roomRows = d.rooms.map((r) => {
+    const t = ROOM_TYPES[r.type] || {};
+    const a = r.w * r.d / 1e6;
+    return `<tr><td>${esc(r.name)}</td><td>${t.label || ''}</td><td>${r.w}×${r.d}</td><td>${a.toFixed(2)} m² (${(a/3.305).toFixed(1)}평)</td></tr>`;
+  }).join('');
+
+  const openRows = (d.openings || []).map((o) => {
+    const t = WINDOW_TYPES[o.winType] || {};
+    const room = d.rooms.find((rr) => rr.id === o.roomId);
+    return `<tr><td>${t.label || ''}</td><td>${esc(room ? room.name : '-')} / ${sideLabel[o.side] || ''}</td><td>${o.w}×${o.h}</td><td>하단 ${o.sill}mm</td></tr>`;
+  }).join('') || `<tr><td colspan="4" style="color:#888">등록된 창호 없음</td></tr>`;
+
+  const ex = d.exterior || {}, roof = d.roof || {};
+  const exMat = (EXTERIOR_MATERIALS[ex.material] || {}).label || '-';
+  const roofT = (ROOF_TYPES[roof.type] || {}).label || '-';
+  const sw = (c) => `<span style="display:inline-block;width:14px;height:14px;border:1px solid #999;border-radius:3px;background:${c};vertical-align:middle;margin-right:6px"></span>`;
+
+  const today = new Date().toLocaleDateString('ko-KR');
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>${esc(d.name)} — 세움 홈플래너</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Noto Sans KR", sans-serif; color: #222; margin: 24px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #c8102e; padding-bottom: 10px; margin-bottom: 16px; }
+  .head .logo { font-weight: 800; font-size: 26px; letter-spacing: 2px; color: #c8102e; }
+  .head h1 { font-size: 18px; margin: 4px 0 0; }
+  .head .meta { text-align: right; font-size: 12px; color: #666; }
+  .imgs { display: flex; gap: 12px; margin-bottom: 16px; }
+  .imgbox { flex: 1; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+  .imgbox .cap { background: #f4f5f7; font-size: 12px; font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #ddd; }
+  .imgbox img { width: 100%; display: block; }
+  .cols { display: flex; gap: 16px; }
+  h2 { font-size: 14px; border-left: 4px solid #c8102e; padding-left: 8px; margin: 14px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+  th { background: #f4f5f7; }
+  .spec td:first-child { color: #666; width: 90px; }
+  .tot { font-weight: 700; }
+  .foot { margin-top: 18px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 8px; }
+  @media print { body { margin: 10mm; } .imgbox { break-inside: avoid; } @page { size: A4; } }
+</style></head><body>
+  <div class="head">
+    <div><div class="logo">SEUM</div><h1>${esc(d.name)}</h1></div>
+    <div class="meta">세움 홈플래너 견적 도면<br>출력일: ${today}</div>
+  </div>
+  <div class="imgs">
+    ${planImg ? `<div class="imgbox"><div class="cap">평면도</div><img src="${planImg}"></div>` : ''}
+    ${threeImg ? `<div class="imgbox"><div class="cap">3D 투시도</div><img src="${threeImg}"></div>` : ''}
+  </div>
+  <div class="cols">
+    <div style="flex:1.4">
+      <h2>공간 구성</h2>
+      <table><thead><tr><th>이름</th><th>종류</th><th>크기(mm)</th><th>면적</th></tr></thead>
+      <tbody>${roomRows}<tr class="tot"><td colspan="3">합계 (${d.rooms.length}개 공간)</td><td>${totalArea.toFixed(2)} m² (${(totalArea/3.305).toFixed(1)}평)</td></tr></tbody></table>
+    </div>
+    <div style="flex:1">
+      <h2>외장 · 지붕 사양</h2>
+      <table class="spec"><tbody>
+        <tr><td>외장재</td><td>${exMat}</td></tr>
+        <tr><td>외장 색상</td><td>${sw(ex.color)}${ex.color || '-'}</td></tr>
+        <tr><td>지붕 형태</td><td>${roofT}</td></tr>
+        <tr><td>지붕 색상</td><td>${sw(roof.color)}${roof.color || '-'}</td></tr>
+        <tr><td>천장 높이</td><td>${d.ceilingHeight} mm</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <h2>창호 내역</h2>
+  <table><thead><tr><th>종류</th><th>위치(방/벽면)</th><th>크기(mm)</th><th>비고</th></tr></thead><tbody>${openRows}</tbody></table>
+  <div class="foot">본 도면은 상담용 참고 자료이며 실제 시공 시 치수·사양은 변경될 수 있습니다. · 세움 홈플래너</div>
+  <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 250); };<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { alert('팝업이 차단되었습니다. 팝업을 허용해 주세요.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 
 // ---------------------------------------------------------------------------

@@ -173,6 +173,16 @@ body {
 .cl-row-act { display: flex; gap: 6px; margin-top: 8px; }
 .bdg { font-size: 10px; background: #eef0f2; color: #556; border-radius: 4px; padding: 1px 6px; }
 .bdg.tpl { background: #fce9ec; color: var(--seum-red); }
+.bdg.fld { background: #eaf3ec; color: #2f7a4d; }
+.cl-row-top { display: flex; gap: 10px; align-items: center; }
+.cl-thumb { width: 72px; height: 50px; flex: 0 0 auto; border-radius: 6px; overflow: hidden; background: #f1f2f4; display: flex; align-items: center; justify-content: center; }
+.cl-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.cl-thumb span { font-size: 10px; color: var(--muted); }
+.cl-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.chip { border: 1px solid var(--line); background: #f6f7f9; color: var(--muted); border-radius: 14px; padding: 4px 10px; font-size: 11.5px; cursor: pointer; font-family: inherit; }
+.chip.on { background: var(--seum-red); color: #fff; border-color: var(--seum-red); }
+.tpl-thumb { height: 70px; border-radius: 6px; overflow: hidden; background: #f1f2f4; display: flex; align-items: center; justify-content: center; }
+.tpl-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .ck { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--ink); margin: 8px 0; line-height: 1.4; cursor: pointer; }
 .ck input { margin-top: 2px; }
 .m-body code { background: #f1f2f4; padding: 1px 5px; border-radius: 4px; font-size: 11px; }

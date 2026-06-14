@@ -8,7 +8,10 @@ import {
 import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
 
+let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
+
 export function buildUI({ editor, viewer, onModeChange }) {
+  _editor = editor;
   buildLibrary();
   buildRoomPalette();
   buildToolbar({ editor, viewer, onModeChange });
@@ -506,15 +509,13 @@ async function openTemplateDialog() {
         body.querySelector('#tpl-cloud-wrap').style.display = '';
         const cg = body.querySelector('#tpl-cloud');
         for (const t of cloudTpls) {
+          const thumb = t.data?.thumb;
           const card = document.createElement('button');
           card.className = 'tpl-card';
-          card.innerHTML = `<div class="tpl-ico">☁</div><div class="tpl-name">${esc(t.name)}</div><div class="tpl-tags">공용 템플릿</div>`;
-          card.onclick = async () => {
-            try {
-              const row = await cloud.getDesign(t.id);
-              store.loadInto(row.data, { cloudId: null });
-              dlg.close(); flash(`'${t.name}' 불러옴`);
-            } catch (e) { alert('불러오기 실패: ' + e.message); }
+          card.innerHTML = `<div class="tpl-thumb">${thumb ? `<img src="${thumb}" alt="">` : '<span class="tpl-ico">☁</span>'}</div><div class="tpl-name">${esc(t.name)}</div><div class="tpl-tags">공용 템플릿</div>`;
+          card.onclick = () => {
+            store.loadInto(t.data, { cloudId: null });
+            dlg.close(); flash(`'${t.name}' 불러옴`);
           };
           cg.appendChild(card);
         }
@@ -603,26 +604,50 @@ function renderCloudHome(body) {
   loadCloudList(body, 'mine');
 }
 
-async function loadCloudList(body, which) {
+async function loadCloudList(body, which, filter = '') {
   const list = body.querySelector('#cl-list');
   list.innerHTML = `<p class="hint">불러오는 중...</p>`;
   try {
-    const rows = which === 'mine' ? await cloud.listMine() : await cloud.listShared();
+    let rows = which === 'mine' ? await cloud.listMine() : await cloud.listShared();
     if (!rows.length) { list.innerHTML = `<p class="hint">도면이 없습니다.</p>`; return; }
+
+    // 고객(폴더) 필터 바 (내 도면에서만)
     list.innerHTML = '';
+    if (which === 'mine') {
+      const customers = [...new Set(rows.map((r) => (r.data?.customer || '').trim()).filter(Boolean))].sort();
+      const bar = document.createElement('div');
+      bar.className = 'cl-filter';
+      bar.innerHTML = `<button class="chip${!filter ? ' on' : ''}" data-c="">전체</button>` +
+        customers.map((c) => `<button class="chip${filter === c ? ' on' : ''}" data-c="${esc(c)}">📁 ${esc(c)}</button>`).join('') +
+        (rows.some((r) => !(r.data?.customer || '').trim()) ? `<button class="chip${filter === '__none' ? ' on' : ''}" data-c="__none">미분류</button>` : '');
+      bar.querySelectorAll('.chip').forEach((ch) => ch.onclick = () => loadCloudList(body, which, ch.dataset.c));
+      list.appendChild(bar);
+      if (filter === '__none') rows = rows.filter((r) => !(r.data?.customer || '').trim());
+      else if (filter) rows = rows.filter((r) => (r.data?.customer || '').trim() === filter);
+    }
+
+    if (!rows.length) { list.insertAdjacentHTML('beforeend', `<p class="hint">해당 폴더에 도면이 없습니다.</p>`); return; }
+
     for (const r of rows) {
+      const cust = (r.data?.customer || '').trim();
+      const thumb = r.data?.thumb;
       const row = document.createElement('div');
       row.className = 'cl-row';
-      const badges = `${r.is_shared ? '<span class="bdg">공유</span>' : ''}${r.is_template ? '<span class="bdg tpl">템플릿</span>' : ''}`;
-      row.innerHTML = `<div class="cl-row-main"><b>${esc(r.name)}</b> ${badges}<small>${new Date(r.updated_at).toLocaleString('ko-KR')}</small></div>
+      const badges = `${cust ? `<span class="bdg fld">📁 ${esc(cust)}</span>` : ''}${r.is_shared ? '<span class="bdg">공유</span>' : ''}${r.is_template ? '<span class="bdg tpl">템플릿</span>' : ''}`;
+      row.innerHTML = `
+        <div class="cl-row-top">
+          <div class="cl-thumb">${thumb ? `<img src="${thumb}" alt="">` : '<span>도면</span>'}</div>
+          <div class="cl-row-main"><b>${esc(r.name)}</b> ${badges}<small>${new Date(r.updated_at).toLocaleString('ko-KR')}</small></div>
+        </div>
         <div class="cl-row-act">
           <button class="mini" data-a="open">열기</button>
           <button class="mini" data-a="link">공유링크</button>
           ${which === 'mine' ? '<button class="mini danger" data-a="del">삭제</button>' : ''}
         </div>`;
-      row.querySelector('[data-a=open]').onclick = async () => {
-        try { const full = await cloud.getDesign(r.id); store.loadInto(full.data, { cloudId: r.id }); flash(`'${r.name}' 불러옴`); closeModal(); }
-        catch (e) { alert('실패: ' + e.message); }
+      row.querySelector('[data-a=open]').onclick = () => {
+        // 목록에서 이미 data 를 받았으므로 추가 요청 없이 바로 로드
+        store.loadInto(r.data, { cloudId: which === 'mine' ? r.id : null });
+        flash(`'${r.name}' 불러옴`); closeModal();
       };
       row.querySelector('[data-a=link]').onclick = async () => {
         const link = cloud.shareLink(r.id);
@@ -633,7 +658,7 @@ async function loadCloudList(body, which) {
       const del = row.querySelector('[data-a=del]');
       if (del) del.onclick = async () => {
         if (!confirm(`'${r.name}' 삭제할까요?`)) return;
-        try { await cloud.removeDesign(r.id); loadCloudList(body, which); flash('삭제됨'); }
+        try { await cloud.removeDesign(r.id); loadCloudList(body, which, filter); flash('삭제됨'); }
         catch (e) { alert('실패: ' + e.message); }
       };
       list.appendChild(row);
@@ -649,6 +674,8 @@ function openSaveForm(body) {
   wrap.className = 'cl-saveform';
   wrap.innerHTML = `
     <label class="fld"><span>도면 이름</span><input id="cs-name" value="${esc(d.name)}"></label>
+    <label class="fld"><span>고객명 / 분류 (폴더)</span><input id="cs-cust" list="cs-cust-list" value="${esc(d.customer || '')}" placeholder="예: 홍길동 고객 / 송절단지"></label>
+    <datalist id="cs-cust-list"></datalist>
     <label class="ck"><input type="checkbox" id="cs-shared"> 영업사원 간 공유 (동료 목록·고객 링크 열람 허용)</label>
     <label class="ck"><input type="checkbox" id="cs-tpl"> 공용 템플릿으로 등록 (모두의 템플릿 갤러리)</label>
     <div class="btn-row">
@@ -658,11 +685,19 @@ function openSaveForm(body) {
     <p id="cs-msg" class="hint"></p>`;
   const list = body.querySelector('#cl-list');
   list.replaceChildren(wrap);
+  // 기존 고객명들을 자동완성으로 제공
+  cloud.listMine().then((rows) => {
+    const names = [...new Set(rows.map((r) => r.data?.customer).filter(Boolean))];
+    wrap.querySelector('#cs-cust-list').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
+  }).catch(() => {});
   wrap.querySelector('#cs-cancel').onclick = () => loadCloudList(body, 'mine');
   wrap.querySelector('#cs-go').onclick = async () => {
     const msg = wrap.querySelector('#cs-msg');
     msg.textContent = '저장 중...';
     try {
+      store.design.customer = wrap.querySelector('#cs-cust').value.trim();
+      // 썸네일 생성 (작은 JPEG)
+      try { store.design.thumb = _editor.toImage(360, 240, 'image/jpeg', 0.6); } catch (e) {}
       const saved = await cloud.saveDesign({
         id: store.cloudId || undefined,
         name: wrap.querySelector('#cs-name').value || '무제 도면',

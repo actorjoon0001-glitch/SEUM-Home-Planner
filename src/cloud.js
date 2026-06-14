@@ -71,7 +71,7 @@ export const cloud = {
     await this.init();
     if (!this.user) return [];
     const { data, error } = await client.from('designs')
-      .select('id,name,is_shared,is_template,updated_at,owner')
+      .select('id,name,data,is_shared,is_template,updated_at,owner')
       .eq('owner', this.user.id).order('updated_at', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -81,7 +81,7 @@ export const cloud = {
   async listShared() {
     await this.init();
     const { data, error } = await client.from('designs')
-      .select('id,name,is_shared,is_template,updated_at,owner')
+      .select('id,name,data,is_shared,is_template,updated_at,owner')
       .eq('is_shared', true).order('updated_at', { ascending: false });
     if (error) throw error;
     return (data || []).filter((d) => !this.user || d.owner !== this.user.id);
@@ -91,7 +91,7 @@ export const cloud = {
   async listTemplates() {
     await this.init();
     const { data, error } = await client.from('designs')
-      .select('id,name,updated_at').eq('is_template', true).order('name');
+      .select('id,name,data,updated_at').eq('is_template', true).order('name');
     if (error) throw error;
     return data || [];
   },

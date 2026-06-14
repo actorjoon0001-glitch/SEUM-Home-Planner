@@ -57,7 +57,7 @@ export class Editor2D {
   }
 
   // 도면 전체를 화면 상태와 무관하게 고해상도 PNG(dataURL)로 렌더 (인쇄/내보내기용)
-  toImage(w = 1600, h = 1100) {
+  toImage(w = 1600, h = 1100, mime = 'image/png', quality) {
     const d = store.design;
     const off = document.createElement('canvas');
     off.width = w; off.height = h;
@@ -85,7 +85,7 @@ export class Editor2D {
     this.oy = -minY * this.scale + (h - (maxY - minY) * this.scale) / 2;
 
     this.draw();
-    const url = off.toDataURL('image/png');
+    const url = off.toDataURL(mime, quality);
 
     // 복원
     Object.assign(this, saved);

@@ -176,6 +176,8 @@ export function normalize(design) {
   if (!Array.isArray(design.openings)) design.openings = [];
   if (!Array.isArray(design.furniture)) design.furniture = [];
   if (!Array.isArray(design.rooms)) design.rooms = [];
+  if (typeof design.customer !== 'string') design.customer = ''; // 고객명/분류
+  if (!('thumb' in design)) design.thumb = null;                 // 썸네일 dataURL
   return design;
 }
 

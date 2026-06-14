@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT } from './data.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES } from './data.js';
 
 const WALL_T = 100; // 벽 두께 mm
 
@@ -32,6 +32,7 @@ export class Viewer3D {
     this.scene.add(this.modelGroup);
 
     this.showRoof = false;
+    this.showExterior = false;
 
     store.subscribe(() => { this.dirty = true; });
     window.addEventListener('resize', () => this._resize());
@@ -105,7 +106,12 @@ export class Viewer3D {
     this.modelGroup.add(ground);
 
     for (const room of d.rooms) this._buildRoom(room, b, H);
+    for (const o of (d.openings || [])) this._buildOpening(o, b);
     for (const f of d.furniture) this._buildFurniture(f, b);
+
+    // 외장재 + 지붕 (토글)
+    if (this.showExterior) this._buildExterior(d, b, H);
+    if (this.showRoof) this._buildRoof(d, b, H);
 
     if (this._firstFrame === undefined) { this._firstFrame = false; this.resetCamera(b); }
     else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
@@ -164,6 +170,137 @@ export class Viewer3D {
       roof.castShadow = true;
       this.modelGroup.add(roof);
     }
+  }
+
+  // 창호: 벽면에 끼워지는 창틀 + 유리(또는 문짝)
+  _buildOpening(o, b) {
+    const room = store.design.rooms.find((r) => r.id === o.roomId);
+    if (!room) return;
+    const t = WINDOW_TYPES[o.winType] || {};
+    const isDoor = t.glass === false;
+    const span = (o.side === 'n' || o.side === 's') ? room.w : room.d;
+    const pos = Math.max(o.w / 2, Math.min(span - o.w / 2, o.pos));
+
+    // 벽면 중심 좌표 (3D)
+    let wx, wz, horizontal;
+    if (o.side === 'n')      { [wx, wz, horizontal] = [room.x + pos, room.y, true]; }
+    else if (o.side === 's') { [wx, wz, horizontal] = [room.x + pos, room.y + room.d, true]; }
+    else if (o.side === 'w') { [wx, wz, horizontal] = [room.x, room.y + pos, false]; }
+    else                     { [wx, wz, horizontal] = [room.x + room.w, room.y + pos, false]; }
+    const [cx, cz] = this._p(wx, wz, b);
+    const cy = (o.sill || 0) + (o.h || 1200) / 2 + 60;
+
+    const g = new THREE.Group();
+    g.position.set(cx, cy, cz);
+    if (!horizontal) g.rotation.y = Math.PI / 2;
+
+    const frameMat = new THREE.MeshStandardMaterial({ color: o.color || '#4a5560', roughness: 0.6, metalness: 0.3 });
+    const W = o.w, Hh = o.h, FT = 70; // 프레임 두께
+    // 외곽 프레임 (위/아래/좌/우)
+    const addFrame = (w, h, x, y) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, WALL_T + 40), frameMat);
+      m.position.set(x, y, 0); m.castShadow = true; g.add(m);
+    };
+    addFrame(W, FT, 0, Hh / 2 - FT / 2);
+    addFrame(W, FT, 0, -Hh / 2 + FT / 2);
+    addFrame(FT, Hh, -W / 2 + FT / 2, 0);
+    addFrame(FT, Hh, W / 2 - FT / 2, 0);
+
+    if (isDoor) {
+      const door = new THREE.Mesh(
+        new THREE.BoxGeometry(W - FT * 2, Hh - FT, WALL_T - 10),
+        new THREE.MeshStandardMaterial({ color: '#6b5640', roughness: 0.7 })
+      );
+      door.position.y = -FT / 2; door.castShadow = true; g.add(door);
+    } else {
+      // 유리 (반투명)
+      const glass = new THREE.Mesh(
+        new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 20),
+        new THREE.MeshStandardMaterial({ color: '#bcd6e6', transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.2 })
+      );
+      g.add(glass);
+      // 창짝 분할 가로대(멀리언)
+      const panes = Math.max(1, t.panes || 1);
+      for (let i = 1; i < panes; i++) {
+        const x = -W / 2 + (W * i) / panes;
+        const mull = new THREE.Mesh(new THREE.BoxGeometry(FT * 0.7, Hh - FT * 2, WALL_T), frameMat);
+        mull.position.set(x, 0, 0); g.add(mull);
+      }
+    }
+    this.modelGroup.add(g);
+  }
+
+  // 외장재: 건물 외곽(바운딩 박스)을 감싸는 외벽 쉘
+  _buildExterior(d, b, ceilH) {
+    const ex = d.exterior || {};
+    const mDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
+    const mat = new THREE.MeshStandardMaterial({
+      color: ex.color || mDef.color,
+      roughness: mDef.roughness, metalness: mDef.metalness,
+      side: THREE.DoubleSide,
+    });
+    const T = 160;          // 외벽 두께
+    const gap = 250;        // 내부 벽과의 간격
+    const H = ceilH + 120;
+    const x0 = -b.w / 2 - gap, x1 = b.w / 2 + gap;
+    const z0 = -b.h / 2 - gap, z1 = b.h / 2 + gap;
+    const W = (x1 - x0), D = (z1 - z0), cy = H / 2 + 60;
+    const mk = (w, h, dep, x, y, z) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dep), mat);
+      m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+      this.modelGroup.add(m);
+    };
+    mk(W + T, H, T, (x0 + x1) / 2, cy, z0);
+    mk(W + T, H, T, (x0 + x1) / 2, cy, z1);
+    mk(T, H, D + T, x0, cy, (z0 + z1) / 2);
+    mk(T, H, D + T, x1, cy, (z0 + z1) / 2);
+  }
+
+  // 지붕: 형태별 생성 (평지붕/박공/비대칭박공/우진각/외쪽)
+  _buildRoof(d, b, ceilH) {
+    const roof = d.roof || { type: 'gable', color: '#3a3f44' };
+    const type = ROOF_TYPES[roof.type] ? roof.type : 'gable';
+    const rise = ROOF_TYPES[type].rise;
+    const mat = new THREE.MeshStandardMaterial({ color: roof.color || '#3a3f44', roughness: 0.8, side: THREE.DoubleSide });
+    const gap = 250, eave = 500; // 처마 내밀기
+    const W = b.w + gap * 2 + eave * 2;
+    const D = b.h + gap * 2 + eave * 2;
+    const baseY = ceilH + 180 + 60;
+    const grp = new THREE.Group();
+    grp.position.set(0, baseY, 0);
+
+    if (type === 'flat') {
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(W, 160, D), mat);
+      slab.position.y = 80; slab.castShadow = true; grp.add(slab);
+    } else if (type === 'hip') {
+      // 우진각: 사각뿔
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(Math.hypot(W, D) / 2, rise, 4), mat);
+      cone.rotation.y = Math.PI / 4;
+      cone.scale.set(W / Math.hypot(W, D) * Math.SQRT2 * 0.5 + 0.5, 1, D / Math.hypot(W, D) * Math.SQRT2 * 0.5 + 0.5);
+      cone.position.y = rise / 2; cone.castShadow = true; grp.add(cone);
+    } else {
+      // 박공/비대칭박공/외쪽: 용마루 위치(ridgeT: 0~1) 로 단면 결정
+      // 용마루는 W(가로) 방향과 직교, D 길이로 길게 뻗음
+      let ridgeT = 0.5;
+      if (type === 'asymGable') ridgeT = 0.32;
+      if (type === 'shed') ridgeT = 1.0;
+      const ridgeX = -W / 2 + W * ridgeT;
+      // 단면(프로파일)을 ExtrudeGeometry 로 D 방향(용마루 방향)으로 압출
+      const shape = new THREE.Shape();
+      shape.moveTo(-W / 2, 0);
+      shape.lineTo(W / 2, 0);
+      if (type === 'shed') {
+        shape.lineTo(W / 2, rise);          // 외쪽: 우측이 높은 한쪽 경사
+      } else {
+        shape.lineTo(ridgeX, rise);         // 박공/비대칭: 용마루 정점
+      }
+      shape.closePath();
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: D, bevelEnabled: false });
+      geo.translate(0, 0, -D / 2);
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = true; grp.add(m);
+    }
+    this.modelGroup.add(grp);
   }
 
   _buildFurniture(f, b) {

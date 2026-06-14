@@ -1,6 +1,10 @@
 // 세움 홈플래너 - UI 구성 (라이브러리 패널, 속성 패널, 툴바 동작)
 import { store } from './store.js';
-import { ROOM_TYPES, FURNITURE_CATALOG, CATEGORIES, catalogOf } from './data.js';
+import {
+  ROOM_TYPES, FURNITURE_CATALOG, CATEGORIES, catalogOf,
+  WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
+  ROOF_TYPES, ROOF_PALETTE,
+} from './data.js';
 
 export function buildUI({ editor, viewer, onModeChange }) {
   buildLibrary();
@@ -51,8 +55,11 @@ function buildLibrary() {
   tabs.innerHTML = '';
   let active = CATEGORIES[0];
 
+  const TABS = [...CATEGORIES, '창호'];
+
   const render = () => {
     grid.innerHTML = '';
+    if (active === '창호') { renderWindows(grid); return; }
     for (const item of FURNITURE_CATALOG.filter((f) => f.cat === active)) {
       const card = document.createElement('div');
       card.className = 'lib-card';
@@ -81,7 +88,7 @@ function buildLibrary() {
     }
   };
 
-  for (const cat of CATEGORIES) {
+  for (const cat of TABS) {
     const t = document.createElement('button');
     t.className = 'lib-tab' + (cat === active ? ' active' : '');
     t.textContent = cat;
@@ -109,6 +116,53 @@ function thumbSvg(item) {
   return `<svg viewBox="0 0 32 32" fill="var(--c)">${map[item.kind] || map.box}</svg>`;
 }
 
+// 창호 라이브러리 카드
+function renderWindows(grid) {
+  for (const item of WINDOW_CATALOG) {
+    const isDoor = item.glass === false;
+    const card = document.createElement('div');
+    card.className = 'lib-card';
+    card.draggable = true;
+    card.title = `${item.label} (${item.w}×${item.h}mm) — 벽(방 가장자리)으로 끌어다 놓으세요`;
+    card.innerHTML = `
+      <div class="lib-thumb">${winThumb(item, isDoor)}</div>
+      <div class="lib-name">${item.label}</div>
+      <div class="lib-dim">${(item.w/10|0)}×${(item.h/10|0)}cm</div>`;
+    card.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', 'win:' + item.id);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    card.addEventListener('dblclick', () => {
+      // 더블클릭 → 첫 방의 북측 벽 중앙에 추가
+      const d = store.design;
+      if (!d.rooms.length) return;
+      const r = d.rooms[0];
+      store.commit((dd) => {
+        dd.openings.push({
+          id: 'o' + Date.now().toString(36),
+          roomId: r.id, side: 'n', pos: Math.round(r.w / 2),
+          winType: item.id, w: item.w, h: item.h, sill: item.sill, color: '#4a5560',
+        });
+        store.selectedOpening = dd.openings[dd.openings.length - 1].id;
+        store.selectedRoom = store.selectedFurniture = null;
+      });
+    });
+    grid.appendChild(card);
+  }
+}
+
+function winThumb(item, isDoor) {
+  if (isDoor) {
+    return `<svg viewBox="0 0 32 32" fill="none" stroke="#4a5560" stroke-width="2">
+      <rect x="8" y="4" width="16" height="24" rx="1"/><circle cx="20" cy="16" r="1.5" fill="#4a5560"/></svg>`;
+  }
+  const panes = Math.max(1, item.panes || 1);
+  let bars = '';
+  for (let i = 1; i < panes; i++) { const x = 4 + (24 * i) / panes; bars += `<line x1="${x}" y1="7" x2="${x}" y2="25"/>`; }
+  return `<svg viewBox="0 0 32 32" fill="#bcd6e6" stroke="#4a5560" stroke-width="2">
+    <rect x="4" y="7" width="24" height="18" rx="1"/>${bars}</svg>`;
+}
+
 // ---------------------------------------------------------------------------
 // 우측: 선택 항목 속성 패널
 // ---------------------------------------------------------------------------
@@ -118,23 +172,98 @@ function renderProperties(editor) {
   const room = d.rooms.find((r) => r.id === store.selectedRoom);
   const furn = d.furniture.find((f) => f.id === store.selectedFurniture);
 
+  const op = (d.openings || []).find((o) => o.id === store.selectedOpening);
+
   if (room) { panel.innerHTML = roomForm(room); bindRoomForm(room); return; }
   if (furn) { panel.innerHTML = furnForm(furn); bindFurnForm(furn); return; }
+  if (op)   { panel.innerHTML = openingForm(op); bindOpeningForm(op); return; }
 
-  // 선택 없음 → 도면 전체 정보
+  // 선택 없음 → 도면 전체 정보 + 외장/지붕
   const totalArea = d.rooms.reduce((s, r) => s + r.w * r.d, 0) / 1e6;
+  const ex = d.exterior || {};
+  const roof = d.roof || {};
+  const matOpts = Object.entries(EXTERIOR_MATERIALS)
+    .map(([k, m]) => `<option value="${k}" ${k === ex.material ? 'selected' : ''}>${m.label}</option>`).join('');
+  const roofOpts = Object.entries(ROOF_TYPES)
+    .map(([k, t]) => `<option value="${k}" ${k === roof.type ? 'selected' : ''}>${t.label}</option>`).join('');
   panel.innerHTML = `
     <div class="prop-empty">
       <p class="ph">도면 정보</p>
       <label class="fld"><span>도면 이름</span><input id="p-name" value="${esc(d.name)}"></label>
       <label class="fld"><span>천장 높이 (mm)</span><input id="p-ceil" type="number" step="50" value="${d.ceilingHeight}"></label>
       <div class="info-row"><span>전체 면적</span><b>${totalArea.toFixed(1)} m² (${(totalArea/3.305).toFixed(1)}평)</b></div>
-      <div class="info-row"><span>공간 수</span><b>${d.rooms.length}개</b></div>
-      <div class="info-row"><span>가구/가전</span><b>${d.furniture.length}개</b></div>
-      <p class="hint">· 좌측에서 방을 추가하거나, 가구를 도면으로 드래그하세요.<br>· 방을 클릭하면 크기를 조절할 수 있습니다.</p>
+      <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${(d.openings||[]).length}</b></div>
+
+      <p class="ph mt">외장재 · 색상</p>
+      <label class="fld"><span>외장재 종류</span><select id="ex-mat">${matOpts}</select></label>
+      <label class="fld"><span>외장 색상</span><input id="ex-color" type="color" value="${ex.color || '#8d96a0'}"></label>
+      <div class="swatches" id="ex-sw">${EXTERIOR_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
+
+      <p class="ph mt">지붕</p>
+      <label class="fld"><span>지붕 형태</span><select id="rf-type">${roofOpts}</select></label>
+      <label class="fld"><span>지붕 색상</span><input id="rf-color" type="color" value="${roof.color || '#3a3f44'}"></label>
+      <div class="swatches" id="rf-sw">${ROOF_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
+
+      <p class="hint">· 3D 화면 우측 상단 <b>외장재 / 지붕</b> 버튼으로 외관을 켜고 끌 수 있습니다.<br>· 창호는 좌측 <b>창호</b> 탭에서 방 가장자리로 드래그하세요.</p>
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
+  document.getElementById('ex-mat').onchange = (e) => store.commit((dd) => {
+    dd.exterior.material = e.target.value;
+    dd.exterior.color = EXTERIOR_MATERIALS[e.target.value].color;
+  });
+  document.getElementById('ex-color').oninput = (e) => store.commit((dd) => dd.exterior.color = e.target.value);
+  document.getElementById('rf-type').onchange = (e) => store.commit((dd) => dd.roof.type = e.target.value);
+  document.getElementById('rf-color').oninput = (e) => store.commit((dd) => dd.roof.color = e.target.value);
+  document.querySelectorAll('#ex-sw .sw').forEach((b) => b.onclick = () => store.commit((dd) => dd.exterior.color = b.dataset.c));
+  document.querySelectorAll('#rf-sw .sw').forEach((b) => b.onclick = () => store.commit((dd) => dd.roof.color = b.dataset.c));
+}
+
+function openingForm(o) {
+  const typeOpts = Object.entries(WINDOW_TYPES)
+    .map(([k, t]) => `<option value="${k}" ${k === o.winType ? 'selected' : ''}>${t.label}</option>`).join('');
+  const sideOpts = [['n', '북(상)'], ['s', '남(하)'], ['e', '동(우)'], ['w', '서(좌)']]
+    .map(([k, l]) => `<option value="${k}" ${k === o.side ? 'selected' : ''}>${l}</option>`).join('');
+  return `
+    <p class="ph">창호 속성</p>
+    <label class="fld"><span>종류</span><select id="o-type">${typeOpts}</select></label>
+    <label class="fld"><span>부착 벽면</span><select id="o-side">${sideOpts}</select></label>
+    <div class="grid2">
+      <label class="fld"><span>폭 W (mm)</span><input id="o-w" type="number" step="100" value="${o.w}"></label>
+      <label class="fld"><span>높이 H (mm)</span><input id="o-h" type="number" step="100" value="${o.h}"></label>
+    </div>
+    <div class="grid2">
+      <label class="fld"><span>하단 높이 (mm)</span><input id="o-sill" type="number" step="50" value="${o.sill}"></label>
+      <label class="fld"><span>벽 위치 (mm)</span><input id="o-pos" type="number" step="100" value="${Math.round(o.pos)}"></label>
+    </div>
+    <label class="fld"><span>창틀 색상</span><input id="o-color" type="color" value="${o.color || '#4a5560'}"></label>
+    <div class="btn-row">
+      <button class="mini" id="o-dup">복제</button>
+      <button class="mini danger" id="o-del">삭제</button>
+    </div>
+    <p class="hint">창은 도면에서 벽을 따라 드래그해 위치를 옮길 수 있습니다.</p>`;
+}
+
+function bindOpeningForm(o) {
+  const upd = (m) => store.commit(() => m());
+  document.getElementById('o-type').onchange = (e) => upd(() => {
+    o.winType = e.target.value;
+    const t = WINDOW_TYPES[e.target.value];
+    o.w = t.w; o.h = t.h; o.sill = t.sill;
+  });
+  document.getElementById('o-side').onchange = (e) => upd(() => o.side = e.target.value);
+  document.getElementById('o-w').onchange = (e) => upd(() => o.w = Math.max(300, +e.target.value || 300));
+  document.getElementById('o-h').onchange = (e) => upd(() => o.h = Math.max(300, +e.target.value || 300));
+  document.getElementById('o-sill').onchange = (e) => upd(() => o.sill = Math.max(0, +e.target.value || 0));
+  document.getElementById('o-pos').onchange = (e) => upd(() => o.pos = +e.target.value || 0);
+  document.getElementById('o-color').oninput = (e) => upd(() => o.color = e.target.value);
+  document.getElementById('o-dup').onclick = () => store.commit((d) => {
+    const copy = { ...o, id: 'o' + Date.now().toString(36), pos: o.pos + 1200 };
+    d.openings.push(copy); store.selectedOpening = copy.id;
+  });
+  document.getElementById('o-del').onclick = () => store.commit((d) => {
+    d.openings = d.openings.filter((x) => x.id !== o.id); store.selectedOpening = null;
+  });
 }
 
 function roomForm(room) {
@@ -265,7 +394,19 @@ function buildToolbar({ editor, viewer, onModeChange }) {
 
   $('tb-roof').onclick = (e) => {
     viewer.controls.maxPolarAngle = viewer.controls.maxPolarAngle > 1.4 ? Math.PI / 2.05 : Math.PI;
-    e.target.classList.toggle('on');
+    e.currentTarget.classList.toggle('on');
+  };
+
+  // 외장재 / 지붕 표시 토글 (3D)
+  $('view-ext').onclick = (e) => {
+    viewer.showExterior = !viewer.showExterior;
+    e.currentTarget.classList.toggle('on', viewer.showExterior);
+    viewer.dirty = true;
+  };
+  $('view-roof').onclick = (e) => {
+    viewer.showRoof = !viewer.showRoof;
+    e.currentTarget.classList.toggle('on', viewer.showRoof);
+    viewer.dirty = true;
   };
 
   // 3D 카메라 프리셋
@@ -281,6 +422,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
     else if (e.key === 'Delete' || e.key === 'Backspace') {
       if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
       else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });
+      else if (store.selectedOpening) store.commit((d) => { d.openings = d.openings.filter((o) => o.id !== store.selectedOpening); store.selectedOpening = null; });
     }
   });
 }

@@ -1,7 +1,7 @@
 // 세움 홈플래너 - 2D 평면 편집기 (HTML5 Canvas)
 // 방 추가/이동/크기조절, 가구 배치/이동/회전, 팬/줌, 치수 표시
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, rid } from './data.js';
+import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening } from './data.js';
 
 const GRID = 100;          // 스냅 단위 (mm)
 const HANDLE = 8;          // 핸들 픽셀 크기
@@ -67,6 +67,9 @@ export class Editor2D {
     // 선택 방 핸들
     const sel = d.rooms.find((r) => r.id === store.selectedRoom);
     if (sel) this._drawHandles(sel);
+
+    // 창호(개구부)
+    for (const o of (d.openings || [])) this._drawOpening(o);
 
     // 가구
     if (this.showFurniture) for (const f of d.furniture) this._drawFurniture(f);
@@ -213,6 +216,92 @@ export class Editor2D {
     ctx.fillText('1 m', x + px + 6, y + 4);
   }
 
+  // ---- 창호(개구부) ----
+  // 개구부의 평면 기하 계산 (mm 단위 끝점 + 외향 방향)
+  _openingGeom(o) {
+    const room = store.design.rooms.find((r) => r.id === o.roomId);
+    if (!room) return null;
+    const half = o.w / 2;
+    let cx, cy, horizontal, nx = 0, ny = 0;
+    const span = (o.side === 'n' || o.side === 's') ? room.w : room.d;
+    const pos = Math.max(half, Math.min(span - half, o.pos)); // 벽 안에 들어오도록
+    if (o.side === 'n') { cx = room.x + pos; cy = room.y;          horizontal = true;  ny = -1; }
+    else if (o.side === 's') { cx = room.x + pos; cy = room.y + room.d; horizontal = true;  ny = 1; }
+    else if (o.side === 'w') { cx = room.x;          cy = room.y + pos; horizontal = false; nx = -1; }
+    else { cx = room.x + room.w; cy = room.y + pos;                horizontal = false; nx = 1; }
+    return { room, cx, cy, horizontal, nx, ny, half };
+  }
+
+  _drawOpening(o) {
+    const g = this._openingGeom(o); if (!g) return;
+    const ctx = this.ctx;
+    const t = WINDOW_TYPES[o.winType] || {};
+    const isDoor = t.glass === false;
+    const selected = o.id === store.selectedOpening;
+    const [pcx, pcy] = this.toPx(g.cx, g.cy);
+    const len = o.w * this.scale;
+    const thick = 9; // 화면상 벽 두께 표현
+
+    ctx.save();
+    ctx.translate(pcx, pcy);
+    if (!g.horizontal) ctx.rotate(Math.PI / 2);
+
+    // 벽 끊기 (흰 배경)
+    ctx.fillStyle = '#f4f5f7';
+    ctx.fillRect(-len / 2, -thick / 2 - 1, len, thick + 2);
+
+    if (isDoor) {
+      // 문: 문짝 + 열림 호
+      ctx.strokeStyle = selected ? '#c8102e' : '#4a5560';
+      ctx.lineWidth = selected ? 2.5 : 1.6;
+      ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(-len / 2, len); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-len / 2, 0, len, 0, Math.PI / 2); ctx.stroke();
+    } else {
+      // 창: 평행 이중선(유리) + 분할
+      ctx.strokeStyle = selected ? '#c8102e' : (o.color || '#4a5560');
+      ctx.lineWidth = selected ? 2.5 : 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-len / 2, -thick / 2); ctx.lineTo(len / 2, -thick / 2);
+      ctx.moveTo(-len / 2, thick / 2);  ctx.lineTo(len / 2, thick / 2);
+      ctx.stroke();
+      // 끝막이
+      ctx.beginPath();
+      ctx.moveTo(-len / 2, -thick / 2); ctx.lineTo(-len / 2, thick / 2);
+      ctx.moveTo(len / 2, -thick / 2);  ctx.lineTo(len / 2, thick / 2);
+      ctx.stroke();
+      // 분할선 (창짝 수)
+      const panes = Math.max(1, t.panes || 1);
+      ctx.lineWidth = 1;
+      for (let i = 1; i < panes; i++) {
+        const x = -len / 2 + (len * i) / panes;
+        ctx.beginPath(); ctx.moveTo(x, -thick / 2); ctx.lineTo(x, thick / 2); ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // 선택 시 라벨
+    if (selected) {
+      ctx.fillStyle = '#c8102e';
+      ctx.font = '11px "Noto Sans KR", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`${t.label || '창'} ${o.w}mm`, pcx + g.nx * 16, pcy + g.ny * 16);
+    }
+  }
+
+  _hitOpening(px, py) {
+    const d = store.design;
+    for (let i = (d.openings || []).length - 1; i >= 0; i--) {
+      const o = d.openings[i];
+      const g = this._openingGeom(o); if (!g) continue;
+      const [pcx, pcy] = this.toPx(g.cx, g.cy);
+      const len = o.w * this.scale;
+      const along = g.horizontal ? Math.abs(px - pcx) : Math.abs(py - pcy);
+      const across = g.horizontal ? Math.abs(py - pcy) : Math.abs(px - pcx);
+      if (along <= len / 2 + 4 && across <= 8) return o;
+    }
+    return null;
+  }
+
   // ---- 히트 테스트 ----
   _hitHandle(room, px, py) {
     const [x, y] = this.toPx(room.x, room.y);
@@ -307,6 +396,14 @@ export class Editor2D {
       return;
     }
 
+    // 창호 클릭 (벽 가장자리)
+    const op = this._hitOpening(px, py);
+    if (op) {
+      store.select(null, null, op.id);
+      this.drag = { mode: 'moveo', o: op };
+      return;
+    }
+
     // 가구 클릭
     const f = this._hitFurniture(px, py);
     if (f) {
@@ -357,6 +454,12 @@ export class Editor2D {
         drag.f.x = this.snap(mx - drag.dx);
         drag.f.y = this.snap(my - drag.dy);
       });
+    } else if (drag.mode === 'moveo') {
+      const room = store.design.rooms.find((r) => r.id === drag.o.roomId);
+      if (room) {
+        const along = (drag.o.side === 'n' || drag.o.side === 's') ? (mx - room.x) : (my - room.y);
+        store.liveUpdate(() => { drag.o.pos = this.snap(along); });
+      }
     } else if (drag.mode === 'resize') {
       this._resizeRoom(drag.room, drag.handle, mx, my);
     } else if (drag.mode === 'rotate') {
@@ -380,7 +483,7 @@ export class Editor2D {
   }
 
   _up() {
-    if (this.drag && ['mover', 'movef', 'resize', 'rotate'].includes(this.drag.mode)) {
+    if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo'].includes(this.drag.mode)) {
       store.liveEnd();
     }
     this.drag = null;
@@ -407,19 +510,59 @@ export class Editor2D {
       if (hk) cur = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }[hk];
     }
     if (cur === 'default') {
-      if (this._hitFurniture(px, py) || this._hitRoom(px, py)) cur = 'move';
+      if (this._hitOpening(px, py)) cur = 'move';
+      else if (this._hitFurniture(px, py) || this._hitRoom(px, py)) cur = 'move';
     }
     this.canvas.style.cursor = cur;
   }
 
   _drop(e) {
     e.preventDefault();
-    const catalogId = e.dataTransfer.getData('text/plain');
-    if (!catalogId) return;
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
     const [px, py] = this._pos(e);
     const [mx, my] = this.toMm(px, py);
+
+    // 창호 드롭: "win:<type>" → 가장 가까운 방의 가까운 벽에 부착
+    if (raw.startsWith('win:')) {
+      const winType = raw.slice(4);
+      this._dropWindow(winType, mx, my);
+      return;
+    }
+    // 가구 드롭
     store.commit((d) => {
-      d.furniture.push({ id: 'f' + Date.now().toString(36), catalogId, x: this.snap(mx), y: this.snap(my), rotation: 0 });
+      d.furniture.push({ id: 'f' + Date.now().toString(36), catalogId: raw, x: this.snap(mx), y: this.snap(my), rotation: 0 });
+    });
+  }
+
+  // 창호를 드롭 지점에서 가장 가까운 방의 가장 가까운 벽면에 부착
+  _dropWindow(winType, mx, my) {
+    const d = store.design;
+    if (!d.rooms.length) return;
+    let best = null;
+    for (const room of d.rooms) {
+      // 점을 방 영역으로 클램프했을 때의 거리로 가까운 방 판정
+      const cxClamp = Math.max(room.x, Math.min(room.x + room.w, mx));
+      const cyClamp = Math.max(room.y, Math.min(room.y + room.d, my));
+      const dist = Math.hypot(mx - cxClamp, my - cyClamp);
+      // 4개 벽까지의 거리
+      const edges = [
+        { side: 'n', dd: Math.abs(my - room.y),          pos: mx - room.x },
+        { side: 's', dd: Math.abs(my - (room.y + room.d)), pos: mx - room.x },
+        { side: 'w', dd: Math.abs(mx - room.x),          pos: my - room.y },
+        { side: 'e', dd: Math.abs(mx - (room.x + room.w)), pos: my - room.y },
+      ];
+      for (const ed of edges) {
+        const score = dist + ed.dd;
+        if (!best || score < best.score) best = { room, side: ed.side, pos: ed.pos, score };
+      }
+    }
+    if (!best) return;
+    store.commit((dd) => {
+      const o = opening(best.room.id, best.side, this.snap(best.pos), winType);
+      dd.openings.push(o);
+      store.selectedOpening = o.id;
+      store.selectedRoom = store.selectedFurniture = null;
     });
   }
 }

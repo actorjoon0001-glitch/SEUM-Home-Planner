@@ -1,14 +1,15 @@
 // 세움 홈플래너 - 상태 관리 (단순 pub/sub + 되돌리기/저장)
-import { createDefaultDesign } from './data.js';
+import { createDefaultDesign, normalize } from './data.js';
 
 const LS_KEY = 'seum-homeplanner:current';
 const LS_LIST = 'seum-homeplanner:saved';
 
 class Store {
   constructor() {
-    this.design = this._load() || createDefaultDesign();
+    this.design = normalize(this._load() || createDefaultDesign());
     this.selectedRoom = null;     // room id
     this.selectedFurniture = null; // furniture id
+    this.selectedOpening = null;  // opening id
     this._subs = new Set();
     this._history = [];
     this._future = [];
@@ -41,6 +42,7 @@ class Store {
   _clampSelection() {
     if (!this.design.rooms.some((r) => r.id === this.selectedRoom)) this.selectedRoom = null;
     if (!this.design.furniture.some((f) => f.id === this.selectedFurniture)) this.selectedFurniture = null;
+    if (!(this.design.openings || []).some((o) => o.id === this.selectedOpening)) this.selectedOpening = null;
   }
 
   // --- 변경 (스냅샷 후 emit) ---
@@ -58,9 +60,10 @@ class Store {
   }
   liveEnd() { this.persist(); }
 
-  select(roomId, furnitureId) {
+  select(roomId, furnitureId, openingId) {
     this.selectedRoom = roomId ?? null;
     this.selectedFurniture = furnitureId ?? null;
+    this.selectedOpening = openingId ?? null;
     this.emit();
   }
 
@@ -72,8 +75,8 @@ class Store {
 
   newDesign() {
     this.commit(() => {});
-    this.design = createDefaultDesign();
-    this.selectedRoom = this.selectedFurniture = null;
+    this.design = normalize(createDefaultDesign());
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null;
     this.persist();
     this.emit();
   }
@@ -95,8 +98,8 @@ class Store {
   loadSaved(name) {
     const entry = this.savedList().find((e) => e.name === name);
     if (!entry) return;
-    this.design = JSON.parse(JSON.stringify(entry.data));
-    this.selectedRoom = this.selectedFurniture = null;
+    this.design = normalize(JSON.parse(JSON.stringify(entry.data)));
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null;
     this._history = []; this._future = [];
     this.persist();
     this.emit();
@@ -107,8 +110,8 @@ class Store {
     const d = JSON.parse(text);
     if (!d.rooms) throw new Error('도면 형식이 아닙니다.');
     this.commit(() => {});
-    this.design = d;
-    this.selectedRoom = this.selectedFurniture = null;
+    this.design = normalize(d);
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null;
     this.persist();
     this.emit();
   }

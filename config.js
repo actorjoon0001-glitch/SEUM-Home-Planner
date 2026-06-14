@@ -5,6 +5,6 @@
 // 비워두면 클라우드 기능만 비활성화되고 나머지(편집/3D/템플릿/인쇄)는 정상 동작합니다.
 // 설정 방법은 supabase/README.md 참고.
 window.SEUM_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://yjfpwgxwcuvfecssmvdj.supabase.co',
+  supabaseAnonKey: 'sb_publishable_hApl76RBqdo4OmrM15qSkw_oHrUfdpX',
 };

@@ -191,6 +191,48 @@ const T = [
       ],
     },
   },
+  {
+    id: 'model-golf-10',
+    title: '킨텍스 전시모델 10평 (골프존)',
+    category: '주택',
+    tags: ['전시모델', '10평', '골프존', '킨텍스'],
+    base: {
+      name: '킨텍스 전시모델 10평 (골프존)',
+      productType: '주택',
+      ceilingHeight: 2400,
+      // T5 갈바듐 외장 + 평지붕 (㈜세움디자인하우징 도면 기준)
+      exterior: { material: 'metal', color: '#3d4651' },
+      roof: { type: 'flat', color: '#4a4a4a' },
+      // 외곽 4,300×8,400 (벽 200) → 내부 폭 3,900. 남측 데크 별도.
+      rooms: [
+        { key: 'bath',    type: 'bath',     name: '욕실',      x: 0,    y: 0,    w: 1200, d: 1800 },
+        { key: 'ent',     type: 'entrance', name: '현관',      x: 0,    y: 1800, w: 1200, d: 1200 },
+        { key: 'kitchen', type: 'kitchen',  name: '주방',      x: 1200, y: 0,    w: 2700, d: 1200 },
+        { key: 'dining',  type: 'living',   name: '다이닝',    x: 1200, y: 1200, w: 2700, d: 1800 },
+        { key: 'golf',    type: 'living',   name: 'GOLF ZONE', x: 0,    y: 3000, w: 3900, d: 4500 },
+        { key: 'deck',    type: 'balcony',  name: '데크',      x: 0,    y: 7500, w: 3900, d: 900  },
+      ],
+      openings: [
+        { roomKey: 'ent',     side: 'w', pos: 600,  winType: 'door' },     // 현관문(폴딩 900)
+        { roomKey: 'bath',    side: 's', pos: 600,  winType: 'door' },     // 욕실 포켓도어 800
+        { roomKey: 'kitchen', side: 'n', pos: 1350, winType: 'fixed' },    // 주방 상단 픽스창
+        { roomKey: 'dining',  side: 'e', pos: 900,  winType: 'fixed' },
+        { roomKey: 'golf',    side: 's', pos: 1950, winType: 'sliding' },  // 데크 출입
+        { roomKey: 'golf',    side: 'e', pos: 2250, winType: 'fixed' },
+        { roomKey: 'golf',    side: 'w', pos: 2250, winType: 'fixed' },
+      ],
+      furniture: [
+        { catalogId: 'toilet', x: 300,  y: 1450, rotation: 0 },
+        { catalogId: 'basin',  x: 850,  y: 300,  rotation: 0 },
+        { catalogId: 'sink',   x: 2400, y: 350,  rotation: 0 },
+        { catalogId: 'fridge', x: 3550, y: 500,  rotation: 0 },
+        { catalogId: 'dining4',x: 2550, y: 2100, rotation: 0 },
+        { catalogId: 'tv',     x: 1950, y: 7350, rotation: 180 },  // 스크린(남측)
+        { catalogId: 'sofa2',  x: 900,  y: 6600, rotation: 0 },
+        { catalogId: 'rug',    x: 1950, y: 5000, rotation: 0 },
+      ],
+    },
+  },
 ];
 
 // 템플릿 목록 (썸네일/표시용 메타)

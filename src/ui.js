@@ -290,6 +290,13 @@ function roomForm(room) {
       <label class="fld"><span>Y 위치</span><input id="r-y" type="number" step="100" value="${room.y}"></label>
     </div>
     <div class="info-row"><span>면적</span><b>${area} m² (${(area/3.305).toFixed(1)}평)</b></div>
+    <div class="fld"><span>벽 (눌러서 트기 ↔ 막기)</span>
+      <div class="wall-toggle" id="r-walls">
+        ${[['n','북'],['s','남'],['w','서'],['e','동']].map(([s,l]) =>
+          `<button class="wt${(room.open||[]).includes(s) ? ' off' : ''}" data-s="${s}">${l}</button>`).join('')}
+      </div>
+    </div>
+    <p class="hint small">거실·주방처럼 트인 공간은 맞닿은 두 방의 해당 면을 모두 '트기'로 (3D에서 벽 사라짐)</p>
     <div class="btn-row">
       <button class="mini" id="r-dup">복제</button>
       <button class="mini danger" id="r-del">삭제</button>
@@ -304,8 +311,15 @@ function bindRoomForm(room) {
   for (const k of ['w', 'd', 'x', 'y']) {
     document.getElementById('r-' + k).onchange = (e) => upd(k, Math.max(0, +e.target.value || 0));
   }
+  document.querySelectorAll('#r-walls .wt').forEach((btn) => btn.onclick = () => store.commit(() => {
+    const s = btn.dataset.s;
+    const open = Array.isArray(room.open) ? room.open : (room.open = []);
+    const i = open.indexOf(s);
+    if (i >= 0) open.splice(i, 1); else open.push(s); // 막기 ↔ 트기 토글
+  }));
   document.getElementById('r-dup').onclick = () => store.commit((d) => {
     const copy = { ...room, id: 'r' + Date.now().toString(36), x: room.x + 400, y: room.y + 400 };
+    if (Array.isArray(room.open)) copy.open = room.open.slice();
     d.rooms.push(copy); store.selectedRoom = copy.id;
   });
   document.getElementById('r-del').onclick = () => store.commit((d) => {

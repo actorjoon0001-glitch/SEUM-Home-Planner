@@ -204,22 +204,22 @@ const T = [
       exterior: { material: 'metal', color: '#3d4651' },
       roof: { type: 'flat', color: '#4a4a4a' },
       // 외곽 4,300×8,400 (벽 200) → 내부 폭 3,900. 남측 데크 별도.
+      // 욕실·현관만 벽으로 구획, 나머지(거실·주방·골프존)는 개방형(open 면으로 벽 생략).
       rooms: [
-        { key: 'bath',    type: 'bath',     name: '욕실',      x: 0,    y: 0,    w: 1200, d: 1800 },
-        { key: 'ent',     type: 'entrance', name: '현관',      x: 0,    y: 1800, w: 1200, d: 1200 },
-        { key: 'kitchen', type: 'kitchen',  name: '주방',      x: 1200, y: 0,    w: 2700, d: 1200 },
-        { key: 'dining',  type: 'living',   name: '다이닝',    x: 1200, y: 1200, w: 2700, d: 1800 },
-        { key: 'golf',    type: 'living',   name: 'GOLF ZONE', x: 0,    y: 3000, w: 3900, d: 4500 },
-        { key: 'deck',    type: 'balcony',  name: '데크',      x: 0,    y: 7500, w: 3900, d: 900  },
+        { key: 'bath', type: 'bath',     name: '욕실',         x: 0,    y: 0,    w: 1200, d: 1800 },
+        { key: 'ent',  type: 'entrance', name: '현관',         x: 0,    y: 1800, w: 1200, d: 1200 },
+        { key: 'ldk',  type: 'kitchen',  name: '주방·다이닝',  x: 1200, y: 0,    w: 2700, d: 3000, open: ['s'] },
+        { key: 'golf', type: 'living',   name: 'GOLF ZONE',    x: 0,    y: 3000, w: 3900, d: 4500, open: ['n'] },
+        { key: 'deck', type: 'balcony',  name: '데크',         x: 0,    y: 7500, w: 3900, d: 900  },
       ],
       openings: [
-        { roomKey: 'ent',     side: 'w', pos: 600,  winType: 'door' },     // 현관문(폴딩 900)
-        { roomKey: 'bath',    side: 's', pos: 600,  winType: 'door' },     // 욕실 포켓도어 800
-        { roomKey: 'kitchen', side: 'n', pos: 1350, winType: 'fixed' },    // 주방 상단 픽스창
-        { roomKey: 'dining',  side: 'e', pos: 900,  winType: 'fixed' },
-        { roomKey: 'golf',    side: 's', pos: 1950, winType: 'sliding' },  // 데크 출입
-        { roomKey: 'golf',    side: 'e', pos: 2250, winType: 'fixed' },
-        { roomKey: 'golf',    side: 'w', pos: 2250, winType: 'fixed' },
+        { roomKey: 'ent',  side: 'w', pos: 600,  winType: 'door' },     // 현관문(폴딩 900)
+        { roomKey: 'bath', side: 's', pos: 600,  winType: 'door' },     // 욕실 포켓도어 800
+        { roomKey: 'ldk',  side: 'n', pos: 1350, winType: 'fixed' },    // 주방 상단 픽스창
+        { roomKey: 'ldk',  side: 'e', pos: 2400, winType: 'fixed' },
+        { roomKey: 'golf', side: 's', pos: 1950, winType: 'sliding' },  // 데크 출입
+        { roomKey: 'golf', side: 'e', pos: 2250, winType: 'fixed' },
+        { roomKey: 'golf', side: 'w', pos: 2250, winType: 'fixed' },
       ],
       furniture: [
         { catalogId: 'toilet', x: 300,  y: 1450, rotation: 0 },
@@ -249,7 +249,9 @@ export function instantiateTemplate(id) {
   const rooms = b.rooms.map((r) => {
     const nid = rid();
     keyToId[r.key] = nid;
-    return { id: nid, type: r.type, name: r.name, x: r.x, y: r.y, w: r.w, d: r.d };
+    const room = { id: nid, type: r.type, name: r.name, x: r.x, y: r.y, w: r.w, d: r.d };
+    if (Array.isArray(r.open) && r.open.length) room.open = r.open.slice(); // 개방형 면(벽 생략)
+    return room;
   });
   const openings = (b.openings || []).map((o) => ({
     id: 'o' + Math.random().toString(36).slice(2, 9),

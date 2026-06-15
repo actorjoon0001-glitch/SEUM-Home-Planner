@@ -184,6 +184,7 @@ export function normalize(design) {
   if (typeof design.customer !== 'string') design.customer = ''; // 고객명/분류
   if (typeof design.productType !== 'string') design.productType = ''; // 제품 종류(주택/체류형 쉼터/농막)
   if (!('thumb' in design)) design.thumb = null;                 // 썸네일 dataURL
+  if (!('underlay' in design)) design.underlay = null;           // 밑그림(PDF/이미지) 참조 도면
   return design;
 }
 

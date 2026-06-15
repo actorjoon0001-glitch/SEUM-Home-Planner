@@ -370,6 +370,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
 
   $('tb-open').onclick = () => openLoadDialog();
   $('tb-templates').onclick = () => openTemplateDialog();
+  $('tb-underlay').onclick = () => openUnderlayDialog(editor);
   $('tb-cloud').onclick = () => openCloudDialog();
 
   $('tb-export').onclick = () => {
@@ -558,6 +559,123 @@ async function openTemplateDialog() {
 }
 
 // ---------------------------------------------------------------------------
+// 밑그림(참조 도면): PDF/이미지를 배경에 깔고 그 위에 방을 그려 편집 도면으로 변환
+// ---------------------------------------------------------------------------
+function openUnderlayDialog(editor) {
+  const body = document.createElement('div');
+  // 밑그림 변경은 undo 히스토리에 큰 이미지가 쌓이지 않도록 liveUpdate 로 처리
+  const apply = (mut) => { store.liveUpdate(mut); store.liveEnd(); };
+
+  function render() {
+    const u = store.design.underlay;
+    if (!u) {
+      body.innerHTML = `
+        <p class="m-sub">갖고 계신 도면 <b>PDF·이미지</b>를 배경으로 깔고, 그 위에 방을 그려 편집 가능한 도면으로 만드세요.</p>
+        <label class="fld"><span>도면 파일 선택 (PDF / PNG / JPG)</span><input id="ul-file" type="file" accept="application/pdf,image/*"></label>
+        <p id="ul-msg" class="hint"></p>
+        <ol class="hint" style="padding-left:18px;line-height:1.8">
+          <li>파일을 고르면 화면 배경에 깔립니다.</li>
+          <li><b>축척 맞추기</b> → 도면에서 길이를 아는 곳(예: 벽 한 변)의 양끝 두 점을 클릭하고 실제 mm 입력 → 크기가 실제와 맞춰집니다.</li>
+          <li>좌측 팔레트에서 방을 추가해 밑그림을 따라 그립니다.</li>
+          <li>다 그리면 <b>밑그림 제거</b> 후 "📐 기본 도면으로 저장".</li>
+        </ol>`;
+      body.querySelector('#ul-file').onchange = (e) => loadFile(e.target.files[0]);
+      return;
+    }
+    body.innerHTML = `
+      <p class="m-sub">밑그림이 깔려 있습니다. <b>축척 맞추기</b>로 크기를 실제와 맞춘 뒤 방을 그려 따라 그리세요.</p>
+      <label class="fld"><span>투명도</span><input id="ul-op" type="range" min="0.1" max="1" step="0.05" value="${u.opacity != null ? u.opacity : 0.5}"></label>
+      <label class="fld"><span>가로 실제 크기(mm)</span><input id="ul-w" type="number" value="${Math.round(u.w)}" step="100"></label>
+      <div class="btn-row">
+        <button class="mini" id="ul-cal" style="flex:1;background:#c8102e;color:#fff;border-color:#c8102e">📏 축척 맞추기 (두 점)</button>
+        <button class="mini" id="ul-focus" style="flex:1">화면 맞춤</button>
+      </div>
+      <div class="btn-row">
+        <button class="mini" id="ul-hide" style="flex:1">${u.hidden ? '밑그림 보이기' : '밑그림 숨기기'}</button>
+        <button class="mini" id="ul-replace" style="flex:1">다른 파일</button>
+        <button class="mini danger" id="ul-del" style="flex:1">밑그림 제거</button>
+      </div>
+      <p id="ul-msg" class="hint"></p>`;
+    body.querySelector('#ul-op').oninput = (e) => store.liveUpdate((d) => { d.underlay.opacity = parseFloat(e.target.value); });
+    body.querySelector('#ul-op').onchange = () => store.liveEnd();
+    body.querySelector('#ul-w').onchange = (e) => {
+      const neww = parseFloat(e.target.value);
+      if (neww > 0) apply((d) => { const f = neww / d.underlay.w; d.underlay.h *= f; d.underlay.w = neww; });
+    };
+    body.querySelector('#ul-cal').onclick = () => {
+      editor.startCalibrate();
+      closeModal();
+      flash('밑그림 위에서 길이를 아는 두 점을 차례로 클릭하세요');
+    };
+    body.querySelector('#ul-focus').onclick = () => editor.focusUnderlay();
+    body.querySelector('#ul-hide').onclick = () => { apply((d) => { d.underlay.hidden = !d.underlay.hidden; }); render(); };
+    body.querySelector('#ul-replace').onclick = () => { apply((d) => { d.underlay = null; }); render(); };
+    body.querySelector('#ul-del').onclick = () => {
+      if (!confirm('밑그림을 제거할까요? (그려둔 방은 그대로 남습니다)')) return;
+      apply((d) => { d.underlay = null; });
+      render();
+    };
+  }
+
+  async function loadFile(file) {
+    if (!file) return;
+    const msg = body.querySelector('#ul-msg');
+    try {
+      msg.style.color = ''; msg.textContent = '불러오는 중...';
+      let dataURL, iw, ih;
+      if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+        ({ dataURL, iw, ih } = await pdfToImage(file));
+      } else {
+        dataURL = await fileToDataURL(file);
+        ({ iw, ih } = await imageSize(dataURL));
+      }
+      const w0 = 12000; // 기본 가로 12m (이후 '축척 맞추기'로 실제 크기 보정)
+      const h0 = w0 * (ih / iw);
+      apply((d) => { d.underlay = { src: dataURL, x: 0, y: 0, w: w0, h: h0, opacity: 0.5, hidden: false }; });
+      editor.focusUnderlay();
+      render();
+      flash('밑그림 불러옴 — 이제 "축척 맞추기"로 크기를 맞추세요');
+    } catch (e) {
+      msg.style.color = '#c8102e';
+      msg.textContent = '불러오기 실패: ' + e.message;
+    }
+  }
+
+  render();
+  modal('밑그림 (참조 도면)', body);
+}
+
+function fileToDataURL(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('파일 읽기 실패'));
+    r.readAsDataURL(file);
+  });
+}
+function imageSize(dataURL) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res({ iw: img.naturalWidth, ih: img.naturalHeight });
+    img.onerror = () => rej(new Error('이미지 형식 오류'));
+    img.src = dataURL;
+  });
+}
+// PDF 1페이지를 이미지(dataURL)로 변환 (pdf.js, CDN 동적 로드)
+async function pdfToImage(file) {
+  const pdfjs = await import('https://esm.sh/pdfjs-dist@4.7.76/build/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs';
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width; canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return { dataURL: canvas.toDataURL('image/jpeg', 0.85), iw: canvas.width, ih: canvas.height };
+}
+
+// ---------------------------------------------------------------------------
 // 클라우드 (Supabase): 로그인 / 저장 / 목록 / 공유 링크
 // ---------------------------------------------------------------------------
 function buildCloud() {
@@ -740,12 +858,15 @@ function openSaveForm(body, { asTemplate = false } = {}) {
       store.design.productType = wrap.querySelector('#cs-ptype').value;
       // 썸네일 생성 (작은 JPEG)
       try { store.design.thumb = _editor.toImage(360, 240, 'image/jpeg', 0.6); } catch (e) {}
+      const isTemplate = wrap.querySelector('#cs-tpl').checked;
+      // 기본 도면(템플릿)에는 용량 큰 밑그림을 제외해 깔끔하게 저장
+      const data = isTemplate && store.design.underlay ? { ...store.design, underlay: null } : store.design;
       const saved = await cloud.saveDesign({
         id: store.cloudId || undefined,
         name: wrap.querySelector('#cs-name').value || '무제 도면',
-        data: store.design,
+        data,
         isShared: wrap.querySelector('#cs-shared').checked,
-        isTemplate: wrap.querySelector('#cs-tpl').checked,
+        isTemplate,
       });
       store.cloudId = saved.id;
       store.design.name = saved.name;

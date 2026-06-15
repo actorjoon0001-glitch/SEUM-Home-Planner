@@ -102,6 +102,9 @@ export class Editor2D {
     ctx.clearRect(0, 0, this.cssW, this.cssH);
     this._drawGrid();
 
+    // 밑그림(참조 도면 PDF/이미지) - 방보다 아래에 깔기
+    this._drawUnderlay();
+
     // 방
     for (const room of d.rooms) this._drawRoom(room);
     // 선택 방 핸들
@@ -114,8 +117,64 @@ export class Editor2D {
     // 가구
     if (this.showFurniture) for (const f of d.furniture) this._drawFurniture(f);
 
+    // 축척 보정 중 클릭 점/선 표시
+    if (this.calib) this._drawCalib();
+
     // 선택 안내
     this._drawScaleBar();
+  }
+
+  // ---- 밑그림(참조 도면) ----
+  _drawUnderlay() {
+    if (this._export) return; // 인쇄/내보내기에는 밑그림 제외
+    const u = store.design.underlay;
+    if (!u || !u.src || u.hidden) return;
+    let img = this._uImg;
+    if (!img || img._key !== u.src) {
+      img = this._uImg = new Image();
+      img._key = u.src;
+      img.onload = () => this.draw();
+      img.src = u.src;
+    }
+    if (!img.complete || !img.naturalWidth) return;
+    const [x, y] = this.toPx(u.x, u.y);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = (u.opacity != null ? u.opacity : 0.5);
+    ctx.drawImage(img, x, y, u.w * this.scale, u.h * this.scale);
+    ctx.restore();
+  }
+
+  _drawCalib() {
+    const ctx = this.ctx;
+    const pts = this.calib.pts.map((p) => this.toPx(p[0], p[1]));
+    ctx.save();
+    ctx.strokeStyle = '#c8102e'; ctx.fillStyle = '#c8102e'; ctx.lineWidth = 2;
+    if (pts.length === 2) {
+      ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); ctx.lineTo(pts[1][0], pts[1][1]); ctx.stroke();
+    }
+    for (const p of pts) { ctx.beginPath(); ctx.arc(p[0], p[1], 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // 밑그림이 화면에 꽉 차도록 보기 이동
+  focusUnderlay() {
+    const u = store.design.underlay;
+    if (!u) { this.fit(); return; }
+    const pad = 600;
+    const w = u.w + pad * 2, h = u.h + pad * 2;
+    this.scale = Math.max(0.0008, Math.min(this.cssW / w, this.cssH / h));
+    this.ox = -(u.x - pad) * this.scale;
+    this.oy = -(u.y - pad) * this.scale;
+    this.draw();
+  }
+
+  // 두 점으로 실제 거리(mm)를 입력해 밑그림 축척 맞추기
+  startCalibrate() {
+    if (!store.design.underlay) return;
+    this.calib = { pts: [] };
+    this.canvas.style.cursor = 'crosshair';
+    this.draw();
   }
 
   _drawGrid() {
@@ -413,6 +472,31 @@ export class Editor2D {
   _down(e) {
     const [px, py] = this._pos(e);
     const d = store.design;
+
+    // 축척 보정 모드: 두 점을 찍고 실제 거리(mm) 입력
+    if (this.calib) {
+      const [mx, my] = this.toMm(px, py);
+      this.calib.pts.push([mx, my]);
+      if (this.calib.pts.length >= 2) {
+        const [a, b] = this.calib.pts;
+        const cur = Math.hypot(b[0] - a[0], b[1] - a[1]); // 현재 두 점 사이 거리(mm)
+        const real = parseFloat(prompt('찍은 두 점 사이의 실제 거리(mm)를 입력하세요.\n예: 1000 = 1m', '1000'));
+        if (real > 0 && cur > 0) {
+          const factor = real / cur;
+          store.liveUpdate((dd) => {
+            const u = dd.underlay;
+            u.x = a[0] + (u.x - a[0]) * factor;
+            u.y = a[1] + (u.y - a[1]) * factor;
+            u.w *= factor; u.h *= factor;
+          });
+          store.liveEnd();
+        }
+        this.calib = null;
+        this.canvas.style.cursor = 'default';
+      }
+      this.draw();
+      return;
+    }
 
     // 스페이스 또는 가운데 버튼 → 팬
     if (e.button === 1 || e.altKey) {

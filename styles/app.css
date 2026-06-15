@@ -120,6 +120,11 @@ body {
 .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 7px 0; border-top: 1px dashed var(--line); }
 .info-row span { color: var(--muted); }
 .info-row b { color: var(--ink); }
+.wall-toggle { display: flex; gap: 6px; margin-top: 4px; }
+.wall-toggle .wt { flex: 1; border: 1px solid var(--line); background: #eef1f4; color: var(--ink); border-radius: 6px; padding: 6px 0; font-size: 12px; cursor: pointer; font-family: inherit; }
+.wall-toggle .wt::before { content: '🧱 '; }
+.wall-toggle .wt.off { background: #fff; color: var(--muted); border-style: dashed; opacity: .7; }
+.wall-toggle .wt.off::before { content: '↔ '; }
 .btn-row { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 .mini {
   flex: 1 1 auto; border: 1px solid var(--line); background: #f6f7f9; color: var(--ink);

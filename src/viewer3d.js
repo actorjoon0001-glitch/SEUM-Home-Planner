@@ -152,12 +152,14 @@ export class Viewer3D {
     };
     const x0 = px, x1 = px + room.w, z0 = pz, z1 = pz + room.d;
     const cy = wallH / 2 + 60;
+    // 개방형 공간: 지정된 면(open)은 벽 생략 → 거실·주방 트인 구조 표현
+    const open = Array.isArray(room.open) ? room.open : [];
     // 북/남 (z방향 끝)
-    mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z0);
-    mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z1);
+    if (!open.includes('n')) mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z0);
+    if (!open.includes('s')) mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z1);
     // 동/서 (x방향 끝)
-    mk(WALL_T, wallH, room.d + WALL_T, x0, cy, pz + room.d / 2);
-    mk(WALL_T, wallH, room.d + WALL_T, x1, cy, pz + room.d / 2);
+    if (!open.includes('w')) mk(WALL_T, wallH, room.d + WALL_T, x0, cy, pz + room.d / 2);
+    if (!open.includes('e')) mk(WALL_T, wallH, room.d + WALL_T, x1, cy, pz + room.d / 2);
 
     // 다락은 경사 지붕 표현
     if (isAttic) {

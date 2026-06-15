@@ -7,9 +7,11 @@ const T = [
   {
     id: 'apt-59',
     title: '아파트 59㎡ (24평형)',
+    category: '주택',
     tags: ['아파트', '24평'],
     base: {
       name: '아파트 59㎡ (24평형)',
+      productType: '주택',
       ceilingHeight: 2300,
       exterior: { material: 'cement', color: '#cdc7ba' },
       roof: { type: 'flat', color: '#5b5b5b' },
@@ -40,9 +42,11 @@ const T = [
   {
     id: 'apt-84',
     title: '아파트 84㎡ (34평형)',
+    category: '주택',
     tags: ['아파트', '34평'],
     base: {
       name: '아파트 84㎡ (34평형)',
+      productType: '주택',
       ceilingHeight: 2400,
       exterior: { material: 'ceramic', color: '#d8d2c6' },
       roof: { type: 'flat', color: '#4a4a4a' },
@@ -79,9 +83,11 @@ const T = [
   {
     id: 'house-30',
     title: '단독주택 99㎡ (박공지붕)',
+    category: '주택',
     tags: ['단독주택', '30평', '박공'],
     base: {
       name: '단독주택 99㎡ (박공지붕)',
+      productType: '주택',
       ceilingHeight: 2600,
       exterior: { material: 'metal', color: '#3d4651' },
       roof: { type: 'gable', color: '#2e3b30' },
@@ -113,11 +119,83 @@ const T = [
       ],
     },
   },
+  {
+    id: 'nongmak-20',
+    title: '농막 20㎡ (6평형)',
+    category: '농막',
+    tags: ['농막', '6평', '20㎡'],
+    base: {
+      name: '농막 20㎡ (6평형)',
+      productType: '농막',
+      ceilingHeight: 2400,
+      exterior: { material: 'wood', color: '#9c7244' },
+      roof: { type: 'gable', color: '#3a3f44' },
+      // 법정 연면적 20㎡ 이하 (거실·침실 겸용 + 주방 + 욕실), 데크는 면적 제외
+      rooms: [
+        { key: 'living',  type: 'living',   name: '거실·침실', x: 0,    y: 0,    w: 4000, d: 3500 },
+        { key: 'bath',    type: 'bath',     name: '욕실',      x: 0,    y: 3500, w: 1700, d: 1500 },
+        { key: 'kitchen', type: 'kitchen',  name: '주방',      x: 1700, y: 3500, w: 2300, d: 1500 },
+        { key: 'deck',    type: 'balcony',  name: '데크',      x: 0,    y: 5000, w: 4000, d: 1500 },
+      ],
+      openings: [
+        { roomKey: 'living',  side: 'n', pos: 2000, winType: 'double' },
+        { roomKey: 'living',  side: 'w', pos: 1750, winType: 'fixed' },
+        { roomKey: 'kitchen', side: 's', pos: 1150, winType: 'door' },
+        { roomKey: 'bath',    side: 'w', pos: 750,  winType: 'casement' },
+      ],
+      furniture: [
+        { catalogId: 'bedS',  x: 700,  y: 900,  rotation: 0 },
+        { catalogId: 'sofa2', x: 2900, y: 800,  rotation: 0 },
+        { catalogId: 'tv',    x: 3700, y: 2000, rotation: 90 },
+        { catalogId: 'sink',  x: 2850, y: 4250, rotation: 0 },
+        { catalogId: 'toilet',x: 1300, y: 4250, rotation: 0 },
+        { catalogId: 'basin', x: 350,  y: 3900, rotation: 0 },
+      ],
+    },
+  },
+  {
+    id: 'shelter-33',
+    title: '체류형 쉼터 33㎡ (10평형)',
+    category: '체류형 쉼터',
+    tags: ['체류형쉼터', '10평', '33㎡', '농지'],
+    base: {
+      name: '체류형 쉼터 33㎡ (10평형)',
+      productType: '체류형 쉼터',
+      ceilingHeight: 2500,
+      exterior: { material: 'metal', color: '#3d4651' },
+      roof: { type: 'gable', color: '#2e3b30' },
+      // 농지법 체류형 쉼터: 연면적 33㎡ 이하 (거실+주방 / 침실 / 욕실), 데크 별도
+      rooms: [
+        { key: 'living',  type: 'living',   name: '거실+주방', x: 0,    y: 0,    w: 3600, d: 4500 },
+        { key: 'bed',     type: 'bedroom',  name: '침실',      x: 3600, y: 0,    w: 2700, d: 3000 },
+        { key: 'bath',    type: 'bath',     name: '욕실',      x: 3600, y: 3000, w: 2700, d: 1500 },
+        { key: 'deck',    type: 'balcony',  name: '데크',      x: 0,    y: 4500, w: 6300, d: 1500 },
+      ],
+      openings: [
+        { roomKey: 'living', side: 's', pos: 1800, winType: 'balcony' },
+        { roomKey: 'living', side: 'w', pos: 2250, winType: 'fixed' },
+        { roomKey: 'living', side: 'n', pos: 600,  winType: 'door' },
+        { roomKey: 'bed',    side: 'e', pos: 1350, winType: 'double' },
+        { roomKey: 'bed',    side: 'n', pos: 1350, winType: 'double' },
+        { roomKey: 'bath',   side: 'e', pos: 750,  winType: 'casement' },
+      ],
+      furniture: [
+        { catalogId: 'sofa3',  x: 1100, y: 3300, rotation: 0 },
+        { catalogId: 'tv',     x: 1800, y: 4200, rotation: 180 },
+        { catalogId: 'dining4',x: 2700, y: 1200, rotation: 0 },
+        { catalogId: 'sink',   x: 1200, y: 300,  rotation: 0 },
+        { catalogId: 'fridge', x: 3100, y: 400,  rotation: 0 },
+        { catalogId: 'bedQ',   x: 4950, y: 1100, rotation: 0 },
+        { catalogId: 'toilet', x: 4100, y: 3300, rotation: 0 },
+        { catalogId: 'basin',  x: 5900, y: 3300, rotation: 0 },
+      ],
+    },
+  },
 ];
 
 // 템플릿 목록 (썸네일/표시용 메타)
 export function listTemplates() {
-  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags }));
+  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택' }));
 }
 
 // 템플릿을 실제 편집 가능한 도면 객체로 인스턴스화 (새 id 부여)
@@ -139,6 +217,7 @@ export function instantiateTemplate(id) {
   const furniture = (b.furniture || []).map((f) => ({ id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 }));
   return normalize({
     name: b.name,
+    productType: b.productType || '',
     ceilingHeight: b.ceilingHeight,
     exterior: { ...b.exterior },
     roof: { ...b.roof },

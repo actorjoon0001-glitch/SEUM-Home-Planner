@@ -23,6 +23,11 @@ export const ROOM_TYPES = {
 export const ATTIC_HEIGHT = 1500;
 
 // ---------------------------------------------------------------------------
+// 세움 제품(기본 도면) 분류 - 기본 도면 라이브러리에서 종류별로 묶어 보여줌
+// ---------------------------------------------------------------------------
+export const PRODUCT_TYPES = ['주택', '체류형 쉼터', '농막'];
+
+// ---------------------------------------------------------------------------
 // 외장재 (집 외부 마감) - 세움은 집짓는 회사이므로 외장재 선택이 중요
 // metalness/roughness 로 3D 질감 표현, color 는 기본색(사용자가 변경 가능)
 // ---------------------------------------------------------------------------
@@ -177,6 +182,7 @@ export function normalize(design) {
   if (!Array.isArray(design.furniture)) design.furniture = [];
   if (!Array.isArray(design.rooms)) design.rooms = [];
   if (typeof design.customer !== 'string') design.customer = ''; // 고객명/분류
+  if (typeof design.productType !== 'string') design.productType = ''; // 제품 종류(주택/체류형 쉼터/농막)
   if (!('thumb' in design)) design.thumb = null;                 // 썸네일 dataURL
   return design;
 }

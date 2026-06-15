@@ -3,7 +3,7 @@ import { store } from './store.js';
 import {
   ROOM_TYPES, FURNITURE_CATALOG, CATEGORIES, catalogOf,
   WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
-  ROOF_TYPES, ROOF_PALETTE,
+  ROOF_TYPES, ROOF_PALETTE, PRODUCT_TYPES,
 } from './data.js';
 import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
@@ -473,54 +473,87 @@ function modal(title, contentEl) {
 }
 
 // ---------------------------------------------------------------------------
-// 템플릿(단지/평형) 라이브러리
+// 기본 도면 라이브러리 (세움 제품: 주택 / 체류형 쉼터 / 농막)
 // ---------------------------------------------------------------------------
+const PRODUCT_ICON = { '주택': '🏠', '체류형 쉼터': '🏕️', '농막': '🛖' };
+
 async function openTemplateDialog() {
   const body = document.createElement('div');
   const builtin = listTemplates();
-  body.innerHTML = `<p class="m-sub">상담 시작용 도면을 선택하면 현재 화면에 불러옵니다.</p>
+  body.innerHTML = `<p class="m-sub">기본 도면을 선택하면 현재 화면에 불러와 바로 수정할 수 있습니다.</p>
+    <div class="cl-filter" id="tpl-filter"></div>
     <div class="tpl-grid" id="tpl-builtin"></div>
     <div id="tpl-cloud-wrap" style="display:none">
-      <p class="m-sub" style="margin-top:14px">공용 템플릿 (클라우드)</p>
+      <p class="m-sub" style="margin-top:14px">☁ 영업팀 공용 기본 도면</p>
       <div class="tpl-grid" id="tpl-cloud"></div>
     </div>`;
-  const dlg = modal('단지 · 평형 템플릿', body);
+  const dlg = modal('기본 도면 라이브러리', body);
 
-  const grid = body.querySelector('#tpl-builtin');
-  for (const t of builtin) {
-    const card = document.createElement('button');
-    card.className = 'tpl-card';
-    card.innerHTML = `<div class="tpl-ico">🏠</div><div class="tpl-name">${esc(t.title)}</div>
-      <div class="tpl-tags">${t.tags.map((x) => `#${esc(x)}`).join(' ')}</div>`;
-    card.onclick = () => {
-      if (!confirm(`'${t.title}' 템플릿을 불러올까요? 현재 작업은 사라집니다.`)) return;
-      const d = instantiateTemplate(t.id);
-      if (d) { store.loadInto(d); dlg.close(); flash(`'${t.title}' 불러옴`); }
-    };
-    grid.appendChild(card);
-  }
+  let cloudTpls = [];
+  let filter = '';
 
-  // 클라우드 공용 템플릿 (설정+가능 시)
+  const matches = (cat) => !filter || cat === filter;
+
+  const renderBuiltin = () => {
+    const grid = body.querySelector('#tpl-builtin');
+    grid.innerHTML = '';
+    for (const t of builtin) {
+      if (!matches(t.category)) continue;
+      const card = document.createElement('button');
+      card.className = 'tpl-card';
+      card.innerHTML = `<div class="tpl-ico">${PRODUCT_ICON[t.category] || '🏠'}</div><div class="tpl-name">${esc(t.title)}</div>
+        <div class="tpl-tags">${t.tags.map((x) => `#${esc(x)}`).join(' ')}</div>`;
+      card.onclick = () => {
+        if (!confirm(`'${t.title}' 기본 도면을 불러올까요? 현재 작업은 사라집니다.`)) return;
+        const d = instantiateTemplate(t.id);
+        if (d) { store.loadInto(d); dlg.close(); flash(`'${t.title}' 불러옴`); }
+      };
+      grid.appendChild(card);
+    }
+  };
+
+  const renderCloud = () => {
+    const wrap = body.querySelector('#tpl-cloud-wrap');
+    const cg = body.querySelector('#tpl-cloud');
+    const shown = cloudTpls.filter((t) => matches((t.data?.productType || '').trim()));
+    wrap.style.display = shown.length ? '' : 'none';
+    cg.innerHTML = '';
+    for (const t of shown) {
+      const thumb = t.data?.thumb;
+      const ptype = (t.data?.productType || '').trim();
+      const card = document.createElement('button');
+      card.className = 'tpl-card';
+      card.innerHTML = `<div class="tpl-thumb">${thumb ? `<img src="${thumb}" alt="">` : `<span class="tpl-ico">${PRODUCT_ICON[ptype] || '☁'}</span>`}</div><div class="tpl-name">${esc(t.name)}</div><div class="tpl-tags">${ptype ? esc(ptype) : '공용 기본 도면'}</div>`;
+      card.onclick = () => {
+        store.loadInto(t.data, { cloudId: null });
+        dlg.close(); flash(`'${t.name}' 불러옴`);
+      };
+      cg.appendChild(card);
+    }
+  };
+
+  const renderFilter = () => {
+    const bar = body.querySelector('#tpl-filter');
+    const cats = ['', ...PRODUCT_TYPES];
+    bar.innerHTML = cats.map((c) =>
+      `<button class="chip${filter === c ? ' on' : ''}" data-c="${esc(c)}">${c ? `${PRODUCT_ICON[c] || ''} ${esc(c)}` : '전체'}</button>`
+    ).join('');
+    bar.querySelectorAll('.chip').forEach((ch) => ch.onclick = () => {
+      filter = ch.dataset.c;
+      renderFilter(); renderBuiltin(); renderCloud();
+    });
+  };
+
+  renderFilter();
+  renderBuiltin();
+
+  // 클라우드 공용 기본 도면 (설정+가능 시)
   if (cloud.configured()) {
     try {
       await cloud.init();
-      const cloudTpls = await cloud.listTemplates();
-      if (cloudTpls.length) {
-        body.querySelector('#tpl-cloud-wrap').style.display = '';
-        const cg = body.querySelector('#tpl-cloud');
-        for (const t of cloudTpls) {
-          const thumb = t.data?.thumb;
-          const card = document.createElement('button');
-          card.className = 'tpl-card';
-          card.innerHTML = `<div class="tpl-thumb">${thumb ? `<img src="${thumb}" alt="">` : '<span class="tpl-ico">☁</span>'}</div><div class="tpl-name">${esc(t.name)}</div><div class="tpl-tags">공용 템플릿</div>`;
-          card.onclick = () => {
-            store.loadInto(t.data, { cloudId: null });
-            dlg.close(); flash(`'${t.name}' 불러옴`);
-          };
-          cg.appendChild(card);
-        }
-      }
-    } catch (e) { /* 클라우드 미가용 → 내장 템플릿만 */ }
+      cloudTpls = await cloud.listTemplates();
+      renderCloud();
+    } catch (e) { /* 클라우드 미가용 → 내장 도면만 */ }
   }
 }
 
@@ -588,6 +621,7 @@ function renderCloudHome(body) {
     </div>
     <div class="btn-row">
       <button class="mini" id="cl-save" style="flex:1;background:#c8102e;color:#fff;border-color:#c8102e">현재 도면 클라우드 저장</button>
+      <button class="mini" id="cl-save-tpl" style="flex:1">📐 기본 도면으로 저장</button>
     </div>
     <div class="cl-tabs">
       <button class="cl-tab active" data-t="mine">내 도면</button>
@@ -596,6 +630,7 @@ function renderCloudHome(body) {
     <div id="cl-list" class="cl-list"><p class="hint">불러오는 중...</p></div>`;
   body.querySelector('#cl-out').onclick = async () => { await cloud.signOut(); reopenCloud(); };
   body.querySelector('#cl-save').onclick = () => openSaveForm(body);
+  body.querySelector('#cl-save-tpl').onclick = () => openSaveForm(body, { asTemplate: true });
   const tabs = body.querySelectorAll('.cl-tab');
   tabs.forEach((tb) => tb.onclick = () => {
     tabs.forEach((x) => x.classList.toggle('active', x === tb));
@@ -633,7 +668,8 @@ async function loadCloudList(body, which, filter = '') {
       const thumb = r.data?.thumb;
       const row = document.createElement('div');
       row.className = 'cl-row';
-      const badges = `${cust ? `<span class="bdg fld">📁 ${esc(cust)}</span>` : ''}${r.is_shared ? '<span class="bdg">공유</span>' : ''}${r.is_template ? '<span class="bdg tpl">템플릿</span>' : ''}`;
+      const ptype = (r.data?.productType || '').trim();
+      const badges = `${ptype ? `<span class="bdg pt">${PRODUCT_ICON[ptype] || ''} ${esc(ptype)}</span>` : ''}${cust ? `<span class="bdg fld">📁 ${esc(cust)}</span>` : ''}${r.is_shared ? '<span class="bdg">공유</span>' : ''}${r.is_template ? '<span class="bdg tpl">기본도면</span>' : ''}`;
       row.innerHTML = `
         <div class="cl-row-top">
           <div class="cl-thumb">${thumb ? `<img src="${thumb}" alt="">` : '<span>도면</span>'}</div>
@@ -668,16 +704,21 @@ async function loadCloudList(body, which, filter = '') {
   }
 }
 
-function openSaveForm(body) {
+function openSaveForm(body, { asTemplate = false } = {}) {
   const d = store.design;
   const wrap = document.createElement('div');
   wrap.className = 'cl-saveform';
+  const ptOptions = ['', ...PRODUCT_TYPES].map((p) =>
+    `<option value="${esc(p)}"${(d.productType || '') === p ? ' selected' : ''}>${p || '미지정'}</option>`
+  ).join('');
   wrap.innerHTML = `
+    <p class="m-sub">${asTemplate ? '현재 도면을 영업팀 공용 <b>기본 도면</b>으로 등록합니다.' : '현재 도면을 클라우드에 저장합니다.'}</p>
     <label class="fld"><span>도면 이름</span><input id="cs-name" value="${esc(d.name)}"></label>
+    <label class="fld"><span>제품 종류</span><select id="cs-ptype">${ptOptions}</select></label>
     <label class="fld"><span>고객명 / 분류 (폴더)</span><input id="cs-cust" list="cs-cust-list" value="${esc(d.customer || '')}" placeholder="예: 홍길동 고객 / 송절단지"></label>
     <datalist id="cs-cust-list"></datalist>
     <label class="ck"><input type="checkbox" id="cs-shared"> 영업사원 간 공유 (동료 목록·고객 링크 열람 허용)</label>
-    <label class="ck"><input type="checkbox" id="cs-tpl"> 공용 템플릿으로 등록 (모두의 템플릿 갤러리)</label>
+    <label class="ck"><input type="checkbox" id="cs-tpl"${asTemplate ? ' checked' : ''}> 기본 도면으로 등록 (영업팀 공용 라이브러리)</label>
     <div class="btn-row">
       <button class="mini" id="cs-go" style="flex:2;background:#c8102e;color:#fff;border-color:#c8102e">저장</button>
       <button class="mini" id="cs-cancel">취소</button>
@@ -696,6 +737,7 @@ function openSaveForm(body) {
     msg.textContent = '저장 중...';
     try {
       store.design.customer = wrap.querySelector('#cs-cust').value.trim();
+      store.design.productType = wrap.querySelector('#cs-ptype').value;
       // 썸네일 생성 (작은 JPEG)
       try { store.design.thumb = _editor.toImage(360, 240, 'image/jpeg', 0.6); } catch (e) {}
       const saved = await cloud.saveDesign({

@@ -81,12 +81,15 @@ export const ROOF_PALETTE = [
 // kind: 3D/2D 표현, w/h/sill 기본값(mm). 배치 후 개별 조정 가능
 // ---------------------------------------------------------------------------
 export const WINDOW_TYPES = {
-  double:   { label: '2중창',          w: 1500, h: 1400, sill: 800,  panes: 2, slide: false, glass: true },
-  sliding:  { label: '미닫이창',       w: 1800, h: 1400, sill: 800,  panes: 2, slide: true,  glass: true },
-  casement: { label: '여닫이창',       w: 900,  h: 1300, sill: 900,  panes: 1, slide: false, glass: true },
-  fixed:    { label: '고정창(픽스)',   w: 1200, h: 1500, sill: 700,  panes: 1, slide: false, glass: true },
-  balcony:  { label: '발코니 대형창',  w: 2700, h: 2200, sill: 50,   panes: 3, slide: true,  glass: true },
-  door:     { label: '현관문',         w: 1000, h: 2100, sill: 0,    panes: 1, slide: false, glass: false },
+  double:    { label: '2중창',          w: 1500, h: 1400, sill: 800, panes: 2, slide: false, glass: true },
+  sliding:   { label: '미닫이창',       w: 1800, h: 1400, sill: 800, panes: 2, slide: true,  glass: true },
+  casement:  { label: '여닫이창',       w: 900,  h: 1300, sill: 900, panes: 1, slide: false, glass: true },
+  casement2: { label: '여닫이창 2짝',   w: 1200, h: 1300, sill: 900, panes: 2, slide: false, glass: true },
+  fixed:     { label: '고정창(픽스)',   w: 1200, h: 1500, sill: 700, panes: 1, slide: false, glass: true },
+  folding:   { label: '폴딩도어',       w: 3600, h: 2200, sill: 0,   panes: 4, slide: true,  glass: true, fold: true },
+  foldWin:   { label: '폴딩창',         w: 2400, h: 1200, sill: 950, panes: 4, slide: true,  glass: true, fold: true },
+  balcony:   { label: '발코니 대형창',  w: 2700, h: 2200, sill: 50,  panes: 3, slide: true,  glass: true },
+  door:      { label: '현관문',         w: 1000, h: 2100, sill: 0,   panes: 1, slide: false, glass: false },
 };
 
 // 창호 라이브러리 카드용 목록

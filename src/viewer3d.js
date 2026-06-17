@@ -144,23 +144,12 @@ export class Viewer3D {
 
     if (isOpen) return; // 발코니는 벽 생략(난간 느낌)
 
-    const wallMat = TEX.wallMaterial('#f6f5f2');
-    const mk = (w, h, depth, cx, cy, cz) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, depth), wallMat);
-      m.position.set(cx, cy, cz);
-      m.castShadow = true; m.receiveShadow = true;
-      this.modelGroup.add(m);
-    };
-    const x0 = px, x1 = px + room.w, z0 = pz, z1 = pz + room.d;
-    const cy = wallH / 2 + 60;
     // 개방형 공간: 지정된 면(open)은 벽 생략 → 거실·주방 트인 구조 표현
+    // 그 외 벽은 창/문 개구부 자리를 비워(실제로 뚫어) 생성
     const open = Array.isArray(room.open) ? room.open : [];
-    // 북/남 (z방향 끝)
-    if (!open.includes('n')) mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z0);
-    if (!open.includes('s')) mk(room.w + WALL_T, wallH, WALL_T, px + room.w / 2, cy, z1);
-    // 동/서 (x방향 끝)
-    if (!open.includes('w')) mk(WALL_T, wallH, room.d + WALL_T, x0, cy, pz + room.d / 2);
-    if (!open.includes('e')) mk(WALL_T, wallH, room.d + WALL_T, x1, cy, pz + room.d / 2);
+    for (const side of ['n', 's', 'w', 'e']) {
+      if (!open.includes(side)) this._buildWall(room, side, wallH, b);
+    }
 
     // 다락은 경사 지붕 표현
     if (isAttic) {
@@ -172,6 +161,55 @@ export class Viewer3D {
       roof.position.set(px + room.w / 2, wallH + 60 + 450, pz + room.d / 2);
       roof.castShadow = true;
       this.modelGroup.add(roof);
+    }
+  }
+
+  // 한 벽면(room+side)에 있는 개구부들을 축 좌표로 정리 (a..c2, sill, top)
+  _collectOps(room, side, L) {
+    return (store.design.openings || [])
+      .filter((o) => o.roomId === room.id && o.side === side)
+      .map((o) => {
+        const half = (o.w || 900) / 2;
+        const c = Math.max(half, Math.min(L - half, o.pos));
+        return { a: c - half, c2: c + half, sill: Math.max(0, o.sill || 0), top: (o.sill || 0) + (o.h || 1200) };
+      })
+      .sort((p, q) => p.a - q.a);
+  }
+
+  // 개구부를 제외한 벽 솔리드 사각형 목록 [a, b, yLo, yHi]
+  // ext: 모서리 메움을 위해 양 끝을 늘리는 길이
+  _wallRects(L, ops, wallH, ext) {
+    const yBase = 60, wallTop = yBase + wallH;
+    const rects = [];
+    let cursor = -ext;
+    for (const o of ops) {
+      const top = Math.min(wallTop, yBase + o.top);
+      if (o.a > cursor) rects.push([cursor, o.a, yBase, wallTop]);     // 개구부 사이 꽉 찬 벽
+      if (top < wallTop) rects.push([o.a, o.c2, top, wallTop]);        // 상부 인방
+      if (o.sill > 0) rects.push([o.a, o.c2, yBase, yBase + o.sill]);  // 하부(창 밑) 벽
+      cursor = Math.max(cursor, o.c2);
+    }
+    if (cursor < L + ext) rects.push([cursor, L + ext, yBase, wallTop]);
+    return rects;
+  }
+
+  // 내벽: 개구부 자리를 비워(뚫어) 벽을 분할 생성
+  _buildWall(room, side, wallH, b) {
+    const [px, pz] = this._p(room.x, room.y, b);
+    const horiz = (side === 'n' || side === 's');
+    const L = horiz ? room.w : room.d;
+    const ops = this._collectOps(room, side, L);
+    const rects = this._wallRects(L, ops, wallH, WALL_T / 2);
+    const mat = TEX.wallMaterial('#f6f5f2');
+    for (const [a, bEnd, yLo, yHi] of rects) {
+      const len = bEnd - a, h = yHi - yLo;
+      if (len < 1 || h < 1) continue;
+      let cx, cz, w, dep;
+      if (horiz) { cx = px + (a + bEnd) / 2; cz = (side === 'n') ? pz : pz + room.d; w = len; dep = WALL_T; }
+      else       { cz = pz + (a + bEnd) / 2; cx = (side === 'w') ? px : px + room.w; w = WALL_T; dep = len; }
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dep), mat);
+      m.position.set(cx, (yLo + yHi) / 2, cz); m.castShadow = true; m.receiveShadow = true;
+      this.modelGroup.add(m);
     }
   }
 
@@ -222,11 +260,12 @@ export class Viewer3D {
         new THREE.MeshStandardMaterial({ color: '#bcd6e6', transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.2 })
       );
       g.add(glass);
-      // 창짝 분할 가로대(멀리언)
+      // 창짝 분할 세로 프레임(멀리언) — 폴딩은 패널마다 두꺼운 프레임
       const panes = Math.max(1, t.panes || 1);
+      const mullW = t.fold ? FT : FT * 0.7;
       for (let i = 1; i < panes; i++) {
         const x = -W / 2 + (W * i) / panes;
-        const mull = new THREE.Mesh(new THREE.BoxGeometry(FT * 0.7, Hh - FT * 2, WALL_T), frameMat);
+        const mull = new THREE.Mesh(new THREE.BoxGeometry(mullW, Hh - FT * 2, WALL_T), frameMat);
         mull.position.set(x, 0, 0); g.add(mull);
       }
     }
@@ -247,29 +286,34 @@ export class Viewer3D {
     const inAnyRoom = (x, y) => rooms.some((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.d);
 
     const mat = (len, h) => TEX.exteriorMaterial(ex.material, col, len, h, mDef.roughness, mDef.metalness);
-    // (가로폭, z두께, 평면X중심, 평면Y중심, 텍스처 길이, 벽높이)
-    const panel = (w, dep, planX, planZ, len, wallH) => {
-      const Hr = wallH + 120;
-      const [px, pz] = this._p(planX, planZ, b);
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, Hr, dep), mat(len, Hr));
-      m.position.set(px, Hr / 2 + 60, pz);
-      m.castShadow = true; m.receiveShadow = true;
-      this.modelGroup.add(m);
+    // 한 외벽에 외장 마감을 입힘 — 창/문 개구부 자리는 비워(뚫어) 둠
+    const cladEdge = (r, side, wallH) => {
+      const [px, pz] = this._p(r.x, r.y, b);
+      const horiz = (side === 'n' || side === 's');
+      const L = horiz ? r.w : r.d;
+      const ops = this._collectOps(r, side, L);
+      const rects = this._wallRects(L, ops, wallH, T); // 끝을 T 늘려 모서리 메움
+      for (const [a, bEnd, yLo, yHi] of rects) {
+        const len = bEnd - a, h = yHi - yLo;
+        if (len < 1 || h < 1) continue;
+        let cx, cz, w, dep;
+        if (horiz) { cx = px + (a + bEnd) / 2; cz = (side === 'n') ? pz - T / 2 : pz + r.d + T / 2; w = len; dep = T; }
+        else       { cz = pz + (a + bEnd) / 2; cx = (side === 'w') ? px - T / 2 : px + r.w + T / 2; w = T; dep = len; }
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dep), mat(len, h));
+        m.position.set(cx, (yLo + yHi) / 2, cz); m.castShadow = true; m.receiveShadow = true;
+        this.modelGroup.add(m);
+      }
     };
 
     for (const r of rooms) {
       const open = Array.isArray(r.open) ? r.open : [];
       const wallH = r.type === 'attic' ? ATTIC_HEIGHT : ceilH;
       const cx = r.x + r.w / 2, cz = r.y + r.d / 2;
-      // 모서리 메움: 가로변은 양끝을 T 만큼 늘려 세로 마감과 겹치게 함
-      if (!open.includes('n') && !inAnyRoom(cx, r.y - EPS))
-        panel(r.w + 2 * T, T, cx, r.y - T / 2, r.w, wallH);
-      if (!open.includes('s') && !inAnyRoom(cx, r.y + r.d + EPS))
-        panel(r.w + 2 * T, T, cx, r.y + r.d + T / 2, r.w, wallH);
-      if (!open.includes('w') && !inAnyRoom(r.x - EPS, cz))
-        panel(T, r.d, r.x - T / 2, cz, r.d, wallH);
-      if (!open.includes('e') && !inAnyRoom(r.x + r.w + EPS, cz))
-        panel(T, r.d, r.x + r.w + T / 2, cz, r.d, wallH);
+      // 바깥(다른 방이 없는 쪽)에 면하고 트지 않은 벽에만 외장 적용
+      if (!open.includes('n') && !inAnyRoom(cx, r.y - EPS)) cladEdge(r, 'n', wallH);
+      if (!open.includes('s') && !inAnyRoom(cx, r.y + r.d + EPS)) cladEdge(r, 's', wallH);
+      if (!open.includes('w') && !inAnyRoom(r.x - EPS, cz)) cladEdge(r, 'w', wallH);
+      if (!open.includes('e') && !inAnyRoom(r.x + r.w + EPS, cz)) cladEdge(r, 'e', wallH);
     }
   }
 

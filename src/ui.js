@@ -9,9 +9,11 @@ import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
+let _viewer = null; // 외장/지붕 자동 표시용
 
 export function buildUI({ editor, viewer, onModeChange }) {
   _editor = editor;
+  _viewer = viewer;
   buildLibrary();
   buildRoomPalette();
   buildToolbar({ editor, viewer, onModeChange });
@@ -211,19 +213,30 @@ function renderProperties(editor) {
       <label class="fld"><span>지붕 색상</span><input id="rf-color" type="color" value="${roof.color || '#3a3f44'}"></label>
       <div class="swatches" id="rf-sw">${ROOF_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
 
-      <p class="hint">· 3D 화면 우측 상단 <b>외장재 / 지붕</b> 버튼으로 외관을 켜고 끌 수 있습니다.<br>· 창호는 좌측 <b>창호</b> 탭에서 방 가장자리로 드래그하세요.</p>
+      <p class="hint">· 자재·색상을 고르면 3D에서 <b>외관(외장재/지붕)</b>이 자동으로 켜집니다. (우측 상단 버튼으로 끌 수 있어요)<br>· 창호는 좌측 <b>창호</b> 탭에서 방 가장자리로 드래그하세요.</p>
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
-  document.getElementById('ex-mat').onchange = (e) => store.commit((dd) => {
+  document.getElementById('ex-mat').onchange = (e) => { store.commit((dd) => {
     dd.exterior.material = e.target.value;
     dd.exterior.color = EXTERIOR_MATERIALS[e.target.value].color;
-  });
-  document.getElementById('ex-color').oninput = (e) => store.commit((dd) => dd.exterior.color = e.target.value);
-  document.getElementById('rf-type').onchange = (e) => store.commit((dd) => dd.roof.type = e.target.value);
-  document.getElementById('rf-color').oninput = (e) => store.commit((dd) => dd.roof.color = e.target.value);
-  document.querySelectorAll('#ex-sw .sw').forEach((b) => b.onclick = () => store.commit((dd) => dd.exterior.color = b.dataset.c));
-  document.querySelectorAll('#rf-sw .sw').forEach((b) => b.onclick = () => store.commit((dd) => dd.roof.color = b.dataset.c));
+  }); showExterior(); };
+  document.getElementById('ex-color').oninput = (e) => { store.commit((dd) => dd.exterior.color = e.target.value); showExterior(); };
+  document.getElementById('rf-type').onchange = (e) => { store.commit((dd) => dd.roof.type = e.target.value); showRoof(); };
+  document.getElementById('rf-color').oninput = (e) => { store.commit((dd) => dd.roof.color = e.target.value); showRoof(); };
+  document.querySelectorAll('#ex-sw .sw').forEach((b) => b.onclick = () => { store.commit((dd) => dd.exterior.color = b.dataset.c); showExterior(); });
+  document.querySelectorAll('#rf-sw .sw').forEach((b) => b.onclick = () => { store.commit((dd) => dd.roof.color = b.dataset.c); showRoof(); });
+}
+
+// 외장재/지붕을 바꾸면 3D 외관을 자동으로 켜서 변화가 바로 보이게 함
+function showExterior() { setOuter('view-ext', 'showExterior'); }
+function showRoof() { setOuter('view-roof', 'showRoof'); }
+function setOuter(btnId, flag) {
+  if (!_viewer || _viewer[flag]) return;
+  _viewer[flag] = true;
+  _viewer.dirty = true;
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.add('on');
 }
 
 function openingForm(o) {

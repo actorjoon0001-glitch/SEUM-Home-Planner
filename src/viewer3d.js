@@ -233,28 +233,44 @@ export class Viewer3D {
     this.modelGroup.add(g);
   }
 
-  // 외장재: 건물 외곽(바운딩 박스)을 감싸는 외벽 쉘
+  // 외장재: 건물 외곽에 면한 "기존 벽체"에 외장 마감을 입힘 (별도 테두리 쉘 X)
+  // 각 방의 4면 중 바깥(다른 방이 없는 쪽)에 면한 벽에만 마감 패널을 덧댐.
   _buildExterior(d, b, ceilH) {
     const ex = d.exterior || {};
     const mDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
     const col = ex.color || mDef.color;
-    const T = 160;          // 외벽 두께
-    const gap = 250;        // 내부 벽과의 간격
-    const H = ceilH + 120;
-    const x0 = -b.w / 2 - gap, x1 = b.w / 2 + gap;
-    const z0 = -b.h / 2 - gap, z1 = b.h / 2 + gap;
-    const W = (x1 - x0), D = (z1 - z0), cy = H / 2 + 60;
-    // 벽마다 길이에 맞춰 자재 텍스처 repeat 을 계산해 적용
-    const mk = (w, h, dep, x, y, z, len) => {
-      const mat = TEX.exteriorMaterial(ex.material, col, len, H, mDef.roughness, mDef.metalness);
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dep), mat);
-      m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+    const T = 120;            // 벽 바깥에 덧대는 외장 마감 두께
+    const EPS = 60;           // 벽 바로 바깥 지점으로 외곽 여부 판정
+
+    // 발코니(개방)는 외벽이 없으므로 외곽 판정 대상에서 제외
+    const rooms = d.rooms.filter((r) => r.type !== 'balcony');
+    const inAnyRoom = (x, y) => rooms.some((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.d);
+
+    const mat = (len, h) => TEX.exteriorMaterial(ex.material, col, len, h, mDef.roughness, mDef.metalness);
+    // (가로폭, z두께, 평면X중심, 평면Y중심, 텍스처 길이, 벽높이)
+    const panel = (w, dep, planX, planZ, len, wallH) => {
+      const Hr = wallH + 120;
+      const [px, pz] = this._p(planX, planZ, b);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, Hr, dep), mat(len, Hr));
+      m.position.set(px, Hr / 2 + 60, pz);
+      m.castShadow = true; m.receiveShadow = true;
       this.modelGroup.add(m);
     };
-    mk(W + T, H, T, (x0 + x1) / 2, cy, z0, W);
-    mk(W + T, H, T, (x0 + x1) / 2, cy, z1, W);
-    mk(T, H, D + T, x0, cy, (z0 + z1) / 2, D);
-    mk(T, H, D + T, x1, cy, (z0 + z1) / 2, D);
+
+    for (const r of rooms) {
+      const open = Array.isArray(r.open) ? r.open : [];
+      const wallH = r.type === 'attic' ? ATTIC_HEIGHT : ceilH;
+      const cx = r.x + r.w / 2, cz = r.y + r.d / 2;
+      // 모서리 메움: 가로변은 양끝을 T 만큼 늘려 세로 마감과 겹치게 함
+      if (!open.includes('n') && !inAnyRoom(cx, r.y - EPS))
+        panel(r.w + 2 * T, T, cx, r.y - T / 2, r.w, wallH);
+      if (!open.includes('s') && !inAnyRoom(cx, r.y + r.d + EPS))
+        panel(r.w + 2 * T, T, cx, r.y + r.d + T / 2, r.w, wallH);
+      if (!open.includes('w') && !inAnyRoom(r.x - EPS, cz))
+        panel(T, r.d, r.x - T / 2, cz, r.d, wallH);
+      if (!open.includes('e') && !inAnyRoom(r.x + r.w + EPS, cz))
+        panel(T, r.d, r.x + r.w + T / 2, cz, r.d, wallH);
+    }
   }
 
   // 지붕: 형태별 생성 (평지붕/박공/비대칭박공/우진각/외쪽)

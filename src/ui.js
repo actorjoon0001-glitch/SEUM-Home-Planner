@@ -3,7 +3,7 @@ import { store } from './store.js';
 import {
   ROOM_TYPES, FURNITURE_CATALOG, CATEGORIES, catalogOf,
   WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
-  ROOF_TYPES, ROOF_PALETTE,
+  ROOF_TYPES, ROOF_PALETTE, PRODUCT_TYPES,
 } from './data.js';
 import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
@@ -315,6 +315,13 @@ function roomForm(room) {
       <label class="fld"><span>Y 위치</span><input id="r-y" type="number" step="100" value="${room.y}"></label>
     </div>
     <div class="info-row"><span>면적</span><b>${area} m² (${(area/3.305).toFixed(1)}평)</b></div>
+    <div class="fld"><span>벽 (눌러서 트기 ↔ 막기)</span>
+      <div class="wall-toggle" id="r-walls">
+        ${[['n','북'],['s','남'],['w','서'],['e','동']].map(([s,l]) =>
+          `<button class="wt${(room.open||[]).includes(s) ? ' off' : ''}" data-s="${s}">${l}</button>`).join('')}
+      </div>
+    </div>
+    <p class="hint small">거실·주방처럼 트인 공간은 맞닿은 두 방의 해당 면을 모두 '트기'로 (3D에서 벽 사라짐)</p>
     <div class="btn-row">
       <button class="mini" id="r-dup">복제</button>
       <button class="mini danger" id="r-del">삭제</button>
@@ -329,8 +336,15 @@ function bindRoomForm(room) {
   for (const k of ['w', 'd', 'x', 'y']) {
     document.getElementById('r-' + k).onchange = (e) => upd(k, Math.max(0, +e.target.value || 0));
   }
+  document.querySelectorAll('#r-walls .wt').forEach((btn) => btn.onclick = () => store.commit(() => {
+    const s = btn.dataset.s;
+    const open = Array.isArray(room.open) ? room.open : (room.open = []);
+    const i = open.indexOf(s);
+    if (i >= 0) open.splice(i, 1); else open.push(s); // 막기 ↔ 트기 토글
+  }));
   document.getElementById('r-dup').onclick = () => store.commit((d) => {
     const copy = { ...room, id: 'r' + Date.now().toString(36), x: room.x + 400, y: room.y + 400 };
+    if (Array.isArray(room.open)) copy.open = room.open.slice();
     d.rooms.push(copy); store.selectedRoom = copy.id;
   });
   document.getElementById('r-del').onclick = () => store.commit((d) => {
@@ -395,6 +409,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
 
   $('tb-open').onclick = () => openLoadDialog();
   $('tb-templates').onclick = () => openTemplateDialog();
+  $('tb-underlay').onclick = () => openUnderlayDialog(editor);
   $('tb-cloud').onclick = () => openCloudDialog();
 
   $('tb-export').onclick = () => {
@@ -490,55 +505,205 @@ function modal(title, contentEl) {
 }
 
 // ---------------------------------------------------------------------------
-// 템플릿(단지/평형) 라이브러리
+// 기본 도면 라이브러리 (세움 제품: 주택 / 체류형 쉼터 / 농막)
 // ---------------------------------------------------------------------------
+const PRODUCT_ICON = { '주택': '🏠', '체류형 쉼터': '🏕️', '농막': '🛖' };
+
 async function openTemplateDialog() {
   const body = document.createElement('div');
   const builtin = listTemplates();
-  body.innerHTML = `<p class="m-sub">상담 시작용 도면을 선택하면 현재 화면에 불러옵니다.</p>
+  body.innerHTML = `<p class="m-sub">기본 도면을 선택하면 현재 화면에 불러와 바로 수정할 수 있습니다.</p>
+    <div class="cl-filter" id="tpl-filter"></div>
     <div class="tpl-grid" id="tpl-builtin"></div>
     <div id="tpl-cloud-wrap" style="display:none">
-      <p class="m-sub" style="margin-top:14px">공용 템플릿 (클라우드)</p>
+      <p class="m-sub" style="margin-top:14px">☁ 영업팀 공용 기본 도면</p>
       <div class="tpl-grid" id="tpl-cloud"></div>
     </div>`;
-  const dlg = modal('단지 · 평형 템플릿', body);
+  const dlg = modal('기본 도면 라이브러리', body);
 
-  const grid = body.querySelector('#tpl-builtin');
-  for (const t of builtin) {
-    const card = document.createElement('button');
-    card.className = 'tpl-card';
-    card.innerHTML = `<div class="tpl-ico">🏠</div><div class="tpl-name">${esc(t.title)}</div>
-      <div class="tpl-tags">${t.tags.map((x) => `#${esc(x)}`).join(' ')}</div>`;
-    card.onclick = () => {
-      if (!confirm(`'${t.title}' 템플릿을 불러올까요? 현재 작업은 사라집니다.`)) return;
-      const d = instantiateTemplate(t.id);
-      if (d) { store.loadInto(d); dlg.close(); flash(`'${t.title}' 불러옴`); }
-    };
-    grid.appendChild(card);
-  }
+  let cloudTpls = [];
+  let filter = '';
 
-  // 클라우드 공용 템플릿 (설정+가능 시)
+  const matches = (cat) => !filter || cat === filter;
+
+  const renderBuiltin = () => {
+    const grid = body.querySelector('#tpl-builtin');
+    grid.innerHTML = '';
+    for (const t of builtin) {
+      if (!matches(t.category)) continue;
+      const card = document.createElement('button');
+      card.className = 'tpl-card';
+      card.innerHTML = `<div class="tpl-ico">${PRODUCT_ICON[t.category] || '🏠'}</div><div class="tpl-name">${esc(t.title)}</div>
+        <div class="tpl-tags">${t.tags.map((x) => `#${esc(x)}`).join(' ')}</div>`;
+      card.onclick = () => {
+        if (!confirm(`'${t.title}' 기본 도면을 불러올까요? 현재 작업은 사라집니다.`)) return;
+        const d = instantiateTemplate(t.id);
+        if (d) { store.loadInto(d); dlg.close(); flash(`'${t.title}' 불러옴`); }
+      };
+      grid.appendChild(card);
+    }
+  };
+
+  const renderCloud = () => {
+    const wrap = body.querySelector('#tpl-cloud-wrap');
+    const cg = body.querySelector('#tpl-cloud');
+    const shown = cloudTpls.filter((t) => matches((t.data?.productType || '').trim()));
+    wrap.style.display = shown.length ? '' : 'none';
+    cg.innerHTML = '';
+    for (const t of shown) {
+      const thumb = t.data?.thumb;
+      const ptype = (t.data?.productType || '').trim();
+      const card = document.createElement('button');
+      card.className = 'tpl-card';
+      card.innerHTML = `<div class="tpl-thumb">${thumb ? `<img src="${thumb}" alt="">` : `<span class="tpl-ico">${PRODUCT_ICON[ptype] || '☁'}</span>`}</div><div class="tpl-name">${esc(t.name)}</div><div class="tpl-tags">${ptype ? esc(ptype) : '공용 기본 도면'}</div>`;
+      card.onclick = () => {
+        store.loadInto(t.data, { cloudId: null });
+        dlg.close(); flash(`'${t.name}' 불러옴`);
+      };
+      cg.appendChild(card);
+    }
+  };
+
+  const renderFilter = () => {
+    const bar = body.querySelector('#tpl-filter');
+    const cats = ['', ...PRODUCT_TYPES];
+    bar.innerHTML = cats.map((c) =>
+      `<button class="chip${filter === c ? ' on' : ''}" data-c="${esc(c)}">${c ? `${PRODUCT_ICON[c] || ''} ${esc(c)}` : '전체'}</button>`
+    ).join('');
+    bar.querySelectorAll('.chip').forEach((ch) => ch.onclick = () => {
+      filter = ch.dataset.c;
+      renderFilter(); renderBuiltin(); renderCloud();
+    });
+  };
+
+  renderFilter();
+  renderBuiltin();
+
+  // 클라우드 공용 기본 도면 (설정+가능 시)
   if (cloud.configured()) {
     try {
       await cloud.init();
-      const cloudTpls = await cloud.listTemplates();
-      if (cloudTpls.length) {
-        body.querySelector('#tpl-cloud-wrap').style.display = '';
-        const cg = body.querySelector('#tpl-cloud');
-        for (const t of cloudTpls) {
-          const thumb = t.data?.thumb;
-          const card = document.createElement('button');
-          card.className = 'tpl-card';
-          card.innerHTML = `<div class="tpl-thumb">${thumb ? `<img src="${thumb}" alt="">` : '<span class="tpl-ico">☁</span>'}</div><div class="tpl-name">${esc(t.name)}</div><div class="tpl-tags">공용 템플릿</div>`;
-          card.onclick = () => {
-            store.loadInto(t.data, { cloudId: null });
-            dlg.close(); flash(`'${t.name}' 불러옴`);
-          };
-          cg.appendChild(card);
-        }
-      }
-    } catch (e) { /* 클라우드 미가용 → 내장 템플릿만 */ }
+      cloudTpls = await cloud.listTemplates();
+      renderCloud();
+    } catch (e) { /* 클라우드 미가용 → 내장 도면만 */ }
   }
+}
+
+// ---------------------------------------------------------------------------
+// 밑그림(참조 도면): PDF/이미지를 배경에 깔고 그 위에 방을 그려 편집 도면으로 변환
+// ---------------------------------------------------------------------------
+function openUnderlayDialog(editor) {
+  const body = document.createElement('div');
+  // 밑그림 변경은 undo 히스토리에 큰 이미지가 쌓이지 않도록 liveUpdate 로 처리
+  const apply = (mut) => { store.liveUpdate(mut); store.liveEnd(); };
+
+  function render() {
+    const u = store.design.underlay;
+    if (!u) {
+      body.innerHTML = `
+        <p class="m-sub">갖고 계신 도면 <b>PDF·이미지</b>를 배경으로 깔고, 그 위에 방을 그려 편집 가능한 도면으로 만드세요.</p>
+        <label class="fld"><span>도면 파일 선택 (PDF / PNG / JPG)</span><input id="ul-file" type="file" accept="application/pdf,image/*"></label>
+        <p id="ul-msg" class="hint"></p>
+        <ol class="hint" style="padding-left:18px;line-height:1.8">
+          <li>파일을 고르면 화면 배경에 깔립니다.</li>
+          <li><b>축척 맞추기</b> → 도면에서 길이를 아는 곳(예: 벽 한 변)의 양끝 두 점을 클릭하고 실제 mm 입력 → 크기가 실제와 맞춰집니다.</li>
+          <li>좌측 팔레트에서 방을 추가해 밑그림을 따라 그립니다.</li>
+          <li>다 그리면 <b>밑그림 제거</b> 후 "📐 기본 도면으로 저장".</li>
+        </ol>`;
+      body.querySelector('#ul-file').onchange = (e) => loadFile(e.target.files[0]);
+      return;
+    }
+    body.innerHTML = `
+      <p class="m-sub">밑그림이 깔려 있습니다. <b>축척 맞추기</b>로 크기를 실제와 맞춘 뒤 방을 그려 따라 그리세요.</p>
+      <label class="fld"><span>투명도</span><input id="ul-op" type="range" min="0.1" max="1" step="0.05" value="${u.opacity != null ? u.opacity : 0.5}"></label>
+      <label class="fld"><span>가로 실제 크기(mm)</span><input id="ul-w" type="number" value="${Math.round(u.w)}" step="100"></label>
+      <div class="btn-row">
+        <button class="mini" id="ul-cal" style="flex:1;background:#c8102e;color:#fff;border-color:#c8102e">📏 축척 맞추기 (두 점)</button>
+        <button class="mini" id="ul-focus" style="flex:1">화면 맞춤</button>
+      </div>
+      <div class="btn-row">
+        <button class="mini" id="ul-hide" style="flex:1">${u.hidden ? '밑그림 보이기' : '밑그림 숨기기'}</button>
+        <button class="mini" id="ul-replace" style="flex:1">다른 파일</button>
+        <button class="mini danger" id="ul-del" style="flex:1">밑그림 제거</button>
+      </div>
+      <p id="ul-msg" class="hint"></p>`;
+    body.querySelector('#ul-op').oninput = (e) => store.liveUpdate((d) => { d.underlay.opacity = parseFloat(e.target.value); });
+    body.querySelector('#ul-op').onchange = () => store.liveEnd();
+    body.querySelector('#ul-w').onchange = (e) => {
+      const neww = parseFloat(e.target.value);
+      if (neww > 0) apply((d) => { const f = neww / d.underlay.w; d.underlay.h *= f; d.underlay.w = neww; });
+    };
+    body.querySelector('#ul-cal').onclick = () => {
+      editor.startCalibrate();
+      closeModal();
+      flash('밑그림 위에서 길이를 아는 두 점을 차례로 클릭하세요');
+    };
+    body.querySelector('#ul-focus').onclick = () => editor.focusUnderlay();
+    body.querySelector('#ul-hide').onclick = () => { apply((d) => { d.underlay.hidden = !d.underlay.hidden; }); render(); };
+    body.querySelector('#ul-replace').onclick = () => { apply((d) => { d.underlay = null; }); render(); };
+    body.querySelector('#ul-del').onclick = () => {
+      if (!confirm('밑그림을 제거할까요? (그려둔 방은 그대로 남습니다)')) return;
+      apply((d) => { d.underlay = null; });
+      render();
+    };
+  }
+
+  async function loadFile(file) {
+    if (!file) return;
+    const msg = body.querySelector('#ul-msg');
+    try {
+      msg.style.color = ''; msg.textContent = '불러오는 중...';
+      let dataURL, iw, ih;
+      if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+        ({ dataURL, iw, ih } = await pdfToImage(file));
+      } else {
+        dataURL = await fileToDataURL(file);
+        ({ iw, ih } = await imageSize(dataURL));
+      }
+      const w0 = 12000; // 기본 가로 12m (이후 '축척 맞추기'로 실제 크기 보정)
+      const h0 = w0 * (ih / iw);
+      apply((d) => { d.underlay = { src: dataURL, x: 0, y: 0, w: w0, h: h0, opacity: 0.5, hidden: false }; });
+      editor.focusUnderlay();
+      render();
+      flash('밑그림 불러옴 — 이제 "축척 맞추기"로 크기를 맞추세요');
+    } catch (e) {
+      msg.style.color = '#c8102e';
+      msg.textContent = '불러오기 실패: ' + e.message;
+    }
+  }
+
+  render();
+  modal('밑그림 (참조 도면)', body);
+}
+
+function fileToDataURL(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('파일 읽기 실패'));
+    r.readAsDataURL(file);
+  });
+}
+function imageSize(dataURL) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res({ iw: img.naturalWidth, ih: img.naturalHeight });
+    img.onerror = () => rej(new Error('이미지 형식 오류'));
+    img.src = dataURL;
+  });
+}
+// PDF 1페이지를 이미지(dataURL)로 변환 (pdf.js, CDN 동적 로드)
+async function pdfToImage(file) {
+  const pdfjs = await import('https://esm.sh/pdfjs-dist@4.7.76/build/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs';
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width; canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return { dataURL: canvas.toDataURL('image/jpeg', 0.85), iw: canvas.width, ih: canvas.height };
 }
 
 // ---------------------------------------------------------------------------
@@ -605,6 +770,7 @@ function renderCloudHome(body) {
     </div>
     <div class="btn-row">
       <button class="mini" id="cl-save" style="flex:1;background:#c8102e;color:#fff;border-color:#c8102e">현재 도면 클라우드 저장</button>
+      <button class="mini" id="cl-save-tpl" style="flex:1">📐 기본 도면으로 저장</button>
     </div>
     <div class="cl-tabs">
       <button class="cl-tab active" data-t="mine">내 도면</button>
@@ -613,6 +779,7 @@ function renderCloudHome(body) {
     <div id="cl-list" class="cl-list"><p class="hint">불러오는 중...</p></div>`;
   body.querySelector('#cl-out').onclick = async () => { await cloud.signOut(); reopenCloud(); };
   body.querySelector('#cl-save').onclick = () => openSaveForm(body);
+  body.querySelector('#cl-save-tpl').onclick = () => openSaveForm(body, { asTemplate: true });
   const tabs = body.querySelectorAll('.cl-tab');
   tabs.forEach((tb) => tb.onclick = () => {
     tabs.forEach((x) => x.classList.toggle('active', x === tb));
@@ -650,7 +817,8 @@ async function loadCloudList(body, which, filter = '') {
       const thumb = r.data?.thumb;
       const row = document.createElement('div');
       row.className = 'cl-row';
-      const badges = `${cust ? `<span class="bdg fld">📁 ${esc(cust)}</span>` : ''}${r.is_shared ? '<span class="bdg">공유</span>' : ''}${r.is_template ? '<span class="bdg tpl">템플릿</span>' : ''}`;
+      const ptype = (r.data?.productType || '').trim();
+      const badges = `${ptype ? `<span class="bdg pt">${PRODUCT_ICON[ptype] || ''} ${esc(ptype)}</span>` : ''}${cust ? `<span class="bdg fld">📁 ${esc(cust)}</span>` : ''}${r.is_shared ? '<span class="bdg">공유</span>' : ''}${r.is_template ? '<span class="bdg tpl">기본도면</span>' : ''}`;
       row.innerHTML = `
         <div class="cl-row-top">
           <div class="cl-thumb">${thumb ? `<img src="${thumb}" alt="">` : '<span>도면</span>'}</div>
@@ -685,16 +853,21 @@ async function loadCloudList(body, which, filter = '') {
   }
 }
 
-function openSaveForm(body) {
+function openSaveForm(body, { asTemplate = false } = {}) {
   const d = store.design;
   const wrap = document.createElement('div');
   wrap.className = 'cl-saveform';
+  const ptOptions = ['', ...PRODUCT_TYPES].map((p) =>
+    `<option value="${esc(p)}"${(d.productType || '') === p ? ' selected' : ''}>${p || '미지정'}</option>`
+  ).join('');
   wrap.innerHTML = `
+    <p class="m-sub">${asTemplate ? '현재 도면을 영업팀 공용 <b>기본 도면</b>으로 등록합니다.' : '현재 도면을 클라우드에 저장합니다.'}</p>
     <label class="fld"><span>도면 이름</span><input id="cs-name" value="${esc(d.name)}"></label>
+    <label class="fld"><span>제품 종류</span><select id="cs-ptype">${ptOptions}</select></label>
     <label class="fld"><span>고객명 / 분류 (폴더)</span><input id="cs-cust" list="cs-cust-list" value="${esc(d.customer || '')}" placeholder="예: 홍길동 고객 / 송절단지"></label>
     <datalist id="cs-cust-list"></datalist>
     <label class="ck"><input type="checkbox" id="cs-shared"> 영업사원 간 공유 (동료 목록·고객 링크 열람 허용)</label>
-    <label class="ck"><input type="checkbox" id="cs-tpl"> 공용 템플릿으로 등록 (모두의 템플릿 갤러리)</label>
+    <label class="ck"><input type="checkbox" id="cs-tpl"${asTemplate ? ' checked' : ''}> 기본 도면으로 등록 (영업팀 공용 라이브러리)</label>
     <div class="btn-row">
       <button class="mini" id="cs-go" style="flex:2;background:#c8102e;color:#fff;border-color:#c8102e">저장</button>
       <button class="mini" id="cs-cancel">취소</button>
@@ -713,14 +886,18 @@ function openSaveForm(body) {
     msg.textContent = '저장 중...';
     try {
       store.design.customer = wrap.querySelector('#cs-cust').value.trim();
+      store.design.productType = wrap.querySelector('#cs-ptype').value;
       // 썸네일 생성 (작은 JPEG)
       try { store.design.thumb = _editor.toImage(360, 240, 'image/jpeg', 0.6); } catch (e) {}
+      const isTemplate = wrap.querySelector('#cs-tpl').checked;
+      // 기본 도면(템플릿)에는 용량 큰 밑그림을 제외해 깔끔하게 저장
+      const data = isTemplate && store.design.underlay ? { ...store.design, underlay: null } : store.design;
       const saved = await cloud.saveDesign({
         id: store.cloudId || undefined,
         name: wrap.querySelector('#cs-name').value || '무제 도면',
-        data: store.design,
+        data,
         isShared: wrap.querySelector('#cs-shared').checked,
-        isTemplate: wrap.querySelector('#cs-tpl').checked,
+        isTemplate,
       });
       store.cloudId = saved.id;
       store.design.name = saved.name;

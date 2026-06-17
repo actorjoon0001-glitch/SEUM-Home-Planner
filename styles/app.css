@@ -157,6 +157,16 @@ body {
 .sw:hover { transform: scale(1.12); box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 .fld input[type=color] { height: 34px; padding: 3px; cursor: pointer; }
 .prop-empty .info-row:first-of-type { border-top: 1px solid var(--line); margin-top: 6px; }
+/* 창호 목록 */
+.win-list { display: flex; flex-direction: column; gap: 5px; margin: 2px 0 4px; }
+.win-item {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  width: 100%; text-align: left; padding: 7px 9px; cursor: pointer;
+  background: #fff; border: 1px solid var(--line); border-radius: 6px; font-family: inherit;
+}
+.win-item:hover { border-color: var(--seum-red); background: #fff7f6; }
+.win-item .wi-name { font-size: 12px; font-weight: 600; color: var(--ink); }
+.win-item .wi-meta { font-size: 11px; color: var(--muted); }
 
 /* ---------- 토스트 / 다이얼로그 ---------- */
 .toast {

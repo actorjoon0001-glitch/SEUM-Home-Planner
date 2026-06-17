@@ -195,6 +195,19 @@ function renderProperties(editor) {
     .map(([k, m]) => `<option value="${k}" ${k === ex.material ? 'selected' : ''}>${m.label}</option>`).join('');
   const roofOpts = Object.entries(ROOF_TYPES)
     .map(([k, t]) => `<option value="${k}" ${k === roof.type ? 'selected' : ''}>${t.label}</option>`).join('');
+  // 창호 목록 (클릭하면 선택 → 편집 폼) — 속성란에서 바로 수정
+  const sideKo = { n: '북', s: '남', e: '동', w: '서' };
+  const ops = d.openings || [];
+  const winListHtml = ops.length
+    ? `<div class="win-list">${ops.map((o) => {
+        const r = d.rooms.find((rr) => rr.id === o.roomId);
+        const t = WINDOW_TYPES[o.winType] || {};
+        return `<button class="win-item" data-id="${o.id}">
+          <span class="wi-name">${t.label || '창호'}</span>
+          <span class="wi-meta">${r ? esc(r.name) : '-'} · ${sideKo[o.side] || o.side} · ${o.w}×${o.h}</span>
+        </button>`;
+      }).join('')}</div>`
+    : `<p class="hint">좌측 <b>창호</b> 탭에서 벽으로 드래그해 추가하세요.</p>`;
   panel.innerHTML = `
     <div class="prop-empty">
       <p class="ph">도면 정보</p>
@@ -215,7 +228,10 @@ function renderProperties(editor) {
       <label class="fld"><span>지붕 색상</span><input id="rf-color" type="color" value="${roof.color || '#3a3f44'}"></label>
       <div class="swatches" id="rf-sw">${ROOF_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
 
-      <p class="hint">· 자재·색상을 고르면 3D에서 <b>외관(외장재/지붕)</b>이 자동으로 켜집니다. (우측 상단 버튼으로 끌 수 있어요)<br>· 창호는 좌측 <b>창호</b> 탭에서 방 가장자리로 드래그하세요.</p>
+      <p class="ph mt">창호 (${ops.length})</p>
+      ${winListHtml}
+
+      <p class="hint">· 위 창호를 누르면 속성에서 종류·크기·위치를 바로 수정할 수 있어요.<br>· 자재·색상을 고르면 3D에서 <b>외관</b>이 자동으로 켜집니다.</p>
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
@@ -235,6 +251,8 @@ function renderProperties(editor) {
   const rfShow = document.getElementById('rf-show');
   rfShow.checked = !!(_viewer && _viewer.showRoof);
   rfShow.onchange = (e) => applyOuter('showRoof', e.target.checked);
+  // 창호 목록 항목 클릭 → 해당 창 선택(편집 폼 표시)
+  document.querySelectorAll('.win-item').forEach((b) => b.onclick = () => store.select(null, null, b.dataset.id));
 }
 
 // 외장/지붕 표시 상태를 한 곳에서 제어 — 플로팅 버튼 + 패널 토글을 함께 동기화
@@ -256,8 +274,10 @@ function openingForm(o) {
     .map(([k, t]) => `<option value="${k}" ${k === o.winType ? 'selected' : ''}>${t.label}</option>`).join('');
   const sideOpts = [['n', '북(상)'], ['s', '남(하)'], ['e', '동(우)'], ['w', '서(좌)']]
     .map(([k, l]) => `<option value="${k}" ${k === o.side ? 'selected' : ''}>${l}</option>`).join('');
+  const room = (store.design.rooms || []).find((r) => r.id === o.roomId);
   return `
-    <p class="ph">창호 속성</p>
+    <button class="mini" id="o-back">← 창호 목록</button>
+    <p class="ph">창호 속성${room ? ` · ${esc(room.name)}` : ''}</p>
     <label class="fld"><span>종류</span><select id="o-type">${typeOpts}</select></label>
     <label class="fld"><span>부착 벽면</span><select id="o-side">${sideOpts}</select></label>
     <div class="grid2">
@@ -278,6 +298,7 @@ function openingForm(o) {
 
 function bindOpeningForm(o) {
   const upd = (m) => store.commit(() => m());
+  document.getElementById('o-back').onclick = () => store.select(null, null, null);
   document.getElementById('o-type').onchange = (e) => upd(() => {
     o.winType = e.target.value;
     const t = WINDOW_TYPES[e.target.value];

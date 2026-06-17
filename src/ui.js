@@ -204,11 +204,13 @@ function renderProperties(editor) {
       <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${(d.openings||[]).length}</b></div>
 
       <p class="ph mt">외장재 · 색상</p>
+      <label class="fld toggle"><span>3D 외관(외장재) 표시</span><input id="ex-show" type="checkbox"></label>
       <label class="fld"><span>외장재 종류</span><select id="ex-mat">${matOpts}</select></label>
       <label class="fld"><span>외장 색상</span><input id="ex-color" type="color" value="${ex.color || '#8d96a0'}"></label>
       <div class="swatches" id="ex-sw">${EXTERIOR_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
 
       <p class="ph mt">지붕</p>
+      <label class="fld toggle"><span>3D 지붕 표시</span><input id="rf-show" type="checkbox"></label>
       <label class="fld"><span>지붕 형태</span><select id="rf-type">${roofOpts}</select></label>
       <label class="fld"><span>지붕 색상</span><input id="rf-color" type="color" value="${roof.color || '#3a3f44'}"></label>
       <div class="swatches" id="rf-sw">${ROOF_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
@@ -226,18 +228,28 @@ function renderProperties(editor) {
   document.getElementById('rf-color').oninput = (e) => { store.commit((dd) => dd.roof.color = e.target.value); showRoof(); };
   document.querySelectorAll('#ex-sw .sw').forEach((b) => b.onclick = () => { store.commit((dd) => dd.exterior.color = b.dataset.c); showExterior(); });
   document.querySelectorAll('#rf-sw .sw').forEach((b) => b.onclick = () => { store.commit((dd) => dd.roof.color = b.dataset.c); showRoof(); });
+  // 외관/지붕 표시 ON·OFF (현재 viewer 상태 반영, 끄기도 여기서 가능)
+  const exShow = document.getElementById('ex-show');
+  exShow.checked = !!(_viewer && _viewer.showExterior);
+  exShow.onchange = (e) => applyOuter('showExterior', e.target.checked);
+  const rfShow = document.getElementById('rf-show');
+  rfShow.checked = !!(_viewer && _viewer.showRoof);
+  rfShow.onchange = (e) => applyOuter('showRoof', e.target.checked);
 }
 
-// 외장재/지붕을 바꾸면 3D 외관을 자동으로 켜서 변화가 바로 보이게 함
-function showExterior() { setOuter('view-ext', 'showExterior'); }
-function showRoof() { setOuter('view-roof', 'showRoof'); }
-function setOuter(btnId, flag) {
-  if (!_viewer || _viewer[flag]) return;
-  _viewer[flag] = true;
+// 외장/지붕 표시 상태를 한 곳에서 제어 — 플로팅 버튼 + 패널 토글을 함께 동기화
+const OUTER_CTRL = { showExterior: ['view-ext', 'ex-show'], showRoof: ['view-roof', 'rf-show'] };
+function applyOuter(flag, on) {
+  if (!_viewer) return;
+  _viewer[flag] = on;
   _viewer.dirty = true;
-  const btn = document.getElementById(btnId);
-  if (btn) btn.classList.add('on');
+  const [btnId, chkId] = OUTER_CTRL[flag];
+  const btn = document.getElementById(btnId); if (btn) btn.classList.toggle('on', on);
+  const chk = document.getElementById(chkId); if (chk) chk.checked = on;
 }
+// 자재/색상을 바꾸면 외관을 자동으로 켜서 변화가 바로 보이게 함
+function showExterior() { applyOuter('showExterior', true); }
+function showRoof() { applyOuter('showRoof', true); }
 
 function openingForm(o) {
   const typeOpts = Object.entries(WINDOW_TYPES)
@@ -419,17 +431,9 @@ function buildToolbar({ editor, viewer, onModeChange }) {
     e.currentTarget.classList.toggle('on');
   };
 
-  // 외장재 / 지붕 표시 토글 (3D)
-  $('view-ext').onclick = (e) => {
-    viewer.showExterior = !viewer.showExterior;
-    e.currentTarget.classList.toggle('on', viewer.showExterior);
-    viewer.dirty = true;
-  };
-  $('view-roof').onclick = (e) => {
-    viewer.showRoof = !viewer.showRoof;
-    e.currentTarget.classList.toggle('on', viewer.showRoof);
-    viewer.dirty = true;
-  };
+  // 외장재 / 지붕 표시 토글 (3D) — 패널 체크박스와 동기화
+  $('view-ext').onclick = () => applyOuter('showExterior', !viewer.showExterior);
+  $('view-roof').onclick = () => applyOuter('showRoof', !viewer.showRoof);
 
   // 3D 카메라 프리셋
   $('view-iso').onclick = () => viewer.view('iso');

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES } from './data.js';
+import * as TEX from './textures.js';
 
 const WALL_T = 100; // 벽 두께 mm
 
@@ -132,10 +133,10 @@ export class Viewer3D {
     const wallH = isAttic ? ATTIC_HEIGHT : ceilH;
     const [px, pz] = this._p(room.x, room.y, b);
 
-    // 바닥
+    // 바닥 (방 종류별 마루/타일 질감)
     const floor = new THREE.Mesh(
       new THREE.BoxGeometry(room.w, 60, room.d),
-      new THREE.MeshStandardMaterial({ color: t.color })
+      TEX.floorMaterial(room.type, t.color, room.w, room.d)
     );
     floor.position.set(px + room.w / 2, 30, pz + room.d / 2);
     floor.receiveShadow = true;
@@ -143,7 +144,7 @@ export class Viewer3D {
 
     if (isOpen) return; // 발코니는 벽 생략(난간 느낌)
 
-    const wallMat = new THREE.MeshStandardMaterial({ color: '#f6f5f2' });
+    const wallMat = TEX.wallMaterial('#f6f5f2');
     const mk = (w, h, depth, cx, cy, cz) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, depth), wallMat);
       m.position.set(cx, cy, cz);
@@ -234,26 +235,24 @@ export class Viewer3D {
   _buildExterior(d, b, ceilH) {
     const ex = d.exterior || {};
     const mDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
-    const mat = new THREE.MeshStandardMaterial({
-      color: ex.color || mDef.color,
-      roughness: mDef.roughness, metalness: mDef.metalness,
-      side: THREE.DoubleSide,
-    });
+    const col = ex.color || mDef.color;
     const T = 160;          // 외벽 두께
     const gap = 250;        // 내부 벽과의 간격
     const H = ceilH + 120;
     const x0 = -b.w / 2 - gap, x1 = b.w / 2 + gap;
     const z0 = -b.h / 2 - gap, z1 = b.h / 2 + gap;
     const W = (x1 - x0), D = (z1 - z0), cy = H / 2 + 60;
-    const mk = (w, h, dep, x, y, z) => {
+    // 벽마다 길이에 맞춰 자재 텍스처 repeat 을 계산해 적용
+    const mk = (w, h, dep, x, y, z, len) => {
+      const mat = TEX.exteriorMaterial(ex.material, col, len, H, mDef.roughness, mDef.metalness);
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dep), mat);
       m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
       this.modelGroup.add(m);
     };
-    mk(W + T, H, T, (x0 + x1) / 2, cy, z0);
-    mk(W + T, H, T, (x0 + x1) / 2, cy, z1);
-    mk(T, H, D + T, x0, cy, (z0 + z1) / 2);
-    mk(T, H, D + T, x1, cy, (z0 + z1) / 2);
+    mk(W + T, H, T, (x0 + x1) / 2, cy, z0, W);
+    mk(W + T, H, T, (x0 + x1) / 2, cy, z1, W);
+    mk(T, H, D + T, x0, cy, (z0 + z1) / 2, D);
+    mk(T, H, D + T, x1, cy, (z0 + z1) / 2, D);
   }
 
   // 지붕: 형태별 생성 (평지붕/박공/비대칭박공/우진각/외쪽)
@@ -261,10 +260,10 @@ export class Viewer3D {
     const roof = d.roof || { type: 'gable', color: '#3a3f44' };
     const type = ROOF_TYPES[roof.type] ? roof.type : 'gable';
     const rise = ROOF_TYPES[type].rise;
-    const mat = new THREE.MeshStandardMaterial({ color: roof.color || '#3a3f44', roughness: 0.8, side: THREE.DoubleSide });
     const gap = 250, eave = 500; // 처마 내밀기
     const W = b.w + gap * 2 + eave * 2;
     const D = b.h + gap * 2 + eave * 2;
+    const mat = TEX.roofMaterial(roof.color || '#3a3f44', W, D); // 슁글 질감
     const baseY = ceilH + 180 + 60;
     const grp = new THREE.Group();
     grp.position.set(0, baseY, 0);
@@ -310,31 +309,39 @@ export class Viewer3D {
     g.position.set(px, 60, pz);
     g.rotation.y = -(f.rotation || 0) * Math.PI / 180;
     const mat = (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 });
+    // finish: 'fabric'|'wood' → 질감 텍스처, 그 외(undefined) → 단색
+    const finMat = (col, w, dd, finish) => {
+      const tx = finish ? TEX.furnitureMaterial(finish, col, w, dd) : null;
+      return tx || mat(col);
+    };
 
-    const addBox = (w, h, dd, y, col, z = 0, x = 0) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dd), mat(col));
+    const addBox = (w, h, dd, y, col, z = 0, x = 0, finish) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dd), finMat(col, w, dd, finish));
       m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
       g.add(m); return m;
     };
 
+    // 수납 가구(옷장/책장/화장대)는 원목 결, 그 외 box(가전·욕실)는 단색
+    const woodBox = ['wardrobe', 'shelf', 'dresser'].includes(c.id);
+
     switch (c.kind) {
       case 'sofa': {
-        addBox(c.w, c.h * 0.45, c.d, c.h * 0.225, c.color);            // 좌석
-        addBox(c.w, c.h * 0.7, c.d * 0.25, c.h * 0.35, c.color, -c.d * 0.37); // 등받이
-        addBox(c.w * 0.12, c.h * 0.55, c.d, c.h * 0.27, c.color, 0, -c.w / 2 + c.w * 0.06);
-        addBox(c.w * 0.12, c.h * 0.55, c.d, c.h * 0.27, c.color, 0, c.w / 2 - c.w * 0.06);
+        addBox(c.w, c.h * 0.45, c.d, c.h * 0.225, c.color, 0, 0, 'fabric');            // 좌석
+        addBox(c.w, c.h * 0.7, c.d * 0.25, c.h * 0.35, c.color, -c.d * 0.37, 0, 'fabric'); // 등받이
+        addBox(c.w * 0.12, c.h * 0.55, c.d, c.h * 0.27, c.color, 0, -c.w / 2 + c.w * 0.06, 'fabric');
+        addBox(c.w * 0.12, c.h * 0.55, c.d, c.h * 0.27, c.color, 0, c.w / 2 - c.w * 0.06, 'fabric');
         break;
       }
       case 'bed': {
-        addBox(c.w, c.h * 0.5, c.d, c.h * 0.25, c.color);              // 매트리스 베이스
-        addBox(c.w, c.h * 0.35, c.d * 0.85, c.h * 0.62, '#ece4d8', c.d * 0.06); // 이불
-        addBox(c.w, c.h * 0.9, c.d * 0.12, c.h * 0.45, '#bfa988', -c.d / 2 + c.d * 0.05); // 헤드보드
-        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, -c.w * 0.22);
-        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, c.w * 0.22);
+        addBox(c.w, c.h * 0.5, c.d, c.h * 0.25, c.color, 0, 0, 'fabric');              // 매트리스 베이스
+        addBox(c.w, c.h * 0.35, c.d * 0.85, c.h * 0.62, '#ece4d8', c.d * 0.06, 0, 'fabric'); // 이불
+        addBox(c.w, c.h * 0.9, c.d * 0.12, c.h * 0.45, '#bfa988', -c.d / 2 + c.d * 0.05, 0, 'wood'); // 헤드보드
+        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, -c.w * 0.22, 'fabric');
+        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, c.w * 0.22, 'fabric');
         break;
       }
       case 'table': {
-        addBox(c.w, c.h * 0.08, c.d, c.h - c.h * 0.04, c.color);       // 상판
+        addBox(c.w, c.h * 0.08, c.d, c.h - c.h * 0.04, c.color, 0, 0, 'wood');       // 상판
         const legC = '#6f5a3f', lh = c.h * 0.92, ly = lh / 2;
         const ox = c.w / 2 - 60, oz = c.d / 2 - 60;
         addBox(60, lh, 60, ly, legC, oz, ox); addBox(60, lh, 60, ly, legC, oz, -ox);
@@ -342,8 +349,8 @@ export class Viewer3D {
         break;
       }
       case 'chair': {
-        addBox(c.w, 60, c.d, c.h * 0.45, c.color);
-        addBox(c.w, c.h * 0.5, 60, c.h * 0.72, c.color, -c.d / 2 + 30);
+        addBox(c.w, 60, c.d, c.h * 0.45, c.color, 0, 0, 'fabric');
+        addBox(c.w, c.h * 0.5, 60, c.h * 0.72, c.color, -c.d / 2 + 30, 0, 'fabric');
         break;
       }
       case 'tv': {
@@ -352,18 +359,18 @@ export class Viewer3D {
         break;
       }
       case 'rug': {
-        const m = addBox(c.w, 12, c.d, 6, c.color); m.castShadow = false;
+        const m = addBox(c.w, 12, c.d, 6, c.color, 0, 0, 'fabric'); m.castShadow = false;
         break;
       }
       case 'plant': {
-        addBox(c.w * 0.6, c.h * 0.25, c.d * 0.6, c.h * 0.12, '#9c7b52');
+        addBox(c.w * 0.6, c.h * 0.25, c.d * 0.6, c.h * 0.12, '#9c7b52', 0, 0, 'wood');
         const leaf = new THREE.Mesh(new THREE.SphereGeometry(c.w * 0.55, 12, 10), mat(c.color));
         leaf.position.y = c.h * 0.62; leaf.scale.y = 1.4; leaf.castShadow = true;
         g.add(leaf);
         break;
       }
       default: // box
-        addBox(c.w, c.h, c.d, c.h / 2, c.color);
+        addBox(c.w, c.h, c.d, c.h / 2, c.color, 0, 0, woodBox ? 'wood' : undefined);
     }
     this.modelGroup.add(g);
   }

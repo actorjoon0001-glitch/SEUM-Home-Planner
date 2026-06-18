@@ -21,6 +21,9 @@ class Store {
   subscribe(fn) { this._subs.add(fn); return () => this._subs.delete(fn); }
   emit() { this._subs.forEach((fn) => fn(this)); }
 
+  canUndo() { return this._history.length > 0; }
+  canRedo() { return this._future.length > 0; }
+
   // --- 되돌리기 스냅샷 ---
   snapshot() {
     this._history.push(JSON.stringify(this.design));

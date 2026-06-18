@@ -465,6 +465,13 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('tb-fit').onclick = () => { editor.fit(); viewer._needCam = true; viewer.dirty = true; };
   $('tb-undo').onclick = () => store.undo();
   $('tb-redo').onclick = () => store.redo();
+  // 되돌릴/다시할 게 없으면 버튼 흐리게(비활성) — 직관적 피드백
+  const refreshUndo = () => {
+    $('tb-undo').disabled = !store.canUndo();
+    $('tb-redo').disabled = !store.canRedo();
+  };
+  store.subscribe(refreshUndo);
+  refreshUndo();
 
   $('tb-new').onclick = () => { if (confirm('새 도면을 시작할까요? 저장하지 않은 변경은 사라집니다.')) store.newDesign(); };
 

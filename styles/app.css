@@ -36,6 +36,13 @@ body {
   font-family: inherit;
 }
 .tb-btn:hover { background: #3a3f47; color: #fff; }
+/* 되돌리기/다시 — 나이 드신 분들도 쉽게 누르도록 크고 또렷하게 */
+.tb-btn.tb-big {
+  background: #eef1f4; color: #20242a; border-color: #cfd4da;
+  font-size: 14px; font-weight: 700; padding: 8px 14px;
+}
+.tb-btn.tb-big:hover { background: #fff; border-color: var(--seum-red); color: var(--seum-red); }
+.tb-btn.tb-big:disabled { background: #34383f; color: #6b7079; border-color: #3a3f47; cursor: default; opacity: .6; }
 .sep { width: 1px; height: 22px; background: #3a3f47; margin: 0 4px; }
 .mode-toggle { margin-left: auto; display: flex; background: #14161a; border-radius: 8px; padding: 3px; }
 .mode-btn {

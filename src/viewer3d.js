@@ -37,6 +37,11 @@ export class Viewer3D {
 
     store.subscribe(() => { this.dirty = true; });
     window.addEventListener('resize', () => this._resize());
+    // 컨테이너 크기 변화를 직접 감지해 캔버스를 맞춤 (3D 탭 표시/창 크기 변화 등)
+    if (typeof ResizeObserver !== 'undefined') {
+      this._ro = new ResizeObserver(() => this._resize());
+      this._ro.observe(this.container);
+    }
     this._animate();
   }
 
@@ -61,13 +66,17 @@ export class Viewer3D {
     if (on) {
       this._resize();
       if (this.dirty) this.rebuild();
+      // 탭 전환 직후 레이아웃이 아직 안 잡혔을 수 있어 다음 프레임에 한 번 더 맞춤
+      requestAnimationFrame(() => this._resize());
     }
   }
 
   _resize() {
     const r = this.container.getBoundingClientRect();
-    if (r.width === 0) return;
-    this.renderer.setPixelRatio(window.devicePixelRatio || 1);
+    if (r.width === 0 || r.height === 0) return;
+    // 픽셀비율 상한 2 — 초고해상도에서 드로잉버퍼가 과도하게 커져
+    // 렌더가 실패(흰 화면)하거나 느려지는 것을 방지
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     // updateStyle=true: 캔버스 CSS 크기를 컨테이너에 맞춤. (false 면 고해상도
     // 화면에서 캔버스가 devicePixelRatio 배로 커져 사이드바를 덮어버림)
     this.renderer.setSize(r.width, r.height, true);

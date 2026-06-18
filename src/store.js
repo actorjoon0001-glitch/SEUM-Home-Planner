@@ -111,14 +111,16 @@ class Store {
   localTemplates() {
     try { return JSON.parse(localStorage.getItem(LS_TPL) || '[]'); } catch (e) { return []; }
   }
-  addLocalTemplate({ title, productType } = {}) {
+  // design 을 주면 그 도면을, 안 주면 현재 도면을 내 기본 도면으로 등록
+  addLocalTemplate({ title, productType, design } = {}) {
     const list = this.localTemplates();
-    const data = JSON.parse(JSON.stringify(this.design));
-    if (data.underlay) data.underlay = null;          // 용량 큰 밑그림은 제외
-    data.productType = productType || data.productType || '';
-    const name = (title || data.name || '내 기본 도면').trim();
-    data.name = name;
-    const entry = { id: 't' + Date.now().toString(36), title: name, productType: data.productType, savedAt: Date.now(), data };
+    const src = design ? normalize(JSON.parse(JSON.stringify(design))) : JSON.parse(JSON.stringify(this.design));
+    if (!Array.isArray(src.rooms)) throw new Error('도면 형식이 아닙니다.');
+    if (src.underlay) src.underlay = null;            // 용량 큰 밑그림은 제외
+    src.productType = productType || src.productType || '';
+    const name = (title || src.name || '내 기본 도면').trim();
+    src.name = name;
+    const entry = { id: 't' + Date.now().toString(36) + Math.floor(Math.random() * 1000), title: name, productType: src.productType, savedAt: Date.now(), data: src };
     list.push(entry);
     localStorage.setItem(LS_TPL, JSON.stringify(list));
     return entry;

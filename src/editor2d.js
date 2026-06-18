@@ -207,10 +207,21 @@ export class Editor2D {
     // 바닥
     ctx.fillStyle = t.color;
     ctx.fillRect(x, y, w, h);
-    // 벽 (테두리)
-    ctx.lineWidth = selected ? 4 : 3;
-    ctx.strokeStyle = selected ? '#c8102e' : '#5b5f66';
-    ctx.strokeRect(x, y, w, h);
+    // 벽 (면별로 그림 — 트인(open) 면은 점선 통로로 표시)
+    const open = Array.isArray(room.open) ? room.open : [];
+    const hov = this.wallEdit && this._hoverWall && this._hoverWall.roomId === room.id ? this._hoverWall.side : null;
+    const drawWall = (x1, y1, x2, y2, side) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      if (side === hov) { ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 6; ctx.setLineDash([]); }
+      else if (open.includes(side)) { ctx.strokeStyle = '#c2c7ce'; ctx.lineWidth = 2; ctx.setLineDash([4, 5]); }
+      else { ctx.strokeStyle = selected ? '#c8102e' : '#5b5f66'; ctx.lineWidth = selected ? 4 : 3; ctx.setLineDash([]); }
+      ctx.stroke(); ctx.setLineDash([]);
+    };
+    drawWall(x, y, x + w, y, 'n');
+    drawWall(x, y + h, x + w, y + h, 's');
+    drawWall(x, y, x, y + h, 'w');
+    drawWall(x + w, y, x + w, y + h, 'e');
 
     // 라벨 + 면적
     const area = (room.w * room.d) / 1e6; // m²
@@ -506,6 +517,13 @@ export class Editor2D {
       return;
     }
 
+    // 벽 편집 모드: 클릭한 벽을 트기↔막기
+    if (this.wallEdit) {
+      const hit = this._hitWall(px, py);
+      if (hit) this._toggleWall(hit.room, hit.side);
+      return;
+    }
+
     // 방 그리기 모드: 도면 위에서 대각선 드래그로 방 생성
     if (this.drawRoom) {
       const [mx, my] = this.toMm(px, py);
@@ -633,9 +651,66 @@ export class Editor2D {
   // 방 그리기 모드 on/off (type=방종류 키 또는 null)
   setDrawRoom(type) {
     this.drawRoom = type || null;
-    if (this.drawRoom) this.calib = null;
+    if (this.drawRoom) { this.calib = null; this.wallEdit = false; this._hoverWall = null; }
     this.canvas.style.cursor = this.drawRoom ? 'crosshair' : 'default';
     this.draw();
+  }
+
+  // 벽 편집 모드 on/off — 2D에서 벽을 클릭해 트기↔막기
+  setWallEdit(on) {
+    this.wallEdit = !!on;
+    if (on) { this.drawRoom = null; this.calib = null; }
+    this._hoverWall = null;
+    this.canvas.style.cursor = on ? 'pointer' : 'default';
+    this.draw();
+  }
+
+  // 클릭/마우스 지점에서 가장 가까운 방 벽(면) 찾기 (px 기준)
+  _hitWall(px, py) {
+    let best = null, bestD = 12; // 12px 이내
+    const distSeg = (x1, y1, x2, y2) => {
+      const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy || 1;
+      let t = ((px - x1) * dx + (py - y1) * dy) / L2; t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    };
+    for (const room of store.design.rooms) {
+      const [x, y] = this.toPx(room.x, room.y);
+      const w = room.w * this.scale, h = room.d * this.scale;
+      const edges = [
+        ['n', x, y, x + w, y], ['s', x, y + h, x + w, y + h],
+        ['w', x, y, x, y + h], ['e', x + w, y, x + w, y + h],
+      ];
+      for (const [side, x1, y1, x2, y2] of edges) {
+        const d = distSeg(x1, y1, x2, y2);
+        if (d < bestD) { bestD = d; best = { room, side }; }
+      }
+    }
+    return best;
+  }
+
+  // 같은 벽을 공유하는 맞닿은 방과 면 찾기
+  _adjacentWall(room, side) {
+    const TOL = 60; // mm
+    const overlap = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0) > 50;
+    for (const r of store.design.rooms) {
+      if (r.id === room.id) continue;
+      if (side === 'n' && Math.abs((r.y + r.d) - room.y) <= TOL && overlap(r.x, r.x + r.w, room.x, room.x + room.w)) return { room: r, side: 's' };
+      if (side === 's' && Math.abs(r.y - (room.y + room.d)) <= TOL && overlap(r.x, r.x + r.w, room.x, room.x + room.w)) return { room: r, side: 'n' };
+      if (side === 'w' && Math.abs((r.x + r.w) - room.x) <= TOL && overlap(r.y, r.y + r.d, room.y, room.y + room.d)) return { room: r, side: 'e' };
+      if (side === 'e' && Math.abs(r.x - (room.x + room.w)) <= TOL && overlap(r.y, r.y + r.d, room.y, room.y + room.d)) return { room: r, side: 'w' };
+    }
+    return null;
+  }
+
+  // 벽 트기↔막기 (맞닿은 방의 면도 함께 토글 → 통로가 실제로 뚫림)
+  _toggleWall(room, side) {
+    const flip = (r, s) => {
+      const open = Array.isArray(r.open) ? r.open : (r.open = []);
+      const i = open.indexOf(s);
+      if (i >= 0) open.splice(i, 1); else open.push(s);
+    };
+    const adj = this._adjacentWall(room, side);
+    store.commit(() => { flip(room, side); if (adj) flip(adj.room, adj.side); });
   }
 
   // 드래그한 사각형으로 방 생성 (밑그림 따라 그리기)
@@ -687,6 +762,17 @@ export class Editor2D {
 
   _updateCursor(px, py) {
     const d = store.design;
+    // 벽 편집 모드: 가까운 벽을 강조 표시
+    if (this.wallEdit) {
+      const hit = this._hitWall(px, py);
+      const next = hit ? { roomId: hit.room.id, side: hit.side } : null;
+      const cur = this._hoverWall;
+      if ((next && (!cur || cur.roomId !== next.roomId || cur.side !== next.side)) || (!next && cur)) {
+        this._hoverWall = next; this.draw();
+      }
+      this.canvas.style.cursor = hit ? 'pointer' : 'default';
+      return;
+    }
     const selRoom = d.rooms.find((r) => r.id === store.selectedRoom);
     let cur = 'default';
     if (selRoom) {

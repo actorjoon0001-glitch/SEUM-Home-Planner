@@ -539,7 +539,7 @@ async function openTemplateDialog() {
     <div class="tpl-add">
       <div class="tpl-add-btns">
         <button class="mini primary" id="tpl-add-btn">➕ 현재 도면을 기본 도면으로 추가</button>
-        <button class="mini" id="tpl-file-btn">📁 도면 파일(.json) 등록</button>
+        <button class="mini" id="tpl-file-btn">📁 파일 등록 (.json · PDF · 이미지)</button>
       </div>
       <div class="tpl-add-form" id="tpl-add-form" style="display:none">
         <input id="tpl-add-title" placeholder="기본 도면 이름" value="${esc(store.design.name || '')}">
@@ -591,15 +591,18 @@ async function openTemplateDialog() {
     grid.innerHTML = '';
     for (const t of shown) {
       const ptype = (t.productType || '').trim();
+      const thumb = t.data && t.data.underlay && t.data.underlay.src;
       const card = document.createElement('div');
       card.className = 'tpl-card';
       card.innerHTML = `<button class="tpl-del" title="삭제">✕</button>
-        <div class="tpl-ico">${PRODUCT_ICON[ptype] || '📌'}</div>
+        <div class="tpl-thumb">${thumb ? `<img src="${thumb}" alt="">` : `<span class="tpl-ico">${PRODUCT_ICON[ptype] || '📌'}</span>`}</div>
         <div class="tpl-name">${esc(t.title)}</div>
-        <div class="tpl-tags">내 기본 도면${ptype ? ` · ${esc(ptype)}` : ''}</div>`;
+        <div class="tpl-tags">${thumb ? '밑그림 도면' : '내 기본 도면'}${ptype ? ` · ${esc(ptype)}` : ''}</div>`;
       card.onclick = () => {
         if (!confirm(`'${t.title}' 기본 도면을 불러올까요? 현재 작업은 사라집니다.`)) return;
-        store.loadInto(t.data); dlg.close(); flash(`'${t.title}' 불러옴`);
+        store.loadInto(t.data); dlg.close();
+        if (thumb && _editor && _editor.focusUnderlay) _editor.focusUnderlay();
+        flash(`'${t.title}' 불러옴`);
       };
       card.querySelector('.tpl-del').onclick = (e) => {
         e.stopPropagation();
@@ -657,29 +660,53 @@ async function openTemplateDialog() {
       flash(`'${title}' 기본 도면에 추가됨`);
     } catch (e) { alert('저장 공간이 부족합니다. 기존 내 기본 도면을 정리해 주세요.'); }
   };
-  // 기존에 가진 도면 파일(.json)을 골라 내 기본 도면으로 등록 (여러 개 가능)
+  // 기존에 가진 도면 파일을 골라 내 기본 도면으로 등록 (여러 개 가능)
+  // .json=편집 도면, PDF/이미지=밑그림 배경 도면, CAD=변환 안내
   body.querySelector('#tpl-file-btn').onclick = () => {
     const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = '.json,application/json'; inp.multiple = true;
-    inp.onchange = () => {
+    inp.type = 'file';
+    inp.accept = '.json,application/json,application/pdf,image/*,.dxf,.dwg';
+    inp.multiple = true;
+    inp.onchange = async () => {
       const files = [...(inp.files || [])]; if (!files.length) return;
-      let ok = 0; let pending = files.length; const fails = [];
-      files.forEach((file) => {
-        const rd = new FileReader();
-        rd.onload = () => {
-          try {
-            const d = JSON.parse(rd.result);
-            const title = (d.name && d.name.trim()) || file.name.replace(/\.json$/i, '');
-            store.addLocalTemplate({ title, productType: d.productType || '', design: d });
+      let ok = 0; const fails = []; const cad = [];
+      for (const file of files) {
+        const name = file.name;
+        const isCad = /\.(dwg|dxf)$/i.test(name);
+        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(name);
+        const isImg = /^image\//.test(file.type) || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
+        const isJson = file.type === 'application/json' || /\.json$/i.test(name);
+        const title = name.replace(/\.[^.]+$/, '');
+        try {
+          if (isCad) { cad.push(name); continue; }
+          if (isJson) {
+            const d = JSON.parse(await file.text());
+            store.addLocalTemplate({ title: (d.name && d.name.trim()) || title, productType: d.productType || '', design: d });
             ok++;
-          } catch (e) { fails.push(file.name); }
-          if (--pending === 0) {
-            filter = ''; renderFilter(); renderLocal();
-            flash(fails.length ? `${ok}개 등록, ${fails.length}개 실패` : `${ok}개 기본 도면 등록됨`);
-          }
-        };
-        rd.readAsText(file);
-      });
+          } else if (isPdf || isImg) {
+            flash(`'${name}' 변환 중...`);
+            let dataURL, iw, ih;
+            if (isPdf) ({ dataURL, iw, ih } = await pdfToImage(file));
+            else { dataURL = await fileToDataURL(file); ({ iw, ih } = await imageSize(dataURL)); }
+            ({ dataURL, iw, ih } = await downscaleDataURL(dataURL, 1800, 0.75)); // 저장 용량 절약
+            const w0 = 12000, h0 = w0 * (ih / iw);
+            const design = {
+              name: title, productType: '', ceilingHeight: 2400,
+              exterior: { material: 'metal', color: '#8d96a0' },
+              roof: { type: 'gable', color: '#3a3f44' },
+              rooms: [], openings: [], furniture: [],
+              underlay: { src: dataURL, x: 0, y: 0, w: w0, h: h0, opacity: 0.5, hidden: false },
+            };
+            store.addLocalTemplate({ title, design, keepUnderlay: true });
+            ok++;
+          } else { fails.push(name); }
+        } catch (e) { fails.push(name); }
+      }
+      filter = ''; renderFilter(); renderLocal();
+      let msg = ok ? `${ok}개 등록` : '';
+      if (fails.length) msg += `${msg ? ', ' : ''}${fails.length}개 실패`;
+      flash(msg || '등록된 파일 없음');
+      if (cad.length) alert(`CAD 파일(${cad.join(', ')})은 브라우저에서 바로 열 수 없습니다.\nCAD 프로그램에서 PDF 또는 이미지(PNG/JPG)로 내보낸 뒤 등록해 주세요.`);
     };
     inp.click();
   };
@@ -798,6 +825,23 @@ function imageSize(dataURL) {
     const img = new Image();
     img.onload = () => res({ iw: img.naturalWidth, ih: img.naturalHeight });
     img.onerror = () => rej(new Error('이미지 형식 오류'));
+    img.src = dataURL;
+  });
+}
+// 라이브러리 저장 용량 절약을 위해 큰 이미지를 줄이고 JPEG 로 재인코딩
+function downscaleDataURL(dataURL, maxDim, quality) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+      const cw = Math.max(1, Math.round(img.naturalWidth * scale));
+      const ch = Math.max(1, Math.round(img.naturalHeight * scale));
+      const c = document.createElement('canvas');
+      c.width = cw; c.height = ch;
+      c.getContext('2d').drawImage(img, 0, 0, cw, ch);
+      res({ dataURL: c.toDataURL('image/jpeg', quality), iw: cw, ih: ch });
+    };
+    img.onerror = () => rej(new Error('이미지 변환 실패'));
     img.src = dataURL;
   });
 }

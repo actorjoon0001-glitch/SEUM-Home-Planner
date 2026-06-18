@@ -31,35 +31,51 @@ function buildRoomPalette() {
   wrap.innerHTML = '';
   const hint = wrap.previousElementSibling; // "클릭하면 방이 추가됩니다"
   let drawMode = false;
+  let wallMode = false;
   let drawType = 'living';
   const chips = {};
 
   const syncChips = () => {
     for (const [k, b] of Object.entries(chips)) b.classList.toggle('active', drawMode && k === drawType);
   };
-  const setDraw = (on) => {
-    drawMode = on;
-    toggle.classList.toggle('on', on);
-    if (_editor) _editor.setDrawRoom(on ? drawType : null);
-    syncChips();
-    if (hint) hint.textContent = on
-      ? '방 종류를 고르고, 도면(밑그림) 위에서 대각선으로 드래그해 방을 그리세요'
+  const setHint = () => {
+    if (!hint) return;
+    hint.textContent = drawMode ? '방 종류를 고르고, 도면 위에서 대각선으로 드래그해 방을 그리세요'
+      : wallMode ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리돼 통로가 뚫림)'
       : '클릭하면 방이 추가됩니다';
   };
+  const setDraw = (on) => {
+    drawMode = on; if (on) { wallMode = false; wallToggle.classList.remove('on'); }
+    drawToggle.classList.toggle('on', on);
+    if (_editor) _editor.setDrawRoom(on ? drawType : null);
+    syncChips(); setHint();
+  };
+  const setWall = (on) => {
+    wallMode = on; if (on) { drawMode = false; drawToggle.classList.remove('on'); syncChips(); }
+    wallToggle.classList.toggle('on', on);
+    if (_editor) _editor.setWallEdit(on);
+    setHint();
+  };
 
-  // 밑그림 따라 그리기용: 드래그로 방 그리기 토글
-  const toggle = document.createElement('button');
-  toggle.className = 'draw-toggle';
-  toggle.textContent = '✏️ 도면 위에 방 그리기';
-  toggle.onclick = () => setDraw(!drawMode);
-  wrap.appendChild(toggle);
+  // 편집 모드 토글: 방 그리기 / 벽 트기·막기
+  const drawToggle = document.createElement('button');
+  drawToggle.className = 'draw-toggle';
+  drawToggle.textContent = '✏️ 도면 위에 방 그리기';
+  drawToggle.onclick = () => setDraw(!drawMode);
+  wrap.appendChild(drawToggle);
+
+  const wallToggle = document.createElement('button');
+  wallToggle.className = 'draw-toggle';
+  wallToggle.textContent = '🧱 벽 트기 / 막기';
+  wallToggle.onclick = () => setWall(!wallMode);
+  wrap.appendChild(wallToggle);
 
   for (const [key, t] of Object.entries(ROOM_TYPES)) {
     const b = document.createElement('button');
     b.className = 'room-chip';
     b.style.background = t.color;
     b.textContent = t.label;
-    b.title = drawMode ? `${t.label} 그리기` : `${t.label} 추가`;
+    b.title = `${t.label} 추가`;
     b.onclick = () => {
       if (drawMode) { drawType = key; if (_editor) _editor.setDrawRoom(key); syncChips(); }
       else addRoom(key);

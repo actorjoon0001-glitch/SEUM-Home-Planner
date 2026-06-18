@@ -537,7 +537,10 @@ async function openTemplateDialog() {
     `<option value="${esc(p)}"${(store.design.productType || '') === p ? ' selected' : ''}>${p}</option>`).join('');
   body.innerHTML = `<p class="m-sub">기본 도면을 선택하면 현재 화면에 불러와 바로 수정할 수 있습니다.</p>
     <div class="tpl-add">
-      <button class="mini primary" id="tpl-add-btn">➕ 현재 도면을 기본 도면으로 추가</button>
+      <div class="tpl-add-btns">
+        <button class="mini primary" id="tpl-add-btn">➕ 현재 도면을 기본 도면으로 추가</button>
+        <button class="mini" id="tpl-file-btn">📁 도면 파일(.json) 등록</button>
+      </div>
       <div class="tpl-add-form" id="tpl-add-form" style="display:none">
         <input id="tpl-add-title" placeholder="기본 도면 이름" value="${esc(store.design.name || '')}">
         <select id="tpl-add-ptype">${ptypeOpts}</select>
@@ -653,6 +656,32 @@ async function openTemplateDialog() {
       filter = ''; renderFilter(); renderLocal();
       flash(`'${title}' 기본 도면에 추가됨`);
     } catch (e) { alert('저장 공간이 부족합니다. 기존 내 기본 도면을 정리해 주세요.'); }
+  };
+  // 기존에 가진 도면 파일(.json)을 골라 내 기본 도면으로 등록 (여러 개 가능)
+  body.querySelector('#tpl-file-btn').onclick = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json,application/json'; inp.multiple = true;
+    inp.onchange = () => {
+      const files = [...(inp.files || [])]; if (!files.length) return;
+      let ok = 0; let pending = files.length; const fails = [];
+      files.forEach((file) => {
+        const rd = new FileReader();
+        rd.onload = () => {
+          try {
+            const d = JSON.parse(rd.result);
+            const title = (d.name && d.name.trim()) || file.name.replace(/\.json$/i, '');
+            store.addLocalTemplate({ title, productType: d.productType || '', design: d });
+            ok++;
+          } catch (e) { fails.push(file.name); }
+          if (--pending === 0) {
+            filter = ''; renderFilter(); renderLocal();
+            flash(fails.length ? `${ok}개 등록, ${fails.length}개 실패` : `${ok}개 기본 도면 등록됨`);
+          }
+        };
+        rd.readAsText(file);
+      });
+    };
+    inp.click();
   };
 
   renderFilter();

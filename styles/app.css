@@ -205,7 +205,8 @@ body {
 .tpl-del:hover { color: var(--seum-red); border-color: #f3c6cd; background: #fdecee; }
 /* 기본 도면 추가 버튼/폼 */
 .tpl-add { margin-bottom: 10px; }
-.tpl-add > .mini { flex: 0 0 auto; }
+.tpl-add-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.tpl-add-btns .mini { flex: 1 1 auto; }
 .mini.primary { background: var(--seum-red); color: #fff; border-color: var(--seum-red); }
 .mini.primary:hover { background: #c62f3b; }
 .tpl-add-form { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }

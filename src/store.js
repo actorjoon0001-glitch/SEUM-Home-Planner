@@ -3,6 +3,7 @@ import { createDefaultDesign, normalize } from './data.js';
 
 const LS_KEY = 'seum-homeplanner:current';
 const LS_LIST = 'seum-homeplanner:saved';
+const LS_TPL = 'seum-homeplanner:my-templates'; // 내 기본 도면(이 기기)
 
 class Store {
   constructor() {
@@ -104,6 +105,26 @@ class Store {
     this._history = []; this._future = [];
     this.persist();
     this.emit();
+  }
+
+  // --- 내 기본 도면 (클라우드 없이 이 기기에 저장하는 로컬 템플릿) ---
+  localTemplates() {
+    try { return JSON.parse(localStorage.getItem(LS_TPL) || '[]'); } catch (e) { return []; }
+  }
+  addLocalTemplate({ title, productType } = {}) {
+    const list = this.localTemplates();
+    const data = JSON.parse(JSON.stringify(this.design));
+    if (data.underlay) data.underlay = null;          // 용량 큰 밑그림은 제외
+    data.productType = productType || data.productType || '';
+    const name = (title || data.name || '내 기본 도면').trim();
+    data.name = name;
+    const entry = { id: 't' + Date.now().toString(36), title: name, productType: data.productType, savedAt: Date.now(), data };
+    list.push(entry);
+    localStorage.setItem(LS_TPL, JSON.stringify(list));
+    return entry;
+  }
+  removeLocalTemplate(id) {
+    localStorage.setItem(LS_TPL, JSON.stringify(this.localTemplates().filter((e) => e.id !== id)));
   }
 
   // 도면 객체를 통째로 적용 (템플릿/클라우드 불러오기 공용)

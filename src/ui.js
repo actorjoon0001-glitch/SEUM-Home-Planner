@@ -533,8 +533,23 @@ const PRODUCT_ICON = { '주택': '🏠', '체류형 쉼터': '🏕️', '농막'
 async function openTemplateDialog() {
   const body = document.createElement('div');
   const builtin = listTemplates();
+  const ptypeOpts = PRODUCT_TYPES.map((p) =>
+    `<option value="${esc(p)}"${(store.design.productType || '') === p ? ' selected' : ''}>${p}</option>`).join('');
   body.innerHTML = `<p class="m-sub">기본 도면을 선택하면 현재 화면에 불러와 바로 수정할 수 있습니다.</p>
+    <div class="tpl-add">
+      <button class="mini primary" id="tpl-add-btn">➕ 현재 도면을 기본 도면으로 추가</button>
+      <div class="tpl-add-form" id="tpl-add-form" style="display:none">
+        <input id="tpl-add-title" placeholder="기본 도면 이름" value="${esc(store.design.name || '')}">
+        <select id="tpl-add-ptype">${ptypeOpts}</select>
+        <button class="mini primary" id="tpl-add-save">추가</button>
+        <button class="mini" id="tpl-add-cancel">취소</button>
+      </div>
+    </div>
     <div class="cl-filter" id="tpl-filter"></div>
+    <div id="tpl-local-wrap" style="display:none">
+      <p class="m-sub" style="margin-top:6px">📌 내 기본 도면 <span style="color:var(--muted)">(이 기기에 저장)</span></p>
+      <div class="tpl-grid" id="tpl-local"></div>
+    </div>
     <div class="tpl-grid" id="tpl-builtin"></div>
     <div id="tpl-cloud-wrap" style="display:none">
       <p class="m-sub" style="margin-top:14px">☁ 영업팀 공용 기본 도면</p>
@@ -560,6 +575,33 @@ async function openTemplateDialog() {
         if (!confirm(`'${t.title}' 기본 도면을 불러올까요? 현재 작업은 사라집니다.`)) return;
         const d = instantiateTemplate(t.id);
         if (d) { store.loadInto(d); dlg.close(); flash(`'${t.title}' 불러옴`); }
+      };
+      grid.appendChild(card);
+    }
+  };
+
+  const renderLocal = () => {
+    const wrap = body.querySelector('#tpl-local-wrap');
+    const grid = body.querySelector('#tpl-local');
+    const shown = store.localTemplates().filter((t) => matches((t.productType || '').trim()));
+    wrap.style.display = shown.length ? '' : 'none';
+    grid.innerHTML = '';
+    for (const t of shown) {
+      const ptype = (t.productType || '').trim();
+      const card = document.createElement('div');
+      card.className = 'tpl-card';
+      card.innerHTML = `<button class="tpl-del" title="삭제">✕</button>
+        <div class="tpl-ico">${PRODUCT_ICON[ptype] || '📌'}</div>
+        <div class="tpl-name">${esc(t.title)}</div>
+        <div class="tpl-tags">내 기본 도면${ptype ? ` · ${esc(ptype)}` : ''}</div>`;
+      card.onclick = () => {
+        if (!confirm(`'${t.title}' 기본 도면을 불러올까요? 현재 작업은 사라집니다.`)) return;
+        store.loadInto(t.data); dlg.close(); flash(`'${t.title}' 불러옴`);
+      };
+      card.querySelector('.tpl-del').onclick = (e) => {
+        e.stopPropagation();
+        if (!confirm(`'${t.title}'을(를) 내 기본 도면에서 삭제할까요?`)) return;
+        store.removeLocalTemplate(t.id); renderLocal();
       };
       grid.appendChild(card);
     }
@@ -593,11 +635,28 @@ async function openTemplateDialog() {
     ).join('');
     bar.querySelectorAll('.chip').forEach((ch) => ch.onclick = () => {
       filter = ch.dataset.c;
-      renderFilter(); renderBuiltin(); renderCloud();
+      renderFilter(); renderLocal(); renderBuiltin(); renderCloud();
     });
   };
 
+  // 현재 도면을 내 기본 도면으로 추가
+  const addForm = body.querySelector('#tpl-add-form');
+  body.querySelector('#tpl-add-btn').onclick = () => { addForm.style.display = 'flex'; body.querySelector('#tpl-add-title').focus(); };
+  body.querySelector('#tpl-add-cancel').onclick = () => { addForm.style.display = 'none'; };
+  body.querySelector('#tpl-add-save').onclick = () => {
+    const title = body.querySelector('#tpl-add-title').value.trim();
+    const productType = body.querySelector('#tpl-add-ptype').value;
+    if (!title) { body.querySelector('#tpl-add-title').focus(); return; }
+    try {
+      store.addLocalTemplate({ title, productType });
+      addForm.style.display = 'none';
+      filter = ''; renderFilter(); renderLocal();
+      flash(`'${title}' 기본 도면에 추가됨`);
+    } catch (e) { alert('저장 공간이 부족합니다. 기존 내 기본 도면을 정리해 주세요.'); }
+  };
+
   renderFilter();
+  renderLocal();
   renderBuiltin();
 
   // 클라우드 공용 기본 도면 (설정+가능 시)

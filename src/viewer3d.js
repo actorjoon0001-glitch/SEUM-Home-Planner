@@ -68,7 +68,9 @@ export class Viewer3D {
     const r = this.container.getBoundingClientRect();
     if (r.width === 0) return;
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
-    this.renderer.setSize(r.width, r.height, false);
+    // updateStyle=true: 캔버스 CSS 크기를 컨테이너에 맞춤. (false 면 고해상도
+    // 화면에서 캔버스가 devicePixelRatio 배로 커져 사이드바를 덮어버림)
+    this.renderer.setSize(r.width, r.height, true);
     this.camera.aspect = r.width / r.height;
     this.camera.updateProjectionMatrix();
   }

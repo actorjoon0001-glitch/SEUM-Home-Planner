@@ -112,11 +112,12 @@ class Store {
     try { return JSON.parse(localStorage.getItem(LS_TPL) || '[]'); } catch (e) { return []; }
   }
   // design 을 주면 그 도면을, 안 주면 현재 도면을 내 기본 도면으로 등록
-  addLocalTemplate({ title, productType, design } = {}) {
+  // keepUnderlay: PDF/이미지 기반 '밑그림 도면'은 배경을 살려둠
+  addLocalTemplate({ title, productType, design, keepUnderlay = false } = {}) {
     const list = this.localTemplates();
     const src = design ? normalize(JSON.parse(JSON.stringify(design))) : JSON.parse(JSON.stringify(this.design));
     if (!Array.isArray(src.rooms)) throw new Error('도면 형식이 아닙니다.');
-    if (src.underlay) src.underlay = null;            // 용량 큰 밑그림은 제외
+    if (src.underlay && !keepUnderlay) src.underlay = null;  // 용량 큰 밑그림은 기본 제외
     src.productType = productType || src.productType || '';
     const name = (title || src.name || '내 기본 도면').trim();
     src.name = name;

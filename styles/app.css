@@ -63,6 +63,14 @@ body {
   font-size: 12px; cursor: pointer; font-family: inherit; color: #33373d; font-weight: 500;
 }
 .room-chip:hover { filter: brightness(.96); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.room-chip.active { outline: 2px solid var(--seum-red); outline-offset: 1px; box-shadow: 0 1px 6px rgba(200,16,46,.3); }
+/* 방 그리기 토글 (밑그림 따라 그리기) */
+.draw-toggle {
+  flex: 1 1 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px;
+  background: #fff; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink);
+}
+.draw-toggle:hover { border-color: var(--seum-red); }
+.draw-toggle.on { background: var(--seum-red); color: #fff; border-color: var(--seum-red); }
 
 .lib-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
 .lib-tab {

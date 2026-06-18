@@ -119,6 +119,8 @@ export class Editor2D {
 
     // 축척 보정 중 클릭 점/선 표시
     if (this.calib) this._drawCalib();
+    // 방 그리기 미리보기
+    if (this.drag && this.drag.mode === 'drawnew') this._drawNewPreview(this.drag);
 
     // 선택 안내
     this._drawScaleBar();
@@ -504,6 +506,13 @@ export class Editor2D {
       return;
     }
 
+    // 방 그리기 모드: 도면 위에서 대각선 드래그로 방 생성
+    if (this.drawRoom) {
+      const [mx, my] = this.toMm(px, py);
+      this.drag = { mode: 'drawnew', ax: mx, ay: my, cx: mx, cy: my };
+      return;
+    }
+
     // 선택된 방 핸들 우선
     const selRoom = d.rooms.find((r) => r.id === store.selectedRoom);
     if (selRoom) {
@@ -563,6 +572,13 @@ export class Editor2D {
       return;
     }
 
+    if (drag.mode === 'drawnew') {
+      const [mxx, myy] = this.toMm(px, py);
+      drag.cx = mxx; drag.cy = myy;
+      this.draw();
+      return;
+    }
+
     const [mx, my] = this.toMm(px, py);
 
     // 실제 편집이 시작되는 첫 이동에서만 되돌리기 스냅샷 기록
@@ -607,10 +623,54 @@ export class Editor2D {
   }
 
   _up() {
+    if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
     if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo'].includes(this.drag.mode)) {
       store.liveEnd();
     }
     this.drag = null;
+  }
+
+  // 방 그리기 모드 on/off (type=방종류 키 또는 null)
+  setDrawRoom(type) {
+    this.drawRoom = type || null;
+    if (this.drawRoom) this.calib = null;
+    this.canvas.style.cursor = this.drawRoom ? 'crosshair' : 'default';
+    this.draw();
+  }
+
+  // 드래그한 사각형으로 방 생성 (밑그림 따라 그리기)
+  _finishDraw(drag) {
+    const x0 = this.snap(Math.min(drag.ax, drag.cx));
+    const y0 = this.snap(Math.min(drag.ay, drag.cy));
+    const x1 = this.snap(Math.max(drag.ax, drag.cx));
+    const y1 = this.snap(Math.max(drag.ay, drag.cy));
+    const w = x1 - x0, dd = y1 - y0;
+    if (w < 300 || dd < 300) { this.draw(); return; } // 너무 작으면 무시
+    const type = this.drawRoom;
+    const t = ROOM_TYPES[type] || ROOM_TYPES.living;
+    store.commit((d) => {
+      const room = { id: rid(), type, name: t.label, x: x0, y: y0, w, d: dd };
+      d.rooms.push(room);
+      store.selectedRoom = room.id; store.selectedFurniture = store.selectedOpening = null;
+    });
+  }
+
+  _drawNewPreview(drag) {
+    const x0 = this.snap(Math.min(drag.ax, drag.cx)), y0 = this.snap(Math.min(drag.ay, drag.cy));
+    const x1 = this.snap(Math.max(drag.ax, drag.cx)), y1 = this.snap(Math.max(drag.ay, drag.cy));
+    const [px, py] = this.toPx(x0, y0);
+    const w = (x1 - x0) * this.scale, h = (y1 - y0) * this.scale;
+    const t = ROOM_TYPES[this.drawRoom] || ROOM_TYPES.living;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = t.color + 'aa';
+    ctx.fillRect(px, py, w, h);
+    ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.strokeRect(px, py, w, h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#c8102e'; ctx.font = '12px sans-serif';
+    ctx.fillText(`${x1 - x0}×${y1 - y0}`, px + 4, py + 14);
+    ctx.restore();
   }
 
   _wheel(e) {

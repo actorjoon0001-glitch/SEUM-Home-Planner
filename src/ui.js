@@ -29,13 +29,42 @@ export function buildUI({ editor, viewer, onModeChange }) {
 function buildRoomPalette() {
   const wrap = document.getElementById('room-palette');
   wrap.innerHTML = '';
+  const hint = wrap.previousElementSibling; // "클릭하면 방이 추가됩니다"
+  let drawMode = false;
+  let drawType = 'living';
+  const chips = {};
+
+  const syncChips = () => {
+    for (const [k, b] of Object.entries(chips)) b.classList.toggle('active', drawMode && k === drawType);
+  };
+  const setDraw = (on) => {
+    drawMode = on;
+    toggle.classList.toggle('on', on);
+    if (_editor) _editor.setDrawRoom(on ? drawType : null);
+    syncChips();
+    if (hint) hint.textContent = on
+      ? '방 종류를 고르고, 도면(밑그림) 위에서 대각선으로 드래그해 방을 그리세요'
+      : '클릭하면 방이 추가됩니다';
+  };
+
+  // 밑그림 따라 그리기용: 드래그로 방 그리기 토글
+  const toggle = document.createElement('button');
+  toggle.className = 'draw-toggle';
+  toggle.textContent = '✏️ 도면 위에 방 그리기';
+  toggle.onclick = () => setDraw(!drawMode);
+  wrap.appendChild(toggle);
+
   for (const [key, t] of Object.entries(ROOM_TYPES)) {
     const b = document.createElement('button');
     b.className = 'room-chip';
     b.style.background = t.color;
     b.textContent = t.label;
-    b.title = `${t.label} 추가`;
-    b.onclick = () => addRoom(key);
+    b.title = drawMode ? `${t.label} 그리기` : `${t.label} 추가`;
+    b.onclick = () => {
+      if (drawMode) { drawType = key; if (_editor) _editor.setDrawRoom(key); syncChips(); }
+      else addRoom(key);
+    };
+    chips[key] = b;
     wrap.appendChild(b);
   }
 }
@@ -743,8 +772,8 @@ function openUnderlayDialog(editor) {
         <ol class="hint" style="padding-left:18px;line-height:1.8">
           <li>파일을 고르면 화면 배경에 깔립니다.</li>
           <li><b>축척 맞추기</b> → 도면에서 길이를 아는 곳(예: 벽 한 변)의 양끝 두 점을 클릭하고 실제 mm 입력 → 크기가 실제와 맞춰집니다.</li>
-          <li>좌측 팔레트에서 방을 추가해 밑그림을 따라 그립니다.</li>
-          <li>다 그리면 <b>밑그림 제거</b> 후 "📐 기본 도면으로 저장".</li>
+          <li>좌측 <b>공간 추가 → ✏️ 도면 위에 방 그리기</b>를 켜고, 밑그림 위에서 <b>드래그</b>해 방을 따라 그립니다. (방 종류 먼저 선택)</li>
+          <li>그린 방은 자동으로 2D·3D 편집 도면이 됩니다. 다 그리면 <b>밑그림 제거</b> 후 "📐 기본 도면으로 저장".</li>
         </ol>`;
       body.querySelector('#ul-file').onchange = (e) => loadFile(e.target.files[0]);
       return;

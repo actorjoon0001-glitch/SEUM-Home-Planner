@@ -120,6 +120,13 @@ export const FURNITURE_CATALOG = [
   { id: 'sink',    cat: '가전', name: '싱크대',       kind: 'box',      w: 2400, d: 600,  h: 850,  color: '#d7d2c8' },
   { id: 'cooktop', cat: '가전', name: '아일랜드',     kind: 'box',      w: 1500, d: 800,  h: 900,  color: '#c7c2b8' },
 
+  // AV · 스크린골프 (가전)
+  { id: 'beam',    cat: '가전', name: '빔프로젝터',   kind: 'box',      w: 360,  d: 320,  h: 150,  color: '#2b2f33' },
+  { id: 'screen',  cat: '가전', name: '스크린',       kind: 'tv',       w: 3000, d: 100,  h: 1700, color: '#f2f2ec' },
+  { id: 'speaker', cat: '가전', name: '스피커',       kind: 'box',      w: 340,  d: 340,  h: 1150, color: '#232323' },
+  { id: 'karaoke', cat: '가전', name: '노래방 기계',  kind: 'box',      w: 600,  d: 520,  h: 1080, color: '#1f2937' },
+  { id: 'golfsim', cat: '가전', name: '스크린골프 기계', kind: 'rug',   w: 1800, d: 2600, h: 40,   color: '#3f6b3f' },
+
   // 욕실
   { id: 'toilet',  cat: '욕실', name: '양변기',       kind: 'box',      w: 400,  d: 700,  h: 800,  color: '#eef0f1' },
   { id: 'basin',   cat: '욕실', name: '세면대',       kind: 'box',      w: 600,  d: 500,  h: 850,  color: '#eef0f1' },

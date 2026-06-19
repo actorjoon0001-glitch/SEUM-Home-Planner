@@ -7,6 +7,7 @@ import {
 } from './data.js';
 import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
+import { dxfToUnderlay } from './dxf.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
@@ -591,7 +592,7 @@ async function openTemplateDialog() {
     <div class="tpl-add">
       <div class="tpl-add-btns">
         <button class="mini primary" id="tpl-add-btn">➕ 현재 도면을 기본 도면으로 추가</button>
-        <button class="mini" id="tpl-file-btn">📁 파일 등록 (.json · PDF · 이미지)</button>
+        <button class="mini" id="tpl-file-btn">📁 파일 등록 (.json · PDF · 이미지 · DXF)</button>
       </div>
       <div class="tpl-add-form" id="tpl-add-form" style="display:none">
         <input id="tpl-add-title" placeholder="기본 도면 이름" value="${esc(store.design.name || '')}">
@@ -722,35 +723,41 @@ async function openTemplateDialog() {
     inp.onchange = async () => {
       const files = [...(inp.files || [])]; if (!files.length) return;
       let ok = 0; const fails = []; const cad = [];
+      const addUnderlay = (title, dataURL, w0, h0) => {
+        store.addLocalTemplate({ title, keepUnderlay: true, design: {
+          name: title, productType: '', ceilingHeight: 2400,
+          exterior: { material: 'metal', color: '#8d96a0' },
+          roof: { type: 'gable', color: '#3a3f44' },
+          rooms: [], openings: [], furniture: [],
+          underlay: { src: dataURL, x: 0, y: 0, w: w0, h: h0, opacity: 0.5, hidden: false },
+        } });
+      };
       for (const file of files) {
         const name = file.name;
-        const isCad = /\.(dwg|dxf)$/i.test(name);
+        const isDwg = /\.dwg$/i.test(name);          // .dwg 는 바이너리라 미지원
+        const isDxf = /\.dxf$/i.test(name);
         const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(name);
         const isImg = /^image\//.test(file.type) || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
         const isJson = file.type === 'application/json' || /\.json$/i.test(name);
         const title = name.replace(/\.[^.]+$/, '');
         try {
-          if (isCad) { cad.push(name); continue; }
+          if (isDwg) { cad.push(name); continue; }
           if (isJson) {
             const d = JSON.parse(await file.text());
             store.addLocalTemplate({ title: (d.name && d.name.trim()) || title, productType: d.productType || '', design: d });
             ok++;
+          } else if (isDxf) {
+            flash(`'${name}' DXF 변환 중...`);
+            const r = dxfToUnderlay(await file.text());
+            if (!r) { fails.push(name); continue; }
+            addUnderlay(title, r.dataURL, r.w, r.h); ok++;
           } else if (isPdf || isImg) {
             flash(`'${name}' 변환 중...`);
             let dataURL, iw, ih;
             if (isPdf) ({ dataURL, iw, ih } = await pdfToImage(file));
             else { dataURL = await fileToDataURL(file); ({ iw, ih } = await imageSize(dataURL)); }
             ({ dataURL, iw, ih } = await downscaleDataURL(dataURL, 1800, 0.75)); // 저장 용량 절약
-            const w0 = 12000, h0 = w0 * (ih / iw);
-            const design = {
-              name: title, productType: '', ceilingHeight: 2400,
-              exterior: { material: 'metal', color: '#8d96a0' },
-              roof: { type: 'gable', color: '#3a3f44' },
-              rooms: [], openings: [], furniture: [],
-              underlay: { src: dataURL, x: 0, y: 0, w: w0, h: h0, opacity: 0.5, hidden: false },
-            };
-            store.addLocalTemplate({ title, design, keepUnderlay: true });
-            ok++;
+            addUnderlay(title, dataURL, 12000, 12000 * (ih / iw)); ok++;
           } else { fails.push(name); }
         } catch (e) { fails.push(name); }
       }
@@ -758,7 +765,7 @@ async function openTemplateDialog() {
       let msg = ok ? `${ok}개 등록` : '';
       if (fails.length) msg += `${msg ? ', ' : ''}${fails.length}개 실패`;
       flash(msg || '등록된 파일 없음');
-      if (cad.length) alert(`CAD 파일(${cad.join(', ')})은 브라우저에서 바로 열 수 없습니다.\nCAD 프로그램에서 PDF 또는 이미지(PNG/JPG)로 내보낸 뒤 등록해 주세요.`);
+      if (cad.length) alert(`.dwg 파일(${cad.join(', ')})은 브라우저에서 바로 열 수 없습니다.\n캐드에서 'DXF로 저장' 후 등록하시면 됩니다. (DXF는 지원)`);
     };
     inp.click();
   };
@@ -789,8 +796,8 @@ function openUnderlayDialog(editor) {
     const u = store.design.underlay;
     if (!u) {
       body.innerHTML = `
-        <p class="m-sub">갖고 계신 도면 <b>PDF·이미지</b>를 배경으로 깔고, 그 위에 방을 그려 편집 가능한 도면으로 만드세요.</p>
-        <label class="fld"><span>도면 파일 선택 (PDF / PNG / JPG)</span><input id="ul-file" type="file" accept="application/pdf,image/*"></label>
+        <p class="m-sub">갖고 계신 도면 <b>PDF·이미지·DXF</b>(캐드)를 배경으로 깔고, 그 위에 방을 그려 편집 가능한 도면으로 만드세요. <span style="color:var(--muted)">(.dwg는 캐드에서 DXF로 저장 후)</span></p>
+        <label class="fld"><span>도면 파일 선택 (PDF / PNG / JPG / DXF)</span><input id="ul-file" type="file" accept="application/pdf,image/*,.dxf"></label>
         <p id="ul-msg" class="hint"></p>
         <ol class="hint" style="padding-left:18px;line-height:1.8">
           <li>파일을 고르면 화면 배경에 깔립니다.</li>
@@ -841,15 +848,19 @@ function openUnderlayDialog(editor) {
     const msg = body.querySelector('#ul-msg');
     try {
       msg.style.color = ''; msg.textContent = '불러오는 중...';
-      let dataURL, iw, ih;
-      if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+      let dataURL, iw, ih, w0, h0;
+      if (/\.dxf$/i.test(file.name)) {
+        const r = dxfToUnderlay(await file.text());
+        if (!r) throw new Error('DXF에서 도형을 찾지 못했습니다 (.dwg는 DXF로 저장 후 시도)');
+        dataURL = r.dataURL; w0 = r.w; h0 = r.h;
+      } else if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
         ({ dataURL, iw, ih } = await pdfToImage(file));
+        w0 = 12000; h0 = w0 * (ih / iw); // 기본 12m, '축척 맞추기'로 보정
       } else {
         dataURL = await fileToDataURL(file);
         ({ iw, ih } = await imageSize(dataURL));
+        w0 = 12000; h0 = w0 * (ih / iw);
       }
-      const w0 = 12000; // 기본 가로 12m (이후 '축척 맞추기'로 실제 크기 보정)
-      const h0 = w0 * (ih / iw);
       apply((d) => { d.underlay = { src: dataURL, x: 0, y: 0, w: w0, h: h0, opacity: 0.5, hidden: false }; });
       editor.focusUnderlay();
       render();

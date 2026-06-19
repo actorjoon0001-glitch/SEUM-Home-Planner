@@ -140,6 +140,19 @@ export const FURNITURE_CATALOG = [
 
 export const CATEGORIES = ['가구', '가전', '욕실', '소품'];
 
+// 빈 도면 (새 도면 시작 시 — 아무 방도 없는 상태)
+export function createEmptyDesign() {
+  return {
+    name: '새 도면',
+    ceilingHeight: 2400,
+    exterior: { material: 'metal', color: EXTERIOR_MATERIALS.metal.color },
+    roof: { type: 'gable', color: '#3a3f44' },
+    rooms: [],
+    openings: [],
+    furniture: [],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 기본 도면 (한샘 스크린샷의 아파트 평면 느낌으로 구성한 예시)
 // 좌표: 평면도 기준 좌상단이 (0,0), x=가로, y=세로(깊이)

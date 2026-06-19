@@ -1,5 +1,5 @@
 // 세움 홈플래너 - 상태 관리 (단순 pub/sub + 되돌리기/저장)
-import { createDefaultDesign, normalize } from './data.js';
+import { createDefaultDesign, createEmptyDesign, normalize } from './data.js';
 
 const LS_KEY = 'seum-homeplanner:current';
 const LS_LIST = 'seum-homeplanner:saved';
@@ -80,7 +80,8 @@ class Store {
 
   newDesign() {
     this.commit(() => {});
-    this.design = normalize(createDefaultDesign());
+    this.design = normalize(createEmptyDesign()); // 빈 상태로 시작
+    this.cloudId = null;
     this.selectedRoom = this.selectedFurniture = this.selectedOpening = null;
     this.persist();
     this.emit();

@@ -474,7 +474,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   store.subscribe(refreshUndo);
   refreshUndo();
 
-  $('tb-new').onclick = () => { if (confirm('새 도면을 시작할까요? 저장하지 않은 변경은 사라집니다.')) store.newDesign(); };
+  $('tb-new').onclick = () => { if (confirm('빈 새 도면을 시작할까요? 저장하지 않은 변경은 사라집니다.')) { store.newDesign(); editor.fit(); viewer._needCam = true; viewer.dirty = true; } };
 
   $('tb-save').onclick = () => {
     const name = prompt('저장할 도면 이름', store.design.name);

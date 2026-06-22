@@ -30,59 +30,59 @@ export function buildUI({ editor, viewer, onModeChange }) {
 function buildRoomPalette() {
   const wrap = document.getElementById('room-palette');
   wrap.innerHTML = '';
-  const hint = wrap.previousElementSibling; // "클릭하면 방이 추가됩니다"
-  let drawMode = false;
-  let wallMode = false;
-  let outlineMode = false;
+  const hint = wrap.previousElementSibling;
+  let mode = 'select';          // select | outline | draw | wall
   let drawType = 'room';
   const chips = {};
 
   const syncChips = () => {
-    for (const [k, b] of Object.entries(chips)) b.classList.toggle('active', drawMode && k === drawType);
+    for (const [k, b] of Object.entries(chips)) b.classList.toggle('active', mode === 'draw' && k === drawType);
   };
   const setHint = () => {
     if (!hint) return;
-    hint.textContent = outlineMode ? '모서리 클릭으로 외벽을 이어 그림(길이 표시). 더블클릭=한 벽 마침→여러 벽 누적 가능, 시작점 클릭=닫기, Backspace=점 취소, Esc=취소'
-      : drawMode ? '방 종류를 고르고, 외곽 안에서 대각선으로 드래그해 방을 그리세요'
-      : wallMode ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리돼 통로가 뚫림)'
-      : '클릭하면 방이 추가됩니다 (드래그로 옮기면 외곽·옆방에 자동 정렬)';
+    hint.textContent =
+      mode === 'outline' ? '모서리 클릭으로 외벽을 이어 그림(길이 표시). 더블클릭=한 벽 마침→여러 벽 누적, 시작점 클릭=닫기, Esc=취소'
+      : mode === 'draw' ? '방 종류를 고르고, 외벽 안에서 대각선으로 드래그해 방을 그리세요'
+      : mode === 'wall' ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리돼 통로가 뚫림)'
+      : '🖱️ 선택/이동 모드 — 방을 클릭해 선택하고 드래그로 옮기세요. 방 칩을 외벽 안으로 드래그도 가능';
   };
-  const setOutline = (on) => {
-    outlineMode = on; if (on) { drawMode = false; wallMode = false; drawToggle.classList.remove('on'); wallToggle.classList.remove('on'); syncChips(); }
-    outlineToggle.classList.toggle('on', on);
-    if (_editor) _editor.setDrawOutline(on);
-    setHint();
-  };
-  const setDraw = (on) => {
-    drawMode = on; if (on) { wallMode = false; outlineMode = false; wallToggle.classList.remove('on'); outlineToggle.classList.remove('on'); }
-    drawToggle.classList.toggle('on', on);
-    if (_editor) _editor.setDrawRoom(on ? drawType : null);
+  const setMode = (m) => {
+    mode = m;
+    selectToggle.classList.toggle('on', m === 'select');
+    outlineToggle.classList.toggle('on', m === 'outline');
+    drawToggle.classList.toggle('on', m === 'draw');
+    wallToggle.classList.toggle('on', m === 'wall');
+    if (_editor) {
+      _editor.setDrawOutline(m === 'outline');
+      _editor.setDrawRoom(m === 'draw' ? drawType : null);
+      _editor.setWallEdit(m === 'wall');
+    }
     syncChips(); setHint();
   };
-  const setWall = (on) => {
-    wallMode = on; if (on) { drawMode = false; outlineMode = false; drawToggle.classList.remove('on'); outlineToggle.classList.remove('on'); syncChips(); }
-    wallToggle.classList.toggle('on', on);
-    if (_editor) _editor.setWallEdit(on);
-    setHint();
-  };
 
-  // 편집 모드 토글: 집 외곽 / 방 그리기 / 벽 트기·막기
+  // 모드 버튼: 선택/이동(기본) · 집 외곽 · 방 그리기 · 벽 트기/막기
+  const selectToggle = document.createElement('button');
+  selectToggle.className = 'draw-toggle mode-select on';
+  selectToggle.textContent = '🖱️ 선택 / 이동 (기본)';
+  selectToggle.onclick = () => setMode('select');
+  wrap.appendChild(selectToggle);
+
   const outlineToggle = document.createElement('button');
   outlineToggle.className = 'draw-toggle';
   outlineToggle.textContent = '🏠 집 외곽(외벽) 그리기';
-  outlineToggle.onclick = () => setOutline(!outlineMode);
+  outlineToggle.onclick = () => setMode(mode === 'outline' ? 'select' : 'outline');
   wrap.appendChild(outlineToggle);
 
   const drawToggle = document.createElement('button');
   drawToggle.className = 'draw-toggle';
   drawToggle.textContent = '✏️ 방 그리기';
-  drawToggle.onclick = () => setDraw(!drawMode);
+  drawToggle.onclick = () => setMode(mode === 'draw' ? 'select' : 'draw');
   wrap.appendChild(drawToggle);
 
   const wallToggle = document.createElement('button');
   wallToggle.className = 'draw-toggle';
   wallToggle.textContent = '🧱 벽 트기 / 막기';
-  wallToggle.onclick = () => setWall(!wallMode);
+  wallToggle.onclick = () => setMode(mode === 'wall' ? 'select' : 'wall');
   wrap.appendChild(wallToggle);
 
   for (const key of ROOM_PALETTE_TYPES) {
@@ -98,7 +98,7 @@ function buildRoomPalette() {
       e.dataTransfer.effectAllowed = 'copy';
     });
     b.onclick = () => {
-      if (drawMode) { drawType = key; if (_editor) _editor.setDrawRoom(key); syncChips(); }
+      if (mode === 'draw') { drawType = key; if (_editor) _editor.setDrawRoom(key); syncChips(); }
       else addRoom(key);
     };
     chips[key] = b;

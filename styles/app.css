@@ -78,6 +78,8 @@ body {
 }
 .draw-toggle:hover { border-color: var(--seum-red); }
 .draw-toggle.on { background: var(--seum-red); color: #fff; border-color: var(--seum-red); }
+/* 선택/이동(기본) 모드는 빨강(작업) 대신 중립색으로 활성 표시 */
+.draw-toggle.mode-select.on { background: #2c3036; color: #fff; border-color: #2c3036; }
 
 .lib-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
 .lib-tab {

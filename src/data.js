@@ -202,6 +202,14 @@ export function placed(catalogId, x, y, rotation = 0) {
   return { id: fid(), catalogId, x, y, rotation };
 }
 
+// 집 외곽(외벽) 좌표 배열 반환 — 다각형 {points} 또는 구버전 사각형 {x,y,w,d} 모두 지원
+export function outlinePoints(o) {
+  if (!o) return null;
+  if (Array.isArray(o.points) && o.points.length >= 3) return o.points;
+  if ('w' in o && 'd' in o) return [[o.x, o.y], [o.x + o.w, o.y], [o.x + o.w, o.y + o.d], [o.x, o.y + o.d]];
+  return null;
+}
+
 // 창호(개구부) 인스턴스 생성
 // roomId: 부착 방, side: 'n'|'e'|'s'|'w', pos: 벽 시작점에서 중심까지 거리(mm), winType: WINDOW_TYPES 키
 export function opening(roomId, side, pos, winType = 'double') {

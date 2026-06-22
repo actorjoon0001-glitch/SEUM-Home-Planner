@@ -1,7 +1,7 @@
 // 세움 홈플래너 - 2D 평면 편집기 (HTML5 Canvas)
 // 방 추가/이동/크기조절, 가구 배치/이동/회전, 팬/줌, 치수 표시
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, outlinePoints } from './data.js';
+import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, outlinePoints, outlineShape } from './data.js';
 
 const GRID = 100;          // 스냅 단위 (mm)
 const HANDLE = 8;          // 핸들 픽셀 크기
@@ -480,11 +480,11 @@ export class Editor2D {
     cv.addEventListener('drop', (e) => this._drop(e));
 
     // 집 외곽(다각형) 그리기: 더블클릭으로 완료, Esc로 취소
-    cv.addEventListener('dblclick', () => { if (this.drawOutline && this.outlineDraft) this._finishOutlinePoly(); });
+    cv.addEventListener('dblclick', () => { if (this.drawOutline && this.outlineDraft) this._finishOutlinePoly(false); });
     window.addEventListener('keydown', (e) => {
       if (!this.drawOutline || !this.outlineDraft) return;
       if (e.key === 'Escape') { this.outlineDraft = null; this.draw(); }
-      else if (e.key === 'Enter') { this._finishOutlinePoly(); }
+      else if (e.key === 'Enter') { this._finishOutlinePoly(false); }
     });
   }
 
@@ -689,7 +689,7 @@ export class Editor2D {
     return [x, y];
   }
 
-  // 외곽 그리기 클릭 처리 (점 추가 / 닫기)
+  // 외곽 그리기 클릭 처리 (점 추가 / 시작점 클릭 시 닫기)
   _outlineClick(px, py) {
     const [mx, my] = this.toMm(px, py);
     const pt = this._outlineSnap(mx, my);
@@ -697,16 +697,17 @@ export class Editor2D {
     else {
       const f = this.outlineDraft[0];
       const [fx, fy] = this.toPx(f[0], f[1]);
-      if (this.outlineDraft.length >= 3 && Math.hypot(px - fx, py - fy) < 16) { this._finishOutlinePoly(); return; }
+      if (this.outlineDraft.length >= 3 && Math.hypot(px - fx, py - fy) < 16) { this._finishOutlinePoly(true); return; }
       this.outlineDraft.push(pt);
     }
     this.draw();
   }
 
-  _finishOutlinePoly() {
-    if (this.outlineDraft && this.outlineDraft.length >= 3) {
+  // closed=true면 닫힌 다각형, 아니면 열린 벽선(완성 강제 안 함, 2점 이상이면 OK)
+  _finishOutlinePoly(closed) {
+    if (this.outlineDraft && this.outlineDraft.length >= 2) {
       const pts = this.outlineDraft.slice();
-      store.commit((dd) => { dd.outline = { points: pts }; });
+      store.commit((dd) => { dd.outline = { points: pts, closed: !!closed && pts.length >= 3 }; });
     }
     this.outlineDraft = null; this._outlineCursor = null;
     this.draw();
@@ -814,21 +815,45 @@ export class Editor2D {
     });
   }
 
-  // 집 외곽(외벽) 2D 표시 — 다각형 두꺼운 벽 + 그리는 중 미리보기
+  // 두 점(mm) 사이 길이(치수) 라벨을 변 중앙에 표시
+  _segLabel(a, p, color) {
+    const len = Math.round(Math.hypot(p[0] - a[0], p[1] - a[1]));
+    if (len < 1) return;
+    const [ax, ay] = this.toPx(a[0], a[1]);
+    const [bx, by] = this.toPx(p[0], p[1]);
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = '600 12px "Noto Sans KR", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const label = len + ' mm';
+    const w = ctx.measureText(label).width + 8;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(mx - w / 2, my - 9, w, 18);
+    ctx.fillStyle = color;
+    ctx.fillText(label, mx, my + 1);
+    ctx.restore();
+  }
+
+  // 집 외곽(외벽) 2D 표시 — 직선 구간 벽 + 치수 + 그리는 중 미리보기
   _drawOutline() {
     const ctx = this.ctx;
     const t = Math.max(3, 200 * this.scale); // 외벽 두께 200mm
-    const pts = outlinePoints(store.design.outline);
-    if (pts) {
+    const sh = outlineShape(store.design.outline);
+    if (sh) {
+      const { pts, closed } = sh;
       ctx.save();
-      ctx.lineJoin = 'miter';
+      ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
       ctx.strokeStyle = '#3a3f44'; ctx.lineWidth = t;
       ctx.beginPath();
       pts.forEach((p, i) => { const [x, y] = this.toPx(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-      ctx.closePath(); ctx.stroke();
+      if (closed) ctx.closePath();
+      ctx.stroke();
       ctx.restore();
+      // 각 변 치수
+      for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) this._segLabel(pts[i], pts[(i + 1) % pts.length], '#3a3f44');
     }
-    // 그리는 중(다각형 draft)
+    // 그리는 중(draft) — 직선 + 치수 + 점
     const draft = this.outlineDraft;
     if (draft && draft.length) {
       ctx.save();
@@ -837,7 +862,6 @@ export class Editor2D {
       draft.forEach((p, i) => { const [x, y] = this.toPx(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
       if (this._outlineCursor) { const [cx, cy] = this.toPx(this._outlineCursor[0], this._outlineCursor[1]); ctx.lineTo(cx, cy); }
       ctx.stroke(); ctx.setLineDash([]);
-      // 점 표시 + 시작점(닫기) 강조
       draft.forEach((p, i) => {
         const [x, y] = this.toPx(p[0], p[1]);
         ctx.fillStyle = (i === 0 && draft.length >= 3) ? '#c8102e' : '#fff';
@@ -845,6 +869,9 @@ export class Editor2D {
         ctx.beginPath(); ctx.arc(x, y, i === 0 ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       });
       ctx.restore();
+      // 놓인 구간 치수 + 현재(고무줄) 구간 길이 실시간 표시
+      for (let i = 0; i < draft.length - 1; i++) this._segLabel(draft[i], draft[i + 1], '#c8102e');
+      if (this._outlineCursor) this._segLabel(draft[draft.length - 1], this._outlineCursor, '#c8102e');
     }
   }
 

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlinePoints } from './data.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlinePoints, outlineShape } from './data.js';
 import * as TEX from './textures.js';
 
 const WALL_T = 100; // 벽 두께 mm
@@ -300,28 +300,31 @@ export class Viewer3D {
     this.modelGroup.add(m);
   }
 
-  // 집 외곽(외벽) — 다각형 각 변에 벽 + 다각형 바닥 (항상 표시)
+  // 집 외곽(외벽) — 각 변에 벽 (+ 닫힌 형태면 바닥)
   _buildOutline(d, b, ceilH) {
-    const pts = outlinePoints(d.outline); if (!pts) return;
+    const sh = outlineShape(d.outline); if (!sh) return;
+    const { pts, closed } = sh;
     const H = ceilH, T = 160, cy = H / 2 + 60;
     const wallMat = TEX.wallMaterial('#f6f5f2');
     const P = pts.map((p) => this._p(p[0], p[1], b));
-    for (let i = 0; i < P.length; i++) {
-      const a = P[i], c = P[(i + 1) % P.length];
+    const n = P.length;
+    for (let i = 0; i < (closed ? n : n - 1); i++) {
+      const a = P[i], c = P[(i + 1) % n];
       this._edgeWall(a[0], a[1], c[0], c[1], H, T, cy, wallMat);
     }
-    // 다각형 바닥 (ShapeGeometry → 바닥에 눕힘)
-    const shape = new THREE.Shape();
-    P.forEach((p, i) => (i ? shape.lineTo(p[0], p[1]) : shape.moveTo(p[0], p[1])));
-    shape.closePath();
-    const floor = new THREE.Mesh(
-      new THREE.ShapeGeometry(shape),
-      new THREE.MeshStandardMaterial({ color: '#e8e4dc', roughness: 0.9, side: THREE.DoubleSide })
-    );
-    floor.rotation.x = Math.PI / 2; // XY 평면 → XZ 바닥
-    floor.position.y = 20;
-    floor.receiveShadow = true;
-    this.modelGroup.add(floor);
+    if (closed && n >= 3) {
+      const shape = new THREE.Shape();
+      P.forEach((p, i) => (i ? shape.lineTo(p[0], p[1]) : shape.moveTo(p[0], p[1])));
+      shape.closePath();
+      const floor = new THREE.Mesh(
+        new THREE.ShapeGeometry(shape),
+        new THREE.MeshStandardMaterial({ color: '#e8e4dc', roughness: 0.9, side: THREE.DoubleSide })
+      );
+      floor.rotation.x = Math.PI / 2;
+      floor.position.y = 20;
+      floor.receiveShadow = true;
+      this.modelGroup.add(floor);
+    }
   }
 
   // 외장재: 외곽(outline)이 있으면 그 둘레를, 없으면 방 외벽에 마감을 입힘
@@ -332,13 +335,14 @@ export class Viewer3D {
     const T = 120;            // 벽 바깥에 덧대는 외장 마감 두께
     const EPS = 60;           // 벽 바로 바깥 지점으로 외곽 여부 판정
 
-    // 집 외곽(다각형)이 있으면 각 변에 외장 마감
-    const opts = outlinePoints(d.outline);
-    if (opts) {
+    // 집 외곽(다각형/열린벽)이 있으면 각 변에 외장 마감
+    const osh = outlineShape(d.outline);
+    if (osh) {
       const H = ceilH + 120, cy = H / 2 + 60;
-      const P = opts.map((p) => this._p(p[0], p[1], b));
-      for (let i = 0; i < P.length; i++) {
-        const a = P[i], c = P[(i + 1) % P.length];
+      const P = osh.pts.map((p) => this._p(p[0], p[1], b));
+      const n = P.length;
+      for (let i = 0; i < (osh.closed ? n : n - 1); i++) {
+        const a = P[i], c = P[(i + 1) % n];
         const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
         this._edgeWall(a[0], a[1], c[0], c[1], H, T, cy,
           TEX.exteriorMaterial(ex.material, col, len, H, mDef.roughness, mDef.metalness));

@@ -205,9 +205,18 @@ export function placed(catalogId, x, y, rotation = 0) {
 // 집 외곽(외벽) 좌표 배열 반환 — 다각형 {points} 또는 구버전 사각형 {x,y,w,d} 모두 지원
 export function outlinePoints(o) {
   if (!o) return null;
-  if (Array.isArray(o.points) && o.points.length >= 3) return o.points;
+  if (Array.isArray(o.points) && o.points.length >= 2) return o.points;
   if ('w' in o && 'd' in o) return [[o.x, o.y], [o.x + o.w, o.y], [o.x + o.w, o.y + o.d], [o.x, o.y + o.d]];
   return null;
+}
+
+// 외곽 형태 {pts, closed} — closed면 마지막↔처음 변도 잇고 바닥을 채움
+export function outlineShape(o) {
+  const pts = outlinePoints(o);
+  if (!pts) return null;
+  // 새 다각형은 o.closed 로 구분, 구버전/사각형은 닫힌 것으로 간주
+  const closed = (o && Array.isArray(o.points)) ? (o.closed !== false && pts.length >= 3) : true;
+  return { pts, closed };
 }
 
 // 창호(개구부) 인스턴스 생성

@@ -23,12 +23,22 @@ body {
   background: #1f2227; color: #fff;
   flex: 0 0 auto;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; }
 .logo {
   font-weight: 800; font-size: 22px; letter-spacing: 2px;
   color: #fff; padding: 2px 8px; background: var(--seum-red); border-radius: 4px;
 }
 .brand-sub { font-size: 12px; color: #b7bcc4; }
+.tb-call {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 6px;
+  background: #18a558; color: #fff; text-decoration: none;
+  border: 1px solid #149150; border-radius: 6px;
+  padding: 6px 12px; font-size: 13px; font-weight: 700; line-height: 1;
+  white-space: nowrap;
+}
+.tb-call:hover { background: #149150; }
+.tb-call.hidden { display: none; }
+.tb-call-ico { font-size: 14px; }
 .tb-group { display: flex; align-items: center; gap: 4px; margin-left: 8px; flex-wrap: wrap; }
 .tb-btn {
   background: #2c3036; color: #d7dbe0; border: 1px solid #3a3f47;

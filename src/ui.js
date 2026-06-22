@@ -401,6 +401,8 @@ function buildToolbar({ editor, viewer, onModeChange }) {
 
   $('tb-print').onclick = () => printDesign(editor, viewer);
 
+  setupCallButton();
+
   $('tb-roof').onclick = (e) => {
     viewer.controls.maxPolarAngle = viewer.controls.maxPolarAngle > 1.4 ? Math.PI / 2.05 : Math.PI;
     e.currentTarget.classList.toggle('on');
@@ -432,6 +434,34 @@ function buildToolbar({ editor, viewer, onModeChange }) {
       if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
       else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });
       else if (store.selectedOpening) store.commit((d) => { d.openings = d.openings.filter((o) => o.id !== store.selectedOpening); store.selectedOpening = null; });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 대표(통합) 상담 번호: 모든 전화가 한 번호로 연결되도록 config.repPhone 사용
+// ---------------------------------------------------------------------------
+function setupCallButton() {
+  const btn = document.getElementById('tb-call');
+  if (!btn) return;
+  const cfg = window.SEUM_CONFIG || {};
+  const raw = (cfg.repPhone || '').trim();
+  if (!raw) { btn.classList.add('hidden'); return; } // 미설정 시 숨김
+
+  const label = (cfg.repPhoneLabel || '').trim();
+  const dial = raw.replace(/[^0-9+]/g, ''); // tel: 용 — 숫자/＋ 만
+  btn.href = 'tel:' + dial;
+  btn.title = (label ? label + ' · ' : '') + raw + ' 로 전화 상담';
+  document.getElementById('tb-call-num').textContent = raw;
+  btn.classList.remove('hidden');
+
+  // 데스크톱 등 전화 앱이 없는 환경 대비: 번호를 클립보드에 복사하고 안내
+  btn.addEventListener('click', () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(raw).then(
+        () => flash(`상담번호 ${raw} 복사됨`),
+        () => {}
+      );
     }
   });
 }

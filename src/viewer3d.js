@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES } from './data.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlinePoints } from './data.js';
 import * as TEX from './textures.js';
 
 const WALL_T = 100; // 벽 두께 mm
@@ -92,10 +92,10 @@ export class Viewer3D {
       minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
       maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
     }
-    if (d.outline) {
-      const o = d.outline;
-      minX = Math.min(minX, o.x); minY = Math.min(minY, o.y);
-      maxX = Math.max(maxX, o.x + o.w); maxY = Math.max(maxY, o.y + o.d);
+    const op = outlinePoints(d.outline);
+    if (op) for (const [px, py] of op) {
+      minX = Math.min(minX, px); minY = Math.min(minY, py);
+      maxX = Math.max(maxX, px); maxY = Math.max(maxY, py);
     }
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 8000; maxY = 8000; }
     return { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cz: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY };
@@ -289,30 +289,39 @@ export class Viewer3D {
     this.modelGroup.add(g);
   }
 
-  // 집 외곽(외벽) — 그린 outline 으로 4면 벽 + 바닥 슬래브 생성 (항상 표시)
+  // 다각형 외곽의 한 변을 따라 회전된 벽 박스 추가
+  _edgeWall(ax, az, bx, bz, H, T, cy, mat) {
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.hypot(dx, dz); if (len < 1) return;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(len + T, H, T), mat);
+    m.position.set((ax + bx) / 2, cy, (az + bz) / 2);
+    m.rotation.y = -Math.atan2(dz, dx);
+    m.castShadow = true; m.receiveShadow = true;
+    this.modelGroup.add(m);
+  }
+
+  // 집 외곽(외벽) — 다각형 각 변에 벽 + 다각형 바닥 (항상 표시)
   _buildOutline(d, b, ceilH) {
-    const o = d.outline;
-    const T = 160, H = ceilH;
-    const cy = H / 2 + 60;
-    const [x0, z0] = this._p(o.x, o.y, b);
-    const [x1, z1] = this._p(o.x + o.w, o.y + o.d, b);
-    const W = x1 - x0, D = z1 - z0;
+    const pts = outlinePoints(d.outline); if (!pts) return;
+    const H = ceilH, T = 160, cy = H / 2 + 60;
     const wallMat = TEX.wallMaterial('#f6f5f2');
-    const mk = (w, dep, x, z) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, H, dep), wallMat);
-      m.position.set(x, cy, z); m.castShadow = true; m.receiveShadow = true;
-      this.modelGroup.add(m);
-    };
-    mk(W + T, T, (x0 + x1) / 2, z0);
-    mk(W + T, T, (x0 + x1) / 2, z1);
-    mk(T, D + T, x0, (z0 + z1) / 2);
-    mk(T, D + T, x1, (z0 + z1) / 2);
+    const P = pts.map((p) => this._p(p[0], p[1], b));
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], c = P[(i + 1) % P.length];
+      this._edgeWall(a[0], a[1], c[0], c[1], H, T, cy, wallMat);
+    }
+    // 다각형 바닥 (ShapeGeometry → 바닥에 눕힘)
+    const shape = new THREE.Shape();
+    P.forEach((p, i) => (i ? shape.lineTo(p[0], p[1]) : shape.moveTo(p[0], p[1])));
+    shape.closePath();
     const floor = new THREE.Mesh(
-      new THREE.BoxGeometry(W, 50, D),
-      TEX.floorMaterial('living', '#e8e4dc', o.w, o.d)
+      new THREE.ShapeGeometry(shape),
+      new THREE.MeshStandardMaterial({ color: '#e8e4dc', roughness: 0.9, side: THREE.DoubleSide })
     );
-    floor.position.set((x0 + x1) / 2, 25, (z0 + z1) / 2); // 방 바닥(0~60)보다 살짝 아래
-    floor.receiveShadow = true; this.modelGroup.add(floor);
+    floor.rotation.x = Math.PI / 2; // XY 평면 → XZ 바닥
+    floor.position.y = 20;
+    floor.receiveShadow = true;
+    this.modelGroup.add(floor);
   }
 
   // 외장재: 외곽(outline)이 있으면 그 둘레를, 없으면 방 외벽에 마감을 입힘
@@ -323,22 +332,17 @@ export class Viewer3D {
     const T = 120;            // 벽 바깥에 덧대는 외장 마감 두께
     const EPS = 60;           // 벽 바로 바깥 지점으로 외곽 여부 판정
 
-    // 집 외곽이 그려져 있으면 그 둘레에 외장 마감
-    if (d.outline) {
-      const o = d.outline, H = ceilH + 120, cy = H / 2 + 60;
-      const [x0, z0] = this._p(o.x, o.y, b);
-      const [x1, z1] = this._p(o.x + o.w, o.y + o.d, b);
-      const W = x1 - x0, D = z1 - z0;
-      const cmat = (len) => TEX.exteriorMaterial(ex.material, col, len, H, mDef.roughness, mDef.metalness);
-      const mk = (w, dep, x, z, len) => {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(w, H, dep), cmat(len));
-        m.position.set(x, cy, z); m.castShadow = true; m.receiveShadow = true;
-        this.modelGroup.add(m);
-      };
-      mk(W + T, T, (x0 + x1) / 2, z0 - T / 2, o.w);
-      mk(W + T, T, (x0 + x1) / 2, z1 + T / 2, o.w);
-      mk(T, D + T, x0 - T / 2, (z0 + z1) / 2, o.d);
-      mk(T, D + T, x1 + T / 2, (z0 + z1) / 2, o.d);
+    // 집 외곽(다각형)이 있으면 각 변에 외장 마감
+    const opts = outlinePoints(d.outline);
+    if (opts) {
+      const H = ceilH + 120, cy = H / 2 + 60;
+      const P = opts.map((p) => this._p(p[0], p[1], b));
+      for (let i = 0; i < P.length; i++) {
+        const a = P[i], c = P[(i + 1) % P.length];
+        const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+        this._edgeWall(a[0], a[1], c[0], c[1], H, T, cy,
+          TEX.exteriorMaterial(ex.material, col, len, H, mDef.roughness, mDef.metalness));
+      }
       return;
     }
 

@@ -105,6 +105,9 @@ export class Editor2D {
     // 밑그림(참조 도면 PDF/이미지) - 방보다 아래에 깔기
     this._drawUnderlay();
 
+    // 집 외곽(외벽) - 방보다 아래(틀)
+    this._drawOutline();
+
     // 방
     for (const room of d.rooms) this._drawRoom(room);
     // 선택 방 핸들
@@ -119,8 +122,8 @@ export class Editor2D {
 
     // 축척 보정 중 클릭 점/선 표시
     if (this.calib) this._drawCalib();
-    // 방 그리기 미리보기
-    if (this.drag && this.drag.mode === 'drawnew') this._drawNewPreview(this.drag);
+    // 방/외곽 그리기 미리보기
+    if (this.drag && (this.drag.mode === 'drawnew' || this.drag.mode === 'drawoutline')) this._drawNewPreview(this.drag);
 
     // 선택 안내
     this._drawScaleBar();
@@ -524,6 +527,13 @@ export class Editor2D {
       return;
     }
 
+    // 집 외곽 그리기: 대각선 드래그로 외벽 사각형 생성
+    if (this.drawOutline) {
+      const [mx, my] = this.toMm(px, py);
+      this.drag = { mode: 'drawoutline', ax: mx, ay: my, cx: mx, cy: my };
+      return;
+    }
+
     // 방 그리기 모드: 도면 위에서 대각선 드래그로 방 생성
     if (this.drawRoom) {
       const [mx, my] = this.toMm(px, py);
@@ -590,7 +600,7 @@ export class Editor2D {
       return;
     }
 
-    if (drag.mode === 'drawnew') {
+    if (drag.mode === 'drawnew' || drag.mode === 'drawoutline') {
       const [mxx, myy] = this.toMm(px, py);
       drag.cx = mxx; drag.cy = myy;
       this.draw();
@@ -603,10 +613,8 @@ export class Editor2D {
     if (!drag.snapped) { store.snapshot(); drag.snapped = true; }
 
     if (drag.mode === 'mover') {
-      store.liveUpdate(() => {
-        drag.room.x = this.snap(mx - drag.dx);
-        drag.room.y = this.snap(my - drag.dy);
-      });
+      const sn = this._snapRoomMove(drag.room, this.snap(mx - drag.dx), this.snap(my - drag.dy));
+      store.liveUpdate(() => { drag.room.x = sn.x; drag.room.y = sn.y; });
     } else if (drag.mode === 'movef') {
       store.liveUpdate(() => {
         drag.f.x = this.snap(mx - drag.dx);
@@ -641,6 +649,7 @@ export class Editor2D {
   }
 
   _up() {
+    if (this.drag && this.drag.mode === 'drawoutline') { this._finishOutline(this.drag); this.drag = null; return; }
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
     if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo'].includes(this.drag.mode)) {
       store.liveEnd();
@@ -648,10 +657,38 @@ export class Editor2D {
     this.drag = null;
   }
 
+  // 집 외곽(외벽) 그리기 모드 on/off
+  setDrawOutline(on) {
+    this.drawOutline = !!on;
+    if (on) { this.drawRoom = null; this.wallEdit = false; this.calib = null; this._hoverWall = null; }
+    this.canvas.style.cursor = on ? 'crosshair' : 'default';
+    this.draw();
+  }
+
+  // 방을 옮길 때 외곽/다른 방 모서리에 자동 정렬(스냅)
+  _snapRoomMove(room, x, y) {
+    const SNAP = 250; // mm 이내면 달라붙음
+    const d = store.design;
+    const xs = [], ys = [];
+    if (d.outline) { xs.push(d.outline.x, d.outline.x + d.outline.w); ys.push(d.outline.y, d.outline.y + d.outline.d); }
+    for (const r of d.rooms) { if (r.id === room.id) continue; xs.push(r.x, r.x + r.w); ys.push(r.y, r.y + r.d); }
+    let nx = x, bx = SNAP;
+    for (const gx of xs) {
+      if (Math.abs(x - gx) < bx) { bx = Math.abs(x - gx); nx = gx; }
+      if (Math.abs((x + room.w) - gx) < bx) { bx = Math.abs((x + room.w) - gx); nx = gx - room.w; }
+    }
+    let ny = y, by = SNAP;
+    for (const gy of ys) {
+      if (Math.abs(y - gy) < by) { by = Math.abs(y - gy); ny = gy; }
+      if (Math.abs((y + room.d) - gy) < by) { by = Math.abs((y + room.d) - gy); ny = gy - room.d; }
+    }
+    return { x: nx, y: ny };
+  }
+
   // 방 그리기 모드 on/off (type=방종류 키 또는 null)
   setDrawRoom(type) {
     this.drawRoom = type || null;
-    if (this.drawRoom) { this.calib = null; this.wallEdit = false; this._hoverWall = null; }
+    if (this.drawRoom) { this.calib = null; this.wallEdit = false; this.drawOutline = false; this._hoverWall = null; }
     this.canvas.style.cursor = this.drawRoom ? 'crosshair' : 'default';
     this.draw();
   }
@@ -659,7 +696,7 @@ export class Editor2D {
   // 벽 편집 모드 on/off — 2D에서 벽을 클릭해 트기↔막기
   setWallEdit(on) {
     this.wallEdit = !!on;
-    if (on) { this.drawRoom = null; this.calib = null; }
+    if (on) { this.drawRoom = null; this.drawOutline = false; this.calib = null; }
     this._hoverWall = null;
     this.canvas.style.cursor = on ? 'pointer' : 'default';
     this.draw();
@@ -730,17 +767,46 @@ export class Editor2D {
     });
   }
 
+  // 드래그 사각형으로 집 외곽(외벽) 생성/교체
+  _finishOutline(drag) {
+    const x0 = this.snap(Math.min(drag.ax, drag.cx)), y0 = this.snap(Math.min(drag.ay, drag.cy));
+    const x1 = this.snap(Math.max(drag.ax, drag.cx)), y1 = this.snap(Math.max(drag.ay, drag.cy));
+    const w = x1 - x0, d = y1 - y0;
+    if (w < 1000 || d < 1000) { this.draw(); return; } // 너무 작으면 무시
+    store.commit((dd) => { dd.outline = { x: x0, y: y0, w, d }; });
+  }
+
+  // 집 외곽(외벽) 2D 표시 — 두꺼운 벽 테두리
+  _drawOutline() {
+    const o = store.design.outline; if (!o) return;
+    const ctx = this.ctx;
+    const [x, y] = this.toPx(o.x, o.y);
+    const w = o.w * this.scale, h = o.d * this.scale;
+    const t = Math.max(3, 200 * this.scale); // 외벽 두께 200mm
+    ctx.save();
+    ctx.strokeStyle = '#3a3f44'; ctx.lineWidth = t;
+    ctx.strokeRect(x + t / 2, y + t / 2, w - t, h - t);
+    ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = '#3a3f44'; ctx.font = '600 12px "Noto Sans KR", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(o.w + ' mm', x + w / 2, y - 8);
+    ctx.save(); ctx.translate(x - 12, y + h / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(o.d + ' mm', 0, 0); ctx.restore();
+    ctx.restore();
+  }
+
   _drawNewPreview(drag) {
     const x0 = this.snap(Math.min(drag.ax, drag.cx)), y0 = this.snap(Math.min(drag.ay, drag.cy));
     const x1 = this.snap(Math.max(drag.ax, drag.cx)), y1 = this.snap(Math.max(drag.ay, drag.cy));
     const [px, py] = this.toPx(x0, y0);
     const w = (x1 - x0) * this.scale, h = (y1 - y0) * this.scale;
-    const t = ROOM_TYPES[this.drawRoom] || ROOM_TYPES.living;
+    const isOutline = drag.mode === 'drawoutline';
     const ctx = this.ctx;
     ctx.save();
-    ctx.fillStyle = t.color + 'aa';
+    ctx.fillStyle = isOutline ? 'rgba(58,63,68,0.12)' : (ROOM_TYPES[this.drawRoom] || ROOM_TYPES.living).color + 'aa';
     ctx.fillRect(px, py, w, h);
-    ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = isOutline ? '#3a3f44' : '#c8102e';
+    ctx.lineWidth = isOutline ? Math.max(3, 200 * this.scale) : 2; ctx.setLineDash([6, 4]);
     ctx.strokeRect(px, py, w, h);
     ctx.setLineDash([]);
     ctx.fillStyle = '#c8102e'; ctx.font = '12px sans-serif';

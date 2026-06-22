@@ -224,6 +224,7 @@ export function normalize(design) {
   if (typeof design.productType !== 'string') design.productType = ''; // 제품 종류(주택/체류형 쉼터/농막)
   if (!('thumb' in design)) design.thumb = null;                 // 썸네일 dataURL
   if (!('underlay' in design)) design.underlay = null;           // 밑그림(PDF/이미지) 참조 도면
+  if (!('outline' in design)) design.outline = null;             // 집 외곽(외벽) {x,y,w,d}
   return design;
 }
 

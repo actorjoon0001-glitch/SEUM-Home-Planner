@@ -33,6 +33,7 @@ function buildRoomPalette() {
   const hint = wrap.previousElementSibling; // "클릭하면 방이 추가됩니다"
   let drawMode = false;
   let wallMode = false;
+  let outlineMode = false;
   let drawType = 'living';
   const chips = {};
 
@@ -41,27 +42,40 @@ function buildRoomPalette() {
   };
   const setHint = () => {
     if (!hint) return;
-    hint.textContent = drawMode ? '방 종류를 고르고, 도면 위에서 대각선으로 드래그해 방을 그리세요'
+    hint.textContent = outlineMode ? '도면 위에서 대각선으로 드래그해 집 외곽(외벽)을 그리세요'
+      : drawMode ? '방 종류를 고르고, 외곽 안에서 대각선으로 드래그해 방을 그리세요'
       : wallMode ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리돼 통로가 뚫림)'
-      : '클릭하면 방이 추가됩니다';
+      : '클릭하면 방이 추가됩니다 (드래그로 옮기면 외곽·옆방에 자동 정렬)';
+  };
+  const setOutline = (on) => {
+    outlineMode = on; if (on) { drawMode = false; wallMode = false; drawToggle.classList.remove('on'); wallToggle.classList.remove('on'); syncChips(); }
+    outlineToggle.classList.toggle('on', on);
+    if (_editor) _editor.setDrawOutline(on);
+    setHint();
   };
   const setDraw = (on) => {
-    drawMode = on; if (on) { wallMode = false; wallToggle.classList.remove('on'); }
+    drawMode = on; if (on) { wallMode = false; outlineMode = false; wallToggle.classList.remove('on'); outlineToggle.classList.remove('on'); }
     drawToggle.classList.toggle('on', on);
     if (_editor) _editor.setDrawRoom(on ? drawType : null);
     syncChips(); setHint();
   };
   const setWall = (on) => {
-    wallMode = on; if (on) { drawMode = false; drawToggle.classList.remove('on'); syncChips(); }
+    wallMode = on; if (on) { drawMode = false; outlineMode = false; drawToggle.classList.remove('on'); outlineToggle.classList.remove('on'); syncChips(); }
     wallToggle.classList.toggle('on', on);
     if (_editor) _editor.setWallEdit(on);
     setHint();
   };
 
-  // 편집 모드 토글: 방 그리기 / 벽 트기·막기
+  // 편집 모드 토글: 집 외곽 / 방 그리기 / 벽 트기·막기
+  const outlineToggle = document.createElement('button');
+  outlineToggle.className = 'draw-toggle';
+  outlineToggle.textContent = '🏠 집 외곽(외벽) 그리기';
+  outlineToggle.onclick = () => setOutline(!outlineMode);
+  wrap.appendChild(outlineToggle);
+
   const drawToggle = document.createElement('button');
   drawToggle.className = 'draw-toggle';
-  drawToggle.textContent = '✏️ 도면 위에 방 그리기';
+  drawToggle.textContent = '✏️ 방 그리기';
   drawToggle.onclick = () => setDraw(!drawMode);
   wrap.appendChild(drawToggle);
 

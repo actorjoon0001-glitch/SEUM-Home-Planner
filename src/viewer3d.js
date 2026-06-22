@@ -92,6 +92,11 @@ export class Viewer3D {
       minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
       maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
     }
+    if (d.outline) {
+      const o = d.outline;
+      minX = Math.min(minX, o.x); minY = Math.min(minY, o.y);
+      maxX = Math.max(maxX, o.x + o.w); maxY = Math.max(maxY, o.y + o.d);
+    }
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 8000; maxY = 8000; }
     return { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cz: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY };
   }
@@ -117,6 +122,7 @@ export class Viewer3D {
     ground.receiveShadow = true;
     this.modelGroup.add(ground);
 
+    if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
     for (const room of d.rooms) this._buildRoom(room, b, H);
     for (const o of (d.openings || [])) this._buildOpening(o, b);
     for (const f of d.furniture) this._buildFurniture(f, b);
@@ -283,14 +289,58 @@ export class Viewer3D {
     this.modelGroup.add(g);
   }
 
-  // 외장재: 건물 외곽에 면한 "기존 벽체"에 외장 마감을 입힘 (별도 테두리 쉘 X)
-  // 각 방의 4면 중 바깥(다른 방이 없는 쪽)에 면한 벽에만 마감 패널을 덧댐.
+  // 집 외곽(외벽) — 그린 outline 으로 4면 벽 + 바닥 슬래브 생성 (항상 표시)
+  _buildOutline(d, b, ceilH) {
+    const o = d.outline;
+    const T = 160, H = ceilH;
+    const cy = H / 2 + 60;
+    const [x0, z0] = this._p(o.x, o.y, b);
+    const [x1, z1] = this._p(o.x + o.w, o.y + o.d, b);
+    const W = x1 - x0, D = z1 - z0;
+    const wallMat = TEX.wallMaterial('#f6f5f2');
+    const mk = (w, dep, x, z) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, H, dep), wallMat);
+      m.position.set(x, cy, z); m.castShadow = true; m.receiveShadow = true;
+      this.modelGroup.add(m);
+    };
+    mk(W + T, T, (x0 + x1) / 2, z0);
+    mk(W + T, T, (x0 + x1) / 2, z1);
+    mk(T, D + T, x0, (z0 + z1) / 2);
+    mk(T, D + T, x1, (z0 + z1) / 2);
+    const floor = new THREE.Mesh(
+      new THREE.BoxGeometry(W, 50, D),
+      TEX.floorMaterial('living', '#e8e4dc', o.w, o.d)
+    );
+    floor.position.set((x0 + x1) / 2, 25, (z0 + z1) / 2); // 방 바닥(0~60)보다 살짝 아래
+    floor.receiveShadow = true; this.modelGroup.add(floor);
+  }
+
+  // 외장재: 외곽(outline)이 있으면 그 둘레를, 없으면 방 외벽에 마감을 입힘
   _buildExterior(d, b, ceilH) {
     const ex = d.exterior || {};
     const mDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
     const col = ex.color || mDef.color;
     const T = 120;            // 벽 바깥에 덧대는 외장 마감 두께
     const EPS = 60;           // 벽 바로 바깥 지점으로 외곽 여부 판정
+
+    // 집 외곽이 그려져 있으면 그 둘레에 외장 마감
+    if (d.outline) {
+      const o = d.outline, H = ceilH + 120, cy = H / 2 + 60;
+      const [x0, z0] = this._p(o.x, o.y, b);
+      const [x1, z1] = this._p(o.x + o.w, o.y + o.d, b);
+      const W = x1 - x0, D = z1 - z0;
+      const cmat = (len) => TEX.exteriorMaterial(ex.material, col, len, H, mDef.roughness, mDef.metalness);
+      const mk = (w, dep, x, z, len) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, H, dep), cmat(len));
+        m.position.set(x, cy, z); m.castShadow = true; m.receiveShadow = true;
+        this.modelGroup.add(m);
+      };
+      mk(W + T, T, (x0 + x1) / 2, z0 - T / 2, o.w);
+      mk(W + T, T, (x0 + x1) / 2, z1 + T / 2, o.w);
+      mk(T, D + T, x0 - T / 2, (z0 + z1) / 2, o.d);
+      mk(T, D + T, x1 + T / 2, (z0 + z1) / 2, o.d);
+      return;
+    }
 
     // 발코니(개방)는 외벽이 없으므로 외곽 판정 대상에서 제외
     const rooms = d.rooms.filter((r) => r.type !== 'balcony');

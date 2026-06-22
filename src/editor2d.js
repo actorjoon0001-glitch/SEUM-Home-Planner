@@ -729,7 +729,7 @@ export class Editor2D {
     const SNAP = 250; // mm 이내면 달라붙음
     const d = store.design;
     const xs = [], ys = [];
-    if (d.outline) { xs.push(d.outline.x, d.outline.x + d.outline.w); ys.push(d.outline.y, d.outline.y + d.outline.d); }
+    for (const { pts } of outlineShapes(d.outline)) for (const p of pts) { xs.push(p[0]); ys.push(p[1]); }
     for (const r of d.rooms) { if (r.id === room.id) continue; xs.push(r.x, r.x + r.w); ys.push(r.y, r.y + r.d); }
     let nx = x, bx = SNAP;
     for (const gx of xs) {
@@ -954,10 +954,59 @@ export class Editor2D {
       this._dropWindow(winType, mx, my);
       return;
     }
+    // 방 드롭: "room:<type>" → 외벽 안에 떨어뜨리면 그 안에 맞춰 배치
+    if (raw.startsWith('room:')) {
+      this._dropRoom(raw.slice(5), mx, my);
+      return;
+    }
     // 가구 드롭
     store.commit((d) => {
       d.furniture.push({ id: 'f' + Date.now().toString(36), catalogId: raw, x: this.snap(mx), y: this.snap(my), rotation: 0 });
     });
+  }
+
+  // 방을 드롭 — 닫힌 외벽 안이면 그 안에 들어가도록 맞추고, 외곽/옆방에 스냅
+  _dropRoom(type, mx, my) {
+    const t = ROOM_TYPES[type] || ROOM_TYPES.living;
+    let w = 3000, d = 3000;
+    let x = mx - w / 2, y = my - d / 2;
+    const poly = this._outlineContaining(mx, my);
+    if (poly) {
+      const bb = this._polyBBox(poly);
+      const m = 100; // 외벽 안쪽 여백
+      w = Math.min(w, Math.max(800, bb.w - m * 2));
+      d = Math.min(d, Math.max(800, bb.h - m * 2));
+      x = Math.min(Math.max(mx - w / 2, bb.x + m), bb.x + bb.w - m - w);
+      y = Math.min(Math.max(my - d / 2, bb.y + m), bb.y + bb.h - m - d);
+    }
+    x = this.snap(x); y = this.snap(y); w = this.snap(w); d = this.snap(d);
+    const sn = this._snapRoomMove({ id: '', w, d }, x, y);
+    store.commit((dd) => {
+      const room = { id: rid(), type, name: t.label, x: sn.x, y: sn.y, w, d };
+      dd.rooms.push(room);
+      store.selectedRoom = room.id; store.selectedFurniture = store.selectedOpening = null;
+    });
+  }
+
+  // 점이 들어있는 닫힌 외곽(다각형) 좌표 반환
+  _outlineContaining(mx, my) {
+    for (const { pts, closed } of outlineShapes(store.design.outline)) {
+      if (closed && pts.length >= 3 && this._pointInPoly(mx, my, pts)) return pts;
+    }
+    return null;
+  }
+  _polyBBox(pts) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  _pointInPoly(x, y, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
   }
 
   // 창호를 드롭 지점에서 가장 가까운 방의 가장 가까운 벽면에 부착

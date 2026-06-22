@@ -90,7 +90,12 @@ function buildRoomPalette() {
     b.className = 'room-chip';
     b.style.background = t.color;
     b.textContent = t.label;
-    b.title = `${t.label} 추가`;
+    b.title = `${t.label} — 클릭 추가 / 외벽 안으로 드래그`;
+    b.draggable = true;
+    b.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', 'room:' + key);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
     b.onclick = () => {
       if (drawMode) { drawType = key; if (_editor) _editor.setDrawRoom(key); syncChips(); }
       else addRoom(key);

@@ -1,7 +1,7 @@
 // 세움 홈플래너 - UI 구성 (라이브러리 패널, 속성 패널, 툴바 동작)
 import { store } from './store.js';
 import {
-  ROOM_TYPES, FURNITURE_CATALOG, CATEGORIES, catalogOf,
+  ROOM_TYPES, FURNITURE_CATALOG, CATEGORIES, catalogOf, ROOM_PALETTE_TYPES,
   WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
   ROOF_TYPES, ROOF_PALETTE, PRODUCT_TYPES,
 } from './data.js';
@@ -34,7 +34,7 @@ function buildRoomPalette() {
   let drawMode = false;
   let wallMode = false;
   let outlineMode = false;
-  let drawType = 'living';
+  let drawType = 'room';
   const chips = {};
 
   const syncChips = () => {
@@ -85,7 +85,8 @@ function buildRoomPalette() {
   wallToggle.onclick = () => setWall(!wallMode);
   wrap.appendChild(wallToggle);
 
-  for (const [key, t] of Object.entries(ROOM_TYPES)) {
+  for (const key of ROOM_PALETTE_TYPES) {
+    const t = ROOM_TYPES[key]; if (!t) continue;
     const b = document.createElement('button');
     b.className = 'room-chip';
     b.style.background = t.color;
@@ -385,8 +386,9 @@ function bindOpeningForm(o) {
 }
 
 function roomForm(room) {
-  const opts = Object.entries(ROOM_TYPES)
-    .map(([k, t]) => `<option value="${k}" ${k === room.type ? 'selected' : ''}>${t.label}</option>`).join('');
+  // 세움 표준 공간 + 현재 방 타입(구버전 호환)만 선택지로
+  const keys = ROOM_PALETTE_TYPES.includes(room.type) ? ROOM_PALETTE_TYPES : [...ROOM_PALETTE_TYPES, room.type];
+  const opts = keys.map((k) => `<option value="${k}" ${k === room.type ? 'selected' : ''}>${(ROOM_TYPES[k] || {}).label || k}</option>`).join('');
   const area = (room.w * room.d / 1e6).toFixed(2);
   return `
     <p class="ph">공간 속성</p>

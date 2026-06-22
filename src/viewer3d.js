@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes } from './data.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
 import * as TEX from './textures.js';
 
 const WALL_T = 100; // 벽 두께 mm
@@ -145,7 +145,7 @@ export class Viewer3D {
   _buildRoom(room, b, ceilH) {
     const t = ROOM_TYPES[room.type] || ROOM_TYPES.hall;
     const isAttic = room.type === 'attic';
-    const isOpen = room.type === 'balcony';
+    const isOpen = OPEN_ROOM_TYPES.includes(room.type);
     const wallH = isAttic ? ATTIC_HEIGHT : ceilH;
     const [px, pz] = this._p(room.x, room.y, b);
 
@@ -352,7 +352,7 @@ export class Viewer3D {
     }
 
     // 발코니(개방)는 외벽이 없으므로 외곽 판정 대상에서 제외
-    const rooms = d.rooms.filter((r) => r.type !== 'balcony');
+    const rooms = d.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type));
     const inAnyRoom = (x, y) => rooms.some((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.d);
 
     const mat = (len, h) => TEX.exteriorMaterial(ex.material, col, len, h, mDef.roughness, mDef.metalness);

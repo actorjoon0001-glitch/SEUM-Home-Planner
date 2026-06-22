@@ -5,19 +5,31 @@
 // 방(공간) 종류 정의
 // ---------------------------------------------------------------------------
 export const ROOM_TYPES = {
+  // 세움 표준 공간 (팔레트 표시)
+  room:     { label: '방',       color: '#d6e2f0', wall: '#a8c0dd' },
+  bath:     { label: '화장실',   color: '#cfe7ec', wall: '#9fcdd6' },
+  utility:  { label: '다용도실', color: '#e6e0ef', wall: '#c2b6d6' },
+  entrance: { label: '현관',     color: '#e2e2e2', wall: '#bdbdbd' },
+  dress:    { label: '드레스룸', color: '#f0dfe8', wall: '#d6aec3' },
+  deck:     { label: '데크',     color: '#dcefe1', wall: '#b3d6bd' },
+  porch:    { label: '포치',     color: '#e9ddc7', wall: '#cdb98f' },
+  sunroom:  { label: '썬룸',     color: '#fbf2cf', wall: '#e3d28f' },
+  // 구버전/내장 도면 호환용 (팔레트엔 숨김, 저장된 도면은 정상 표시)
   living:   { label: '거실',     color: '#cfe3d4', wall: '#9bbfa6' },
   bedroom:  { label: '침실',     color: '#d6e2f0', wall: '#a8c0dd' },
   kitchen:  { label: '주방',     color: '#f3e3c9', wall: '#d8c19a' },
-  bath:     { label: '욕실',     color: '#cfe7ec', wall: '#9fcdd6' },
-  utility:  { label: '다용도실', color: '#e6e0ef', wall: '#c2b6d6' },
   attic:    { label: '다락',     color: '#efe0d6', wall: '#d6b89f' },
-  dress:    { label: '드레스룸', color: '#f0dfe8', wall: '#d6aec3' },
-  entrance: { label: '현관',     color: '#e2e2e2', wall: '#bdbdbd' },
   balcony:  { label: '발코니',   color: '#dcefe1', wall: '#b3d6bd' },
   hall:     { label: '복도',     color: '#ededed', wall: '#c7c7c7' },
   pantry:   { label: '팬트리',   color: '#efe7d2', wall: '#d4c79f' },
   study:    { label: '서재',     color: '#dde7d6', wall: '#aec3a0' },
 };
+
+// 좌측 팔레트에 보여줄 공간 (세움에서 쓰는 것만)
+export const ROOM_PALETTE_TYPES = ['room', 'bath', 'utility', 'entrance', 'dress', 'deck', 'porch', 'sunroom'];
+
+// 벽이 없는 개방형 공간 (데크·포치·발코니) — 3D에서 바닥만
+export const OPEN_ROOM_TYPES = ['balcony', 'deck', 'porch'];
 
 // 다락은 천장이 낮음 → 3D 표현 시 사용
 export const ATTIC_HEIGHT = 1500;

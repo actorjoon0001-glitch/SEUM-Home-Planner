@@ -1,7 +1,7 @@
 // 세움 홈플래너 - 2D 평면 편집기 (HTML5 Canvas)
 // 방 추가/이동/크기조절, 가구 배치/이동/회전, 팬/줌, 치수 표시
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, outlinePoints, outlineShape } from './data.js';
+import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, outlinePoints, outlineShape, outlineShapes } from './data.js';
 
 const GRID = 100;          // 스냅 단위 (mm)
 const HANDLE = 8;          // 핸들 픽셀 크기
@@ -485,6 +485,7 @@ export class Editor2D {
       if (!this.drawOutline || !this.outlineDraft) return;
       if (e.key === 'Escape') { this.outlineDraft = null; this.draw(); }
       else if (e.key === 'Enter') { this._finishOutlinePoly(false); }
+      else if (e.key === 'Backspace') { e.preventDefault(); this.outlineDraft.pop(); if (!this.outlineDraft.length) this.outlineDraft = null; this.draw(); }
     });
   }
 
@@ -703,11 +704,21 @@ export class Editor2D {
     this.draw();
   }
 
+  // 외곽 경로를 누적 추가 — 이전 벽을 지우지 않음 (여러 외벽 가능)
   // closed=true면 닫힌 다각형, 아니면 열린 벽선(완성 강제 안 함, 2점 이상이면 OK)
   _finishOutlinePoly(closed) {
     if (this.outlineDraft && this.outlineDraft.length >= 2) {
-      const pts = this.outlineDraft.slice();
-      store.commit((dd) => { dd.outline = { points: pts, closed: !!closed && pts.length >= 3 }; });
+      const path = { points: this.outlineDraft.slice(), closed: !!closed && this.outlineDraft.length >= 3 };
+      store.commit((dd) => {
+        const cur = dd.outline;
+        let paths;
+        if (cur && Array.isArray(cur.paths)) paths = cur.paths.slice();
+        else if (cur && Array.isArray(cur.points)) paths = [{ points: cur.points, closed: cur.closed !== false && cur.points.length >= 3 }];
+        else if (cur && 'w' in cur) paths = [{ points: [[cur.x, cur.y], [cur.x + cur.w, cur.y], [cur.x + cur.w, cur.y + cur.d], [cur.x, cur.y + cur.d]], closed: true }];
+        else paths = [];
+        paths.push(path);
+        dd.outline = { paths };
+      });
     }
     this.outlineDraft = null; this._outlineCursor = null;
     this.draw();
@@ -839,9 +850,7 @@ export class Editor2D {
   _drawOutline() {
     const ctx = this.ctx;
     const t = Math.max(3, 200 * this.scale); // 외벽 두께 200mm
-    const sh = outlineShape(store.design.outline);
-    if (sh) {
-      const { pts, closed } = sh;
+    for (const { pts, closed } of outlineShapes(store.design.outline)) {
       ctx.save();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
       ctx.strokeStyle = '#3a3f44'; ctx.lineWidth = t;

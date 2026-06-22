@@ -42,7 +42,7 @@ function buildRoomPalette() {
   };
   const setHint = () => {
     if (!hint) return;
-    hint.textContent = outlineMode ? '모서리를 클릭해 외벽을 이어 그리세요(길이 표시). 더블클릭=그만 그리기(열린 채 OK), 시작점 클릭=닫기, Esc=취소'
+    hint.textContent = outlineMode ? '모서리 클릭으로 외벽을 이어 그림(길이 표시). 더블클릭=한 벽 마침→여러 벽 누적 가능, 시작점 클릭=닫기, Backspace=점 취소, Esc=취소'
       : drawMode ? '방 종류를 고르고, 외곽 안에서 대각선으로 드래그해 방을 그리세요'
       : wallMode ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리돼 통로가 뚫림)'
       : '클릭하면 방이 추가됩니다 (드래그로 옮기면 외곽·옆방에 자동 정렬)';

@@ -219,6 +219,24 @@ export function outlineShape(o) {
   return { pts, closed };
 }
 
+// 외곽 전체 → 여러 벽 경로 [{pts, closed}, ...] (다중 외벽 누적 지원)
+export function outlineShapes(o) {
+  if (!o) return [];
+  if (Array.isArray(o.paths)) return o.paths.map(pathToShape).filter(Boolean);
+  const s = outlineShape(o); // 단일 외곽(구버전/사각형) 호환
+  return s ? [s] : [];
+}
+function pathToShape(p) {
+  if (!p) return null;
+  if (Array.isArray(p.points) && p.points.length >= 2) {
+    return { pts: p.points, closed: p.closed !== false && p.points.length >= 3 };
+  }
+  if ('w' in p && 'd' in p) {
+    return { pts: [[p.x, p.y], [p.x + p.w, p.y], [p.x + p.w, p.y + p.d], [p.x, p.y + p.d]], closed: true };
+  }
+  return null;
+}
+
 // 창호(개구부) 인스턴스 생성
 // roomId: 부착 방, side: 'n'|'e'|'s'|'w', pos: 벽 시작점에서 중심까지 거리(mm), winType: WINDOW_TYPES 키
 export function opening(roomId, side, pos, winType = 'double') {

@@ -288,27 +288,73 @@ export class Viewer3D {
     this.modelGroup.add(g);
   }
 
-  // 다각형 외곽의 한 변을 따라 회전된 벽 박스 추가
-  _edgeWall(ax, az, bx, bz, H, T, cy, mat) {
-    const dx = bx - ax, dz = bz - az;
+  // 개구부(창/문)를 평면 좌표 기준으로 환산 — 외곽 벽에서도 같은 자리에 구멍을 뚫기 위함
+  _openingWorld(o) {
+    const room = store.design.rooms.find((r) => r.id === o.roomId);
+    if (!room) return null;
+    const horiz = (o.side === 'n' || o.side === 's');
+    const span = horiz ? room.w : room.d;
+    const half = (o.w || 900) / 2;
+    const pos = Math.max(half, Math.min(span - half, o.pos));
+    let cx, cy;
+    if (o.side === 'n') { cx = room.x + pos; cy = room.y; }
+    else if (o.side === 's') { cx = room.x + pos; cy = room.y + room.d; }
+    else if (o.side === 'w') { cx = room.x; cy = room.y + pos; }
+    else { cx = room.x + room.w; cy = room.y + pos; }
+    return { cx, cy, horiz, half, sill: Math.max(0, o.sill || 0), top: (o.sill || 0) + (o.h || 1200) };
+  }
+
+  // 외곽 한 변(A→B, 중심원점 좌표) 위에 놓인 개구부들을 _wallRects 형식으로 수집
+  _edgeOpenings(A, dir, len, b) {
+    const TOL = 300; // 방 벽과 외벽 사이 간격 허용치(mm)
+    const edgeHoriz = Math.abs(dir[0]) >= Math.abs(dir[1]);
+    const out = [];
+    for (const o of (store.design.openings || [])) {
+      const w = this._openingWorld(o); if (!w) continue;
+      if (w.horiz !== edgeHoriz) continue; // 변 방향과 개구부 방향 일치
+      const [pcx, pcz] = this._p(w.cx, w.cy, b);
+      const vx = pcx - A[0], vz = pcz - A[1];
+      const t = vx * dir[0] + vz * dir[1];               // 변을 따라간 위치
+      const perp = Math.abs(-vx * dir[1] + vz * dir[0]); // 변과의 수직 거리
+      if (perp > TOL) continue;
+      if (t < -w.half || t > len + w.half) continue;
+      const a = Math.max(0, t - w.half), c2 = Math.min(len, t + w.half);
+      if (c2 - a < 1) continue;
+      out.push({ a, c2, sill: w.sill, top: w.top });
+    }
+    return out.sort((p, q) => p.a - q.a);
+  }
+
+  // 외곽/외장 한 변을 개구부 자리를 비워(뚫어) 만든다 (내벽 _buildWall 과 동일 원리)
+  _buildCarvedEdge(A, B, wallH, T, ext, b, matFn) {
+    const dx = B[0] - A[0], dz = B[1] - A[1];
     const len = Math.hypot(dx, dz); if (len < 1) return;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(len + T, H, T), mat);
-    m.position.set((ax + bx) / 2, cy, (az + bz) / 2);
-    m.rotation.y = -Math.atan2(dz, dx);
-    m.castShadow = true; m.receiveShadow = true;
-    this.modelGroup.add(m);
+    const ux = dx / len, uz = dz / len;
+    const ops = this._edgeOpenings(A, [ux, uz], len, b);
+    const rects = this._wallRects(len, ops, wallH, ext);
+    const ang = -Math.atan2(dz, dx);
+    for (const [a, bEnd, yLo, yHi] of rects) {
+      const segLen = bEnd - a, h = yHi - yLo;
+      if (segLen < 1 || h < 1) continue;
+      const mid = (a + bEnd) / 2;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(segLen, h, T), matFn(segLen, h));
+      m.position.set(A[0] + ux * mid, (yLo + yHi) / 2, A[1] + uz * mid);
+      m.rotation.y = ang;
+      m.castShadow = true; m.receiveShadow = true;
+      this.modelGroup.add(m);
+    }
   }
 
   // 집 외곽(외벽) — 각 경로의 변에 벽 (+ 닫힌 경로면 바닥). 여러 외벽 누적 지원
   _buildOutline(d, b, ceilH) {
-    const H = ceilH, T = 160, cy = H / 2 + 60;
+    const H = ceilH, T = 160;
     const wallMat = TEX.wallMaterial('#f6f5f2');
     for (const { pts, closed } of outlineShapes(d.outline)) {
       const P = pts.map((p) => this._p(p[0], p[1], b));
       const n = P.length;
       for (let i = 0; i < (closed ? n : n - 1); i++) {
         const a = P[i], c = P[(i + 1) % n];
-        this._edgeWall(a[0], a[1], c[0], c[1], H, T, cy, wallMat);
+        this._buildCarvedEdge(a, c, H, T, T / 2, b, () => wallMat); // 창/문 자리는 비워 둠
       }
       if (closed && n >= 3) {
         const shape = new THREE.Shape();
@@ -337,15 +383,14 @@ export class Viewer3D {
     // 집 외곽(다각형/열린벽)이 있으면 각 경로의 변에 외장 마감
     const oshapes = outlineShapes(d.outline);
     if (oshapes.length) {
-      const H = ceilH + 120, cy = H / 2 + 60;
+      const H = ceilH + 120;
       for (const { pts, closed } of oshapes) {
         const P = pts.map((p) => this._p(p[0], p[1], b));
         const n = P.length;
         for (let i = 0; i < (closed ? n : n - 1); i++) {
           const a = P[i], c = P[(i + 1) % n];
-          const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
-          this._edgeWall(a[0], a[1], c[0], c[1], H, T, cy,
-            TEX.exteriorMaterial(ex.material, col, len, H, mDef.roughness, mDef.metalness));
+          this._buildCarvedEdge(a, c, H, T, T, b, // 창/문 자리는 비워 둠
+            (segLen, h) => TEX.exteriorMaterial(ex.material, col, segLen, h, mDef.roughness, mDef.metalness));
         }
       }
       return;

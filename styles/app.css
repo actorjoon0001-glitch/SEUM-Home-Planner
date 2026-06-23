@@ -91,6 +91,7 @@ body {
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
   overflow-y: auto; padding-right: 2px; flex: 1 1 auto; min-height: 0;
 }
+.lib-grid.lib-grid-compact { flex: 0 0 auto; max-height: 232px; }
 .lib-card {
   border: 1px solid var(--line); border-radius: 8px; padding: 8px 6px; text-align: center;
   cursor: grab; background: #fff; user-select: none;

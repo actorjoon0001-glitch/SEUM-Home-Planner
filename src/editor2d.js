@@ -1,7 +1,7 @@
 // 세움 홈플래너 - 2D 평면 편집기 (HTML5 Canvas)
 // 방 추가/이동/크기조절, 가구 배치/이동/회전, 팬/줌, 치수 표시
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, outlinePoints, outlineShape, outlineShapes } from './data.js';
+import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, openingOutline, outlinePoints, outlineShape, outlineShapes } from './data.js';
 
 const GRID = 100;          // 스냅 단위 (mm)
 const HANDLE = 8;          // 핸들 픽셀 크기
@@ -334,9 +334,27 @@ export class Editor2D {
   // ---- 창호(개구부) ----
   // 개구부의 평면 기하 계산 (mm 단위 끝점 + 외향 방향)
   _openingGeom(o) {
+    const half = o.w / 2;
+    // 외벽(외곽)에 부착된 개구부
+    if (o.onOutline) {
+      const shapes = outlineShapes(store.design.outline);
+      const path = shapes[o.pathIndex]; if (!path) return null;
+      const pts = path.pts, n = pts.length;
+      const eMax = path.closed ? n : n - 1;
+      if (o.edgeIndex < 0 || o.edgeIndex >= eMax) return null;
+      const A = pts[o.edgeIndex], B = pts[(o.edgeIndex + 1) % n];
+      const ex = B[0] - A[0], ey = B[1] - A[1], len = Math.hypot(ex, ey);
+      if (len < 1) return null;
+      const ux = ex / len, uy = ey / len;
+      const pos = Math.max(half, Math.min(len - half, o.pos));
+      return {
+        cx: A[0] + ux * pos, cy: A[1] + uy * pos, half,
+        angle: Math.atan2(uy, ux), horizontal: Math.abs(ux) >= Math.abs(uy),
+        nx: uy, ny: -ux, ax: A[0], ay: A[1], ux, uy, edgeLen: len,
+      };
+    }
     const room = store.design.rooms.find((r) => r.id === o.roomId);
     if (!room) return null;
-    const half = o.w / 2;
     let cx, cy, horizontal, nx = 0, ny = 0;
     const span = (o.side === 'n' || o.side === 's') ? room.w : room.d;
     const pos = Math.max(half, Math.min(span - half, o.pos)); // 벽 안에 들어오도록
@@ -344,7 +362,7 @@ export class Editor2D {
     else if (o.side === 's') { cx = room.x + pos; cy = room.y + room.d; horizontal = true;  ny = 1; }
     else if (o.side === 'w') { cx = room.x;          cy = room.y + pos; horizontal = false; nx = -1; }
     else { cx = room.x + room.w; cy = room.y + pos;                horizontal = false; nx = 1; }
-    return { room, cx, cy, horizontal, nx, ny, half };
+    return { room, cx, cy, horizontal, nx, ny, half, angle: horizontal ? 0 : Math.PI / 2 };
   }
 
   _drawOpening(o) {
@@ -355,11 +373,12 @@ export class Editor2D {
     const selected = o.id === store.selectedOpening;
     const [pcx, pcy] = this.toPx(g.cx, g.cy);
     const len = o.w * this.scale;
-    const thick = 9; // 화면상 벽 두께 표현
+    // 화면상 벽 두께 표현 — 외벽(200mm)은 더 두꺼우므로 그 폭을 덮도록 맞춤
+    const thick = o.onOutline ? Math.max(9, 200 * this.scale + 4) : 9;
 
     ctx.save();
     ctx.translate(pcx, pcy);
-    if (!g.horizontal) ctx.rotate(Math.PI / 2);
+    ctx.rotate(g.angle || 0);
 
     // 벽 끊기 (흰 배경)
     ctx.fillStyle = '#f4f5f7';
@@ -410,8 +429,10 @@ export class Editor2D {
       const g = this._openingGeom(o); if (!g) continue;
       const [pcx, pcy] = this.toPx(g.cx, g.cy);
       const len = o.w * this.scale;
-      const along = g.horizontal ? Math.abs(px - pcx) : Math.abs(py - pcy);
-      const across = g.horizontal ? Math.abs(py - pcy) : Math.abs(px - pcx);
+      const dx = px - pcx, dy = py - pcy;
+      const ca = Math.cos(g.angle || 0), sa = Math.sin(g.angle || 0);
+      const along = Math.abs(dx * ca + dy * sa);
+      const across = Math.abs(-dx * sa + dy * ca);
       if (along <= len / 2 + 4 && across <= 8) return o;
     }
     return null;
@@ -633,10 +654,18 @@ export class Editor2D {
         drag.f.y = this.snap(my - drag.dy);
       });
     } else if (drag.mode === 'moveo') {
-      const room = store.design.rooms.find((r) => r.id === drag.o.roomId);
-      if (room) {
-        const along = (drag.o.side === 'n' || drag.o.side === 's') ? (mx - room.x) : (my - room.y);
-        store.liveUpdate(() => { drag.o.pos = this.snap(along); });
+      if (drag.o.onOutline) {
+        const g = this._openingGeom(drag.o);
+        if (g) {
+          const along = (mx - g.ax) * g.ux + (my - g.ay) * g.uy;
+          store.liveUpdate(() => { drag.o.pos = this.snap(along); });
+        }
+      } else {
+        const room = store.design.rooms.find((r) => r.id === drag.o.roomId);
+        if (room) {
+          const along = (drag.o.side === 'n' || drag.o.side === 's') ? (mx - room.x) : (my - room.y);
+          store.liveUpdate(() => { drag.o.pos = this.snap(along); });
+        }
       }
     } else if (drag.mode === 'resize') {
       this._resizeRoom(drag.room, drag.handle, mx, my);
@@ -1010,30 +1039,52 @@ export class Editor2D {
   }
 
   // 창호를 드롭 지점에서 가장 가까운 방의 가장 가까운 벽면에 부착
+  // 점 → 선분 거리와 변을 따라간 거리(mm) 반환
+  _distToSeg(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + t * dx, cy = ay + t * dy;
+    return { dist: Math.hypot(px - cx, py - cy), along: t * Math.sqrt(len2) };
+  }
+
   _dropWindow(winType, mx, my) {
     const d = store.design;
-    if (!d.rooms.length) return;
-    let best = null;
+    // 1) 가장 가까운 방 벽 후보
+    let roomBest = null;
     for (const room of d.rooms) {
-      // 점을 방 영역으로 클램프했을 때의 거리로 가까운 방 판정
-      const cxClamp = Math.max(room.x, Math.min(room.x + room.w, mx));
-      const cyClamp = Math.max(room.y, Math.min(room.y + room.d, my));
-      const dist = Math.hypot(mx - cxClamp, my - cyClamp);
-      // 4개 벽까지의 거리
-      const edges = [
-        { side: 'n', dd: Math.abs(my - room.y),          pos: mx - room.x },
-        { side: 's', dd: Math.abs(my - (room.y + room.d)), pos: mx - room.x },
-        { side: 'w', dd: Math.abs(mx - room.x),          pos: my - room.y },
-        { side: 'e', dd: Math.abs(mx - (room.x + room.w)), pos: my - room.y },
+      const segs = [
+        { side: 'n', ax: room.x, ay: room.y, bx: room.x + room.w, by: room.y },
+        { side: 's', ax: room.x, ay: room.y + room.d, bx: room.x + room.w, by: room.y + room.d },
+        { side: 'w', ax: room.x, ay: room.y, bx: room.x, by: room.y + room.d },
+        { side: 'e', ax: room.x + room.w, ay: room.y, bx: room.x + room.w, by: room.y + room.d },
       ];
-      for (const ed of edges) {
-        const score = dist + ed.dd;
-        if (!best || score < best.score) best = { room, side: ed.side, pos: ed.pos, score };
+      for (const s of segs) {
+        const r = this._distToSeg(mx, my, s.ax, s.ay, s.bx, s.by);
+        const pos = (s.side === 'n' || s.side === 's') ? (mx - room.x) : (my - room.y);
+        if (!roomBest || r.dist < roomBest.dist) roomBest = { room, side: s.side, pos, dist: r.dist };
       }
     }
-    if (!best) return;
+    // 2) 가장 가까운 외벽(외곽) 변 후보 — 방 없이 외벽에 바로 부착 가능
+    let outBest = null;
+    outlineShapes(d.outline).forEach((path, pi) => {
+      const pts = path.pts, n = pts.length;
+      const eMax = path.closed ? n : n - 1;
+      for (let ei = 0; ei < eMax; ei++) {
+        const A = pts[ei], B = pts[(ei + 1) % n];
+        const r = this._distToSeg(mx, my, A[0], A[1], B[0], B[1]);
+        if (!outBest || r.dist < outBest.dist) outBest = { pathIndex: pi, edgeIndex: ei, pos: r.along, dist: r.dist };
+      }
+    });
+    // 3) 더 가까운 쪽에 부착 — 방 벽과 외벽이 겹칠 땐 방 벽을 우선(50mm 편향),
+    //    바깥 외벽 쪽에 떨어뜨리면 외벽에 직접 부착
+    const useOutline = outBest && (!roomBest || outBest.dist + 50 < roomBest.dist);
+    if (!useOutline && !roomBest) return;
     store.commit((dd) => {
-      const o = opening(best.room.id, best.side, this.snap(best.pos), winType);
+      const o = useOutline
+        ? openingOutline(outBest.pathIndex, outBest.edgeIndex, this.snap(outBest.pos), winType)
+        : opening(roomBest.room.id, roomBest.side, this.snap(roomBest.pos), winType);
       dd.openings.push(o);
       store.selectedOpening = o.id;
       store.selectedRoom = store.selectedFurniture = null;

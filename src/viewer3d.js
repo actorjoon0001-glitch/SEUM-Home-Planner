@@ -34,6 +34,7 @@ export class Viewer3D {
 
     this.showRoof = false;
     this.showExterior = false;
+    this.wallOpacity = 1;       // 3D 벽 투명도 (1=불투명) — 내부 들여다보기
 
     store.subscribe(() => { this.dirty = true; });
     window.addEventListener('resize', () => this._resize());
@@ -134,6 +135,13 @@ export class Viewer3D {
     else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
   }
 
+  // 벽 재질 (투명도 < 1 이면 반투명 → 내부 들여다보기)
+  _wallMat() {
+    const m = TEX.wallMaterial('#f6f5f2');
+    if (this.wallOpacity < 1) { m.transparent = true; m.opacity = this.wallOpacity; }
+    return m;
+  }
+
   // 카메라 줌 (하단 줌 버튼) — 타깃 기준 당기기/밀기
   zoom(factor) {
     const t = this.controls.target;
@@ -224,7 +232,7 @@ export class Viewer3D {
     const L = horiz ? room.w : room.d;
     const ops = this._collectOps(room, side, L);
     const rects = this._wallRects(L, ops, wallH, WALL_T / 2);
-    const mat = TEX.wallMaterial('#f6f5f2');
+    const mat = this._wallMat();
     for (const [a, bEnd, yLo, yHi] of rects) {
       const len = bEnd - a, h = yHi - yLo;
       if (len < 1 || h < 1) continue;
@@ -366,7 +374,7 @@ export class Viewer3D {
   // 집 외곽(외벽) — 각 경로의 변에 벽 (+ 닫힌 경로면 바닥). 여러 외벽 누적 지원
   _buildOutline(d, b, ceilH) {
     const H = ceilH, T = 160;
-    const wallMat = TEX.wallMaterial('#f6f5f2');
+    const wallMat = this._wallMat();
     for (const { pts, closed } of outlineShapes(d.outline)) {
       const P = pts.map((p) => this._p(p[0], p[1], b));
       const n = P.length;

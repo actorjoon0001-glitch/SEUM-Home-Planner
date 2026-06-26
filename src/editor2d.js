@@ -40,6 +40,16 @@ export class Editor2D {
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
+  // 화면 중심 기준 확대/축소 (하단 줌 버튼)
+  zoomBy(factor) {
+    const cx = this.cssW / 2, cy = this.cssH / 2;
+    const [mx, my] = this.toMm(cx, cy);
+    this.scale = Math.max(0.008, Math.min(0.5, this.scale * factor));
+    this.ox = cx - mx * this.scale;
+    this.oy = cy - my * this.scale;
+    this.draw();
+  }
+
   fit() {
     const d = store.design;
     if (!d.rooms.length) { this.draw(); return; }

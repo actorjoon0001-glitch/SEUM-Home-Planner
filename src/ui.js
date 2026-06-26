@@ -349,6 +349,10 @@ function renderProperties(editor) {
       <div class="info-row"><span>전체 면적</span><b>${totalArea.toFixed(1)} m² (${(totalArea/3.305).toFixed(1)}평)</b></div>
       <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${(d.openings||[]).length}</b></div>
 
+      <p class="ph mt">3D 보기</p>
+      <label class="fld"><span>벽 투명도 <small id="wo-val">${Math.round((_viewer ? _viewer.wallOpacity : 1) * 100)}%</small></span>
+        <input id="wo-range" type="range" min="0.2" max="1" step="0.05" value="${_viewer ? _viewer.wallOpacity : 1}"></label>
+
       <p class="ph mt">외장재 · 색상</p>
       <label class="fld toggle"><span>3D 외관(외장재) 표시</span><input id="ex-show" type="checkbox"></label>
       <label class="fld"><span>외장재 종류</span><select id="ex-mat">${matOpts}</select></label>
@@ -368,6 +372,12 @@ function renderProperties(editor) {
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
+  const woRange = document.getElementById('wo-range');
+  if (woRange) woRange.oninput = (e) => {
+    const v = parseFloat(e.target.value);
+    document.getElementById('wo-val').textContent = Math.round(v * 100) + '%';
+    if (_viewer) { _viewer.wallOpacity = v; _viewer.dirty = true; }
+  };
   document.getElementById('ex-mat').onchange = (e) => { store.commit((dd) => {
     dd.exterior.material = e.target.value;
     dd.exterior.color = EXTERIOR_MATERIALS[e.target.value].color;

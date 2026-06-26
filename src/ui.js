@@ -15,6 +15,7 @@ let _viewer = null; // 외장/지붕 자동 표시용
 export function buildUI({ editor, viewer, onModeChange }) {
   _editor = editor;
   _viewer = viewer;
+  buildWindows();
   buildLibrary();
   buildRoomPalette();
   buildToolbar({ editor, viewer, onModeChange });
@@ -145,11 +146,10 @@ function buildLibrary() {
   tabs.innerHTML = '';
   let active = CATEGORIES[0];
 
-  const TABS = [...CATEGORIES, '창호'];
+  const TABS = [...CATEGORIES];
 
   const render = () => {
     grid.innerHTML = '';
-    if (active === '창호') { renderWindows(grid); return; }
     for (const item of FURNITURE_CATALOG.filter((f) => f.cat === active)) {
       const card = document.createElement('div');
       card.className = 'lib-card';
@@ -206,39 +206,74 @@ function thumbSvg(item) {
   return `<svg viewBox="0 0 32 32" fill="var(--c)">${map[item.kind] || map.box}</svg>`;
 }
 
-// 창호 라이브러리 카드
-function renderWindows(grid) {
-  for (const item of WINDOW_CATALOG) {
-    const isDoor = item.glass === false;
-    const card = document.createElement('div');
-    card.className = 'lib-card';
-    card.draggable = true;
-    card.title = `${item.label} (${item.w}×${item.h}mm) — 벽(방 가장자리)으로 끌어다 놓으세요`;
-    card.innerHTML = `
-      <div class="lib-thumb">${winThumb(item, isDoor)}</div>
-      <div class="lib-name">${item.label}</div>
-      <div class="lib-dim">${(item.w/10|0)}×${(item.h/10|0)}cm</div>`;
-    card.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', 'win:' + item.id);
-      e.dataTransfer.effectAllowed = 'copy';
-    });
-    card.addEventListener('dblclick', () => {
-      // 더블클릭 → 첫 방의 북측 벽 중앙에 추가
-      const d = store.design;
-      if (!d.rooms.length) return;
-      const r = d.rooms[0];
-      store.commit((dd) => {
-        dd.openings.push({
-          id: 'o' + Date.now().toString(36),
-          roomId: r.id, side: 'n', pos: Math.round(r.w / 2),
-          winType: item.id, w: item.w, h: item.h, sill: item.sill, color: '#4a5560',
-        });
-        store.selectedOpening = dd.openings[dd.openings.length - 1].id;
-        store.selectedRoom = store.selectedFurniture = null;
-      });
-    });
-    grid.appendChild(card);
+// 창호를 '문' 종류로 볼지 판정 (유리 없는 문 또는 라벨에 문/도어 포함)
+function isDoorType(item) {
+  return item.glass === false || /도어|문/.test(item.label || '');
+}
+
+// 창호 라이브러리 패널 (창문 / 문 분리)
+function buildWindows() {
+  const tabs = document.getElementById('win-tabs');
+  const grid = document.getElementById('win-grid');
+  if (!tabs || !grid) return;
+  tabs.innerHTML = '';
+
+  const WIN_TABS = ['창문', '문'];
+  let active = WIN_TABS[0];
+
+  const render = () => {
+    grid.innerHTML = '';
+    const wantDoor = active === '문';
+    for (const item of WINDOW_CATALOG.filter((w) => isDoorType(w) === wantDoor)) {
+      grid.appendChild(windowCard(item));
+    }
+  };
+
+  for (const name of WIN_TABS) {
+    const t = document.createElement('button');
+    t.className = 'lib-tab' + (name === active ? ' active' : '');
+    t.textContent = name;
+    t.onclick = () => {
+      active = name;
+      [...tabs.children].forEach((c) => c.classList.toggle('active', c.textContent === name));
+      render();
+    };
+    tabs.appendChild(t);
   }
+  render();
+}
+
+// 창호 카드 한 장 생성
+function windowCard(item) {
+  const isDoor = item.glass === false;
+  const card = document.createElement('div');
+  card.className = 'lib-card';
+  card.draggable = true;
+  card.title = `${item.label} (${item.w}×${item.h}mm) — 방 벽이나 외벽으로 끌어다 놓으세요`;
+  card.innerHTML = `
+    <div class="lib-thumb">${winThumb(item, isDoor)}</div>
+    <div class="lib-name">${item.label}</div>
+    <div class="lib-dim">${(item.w/10|0)}×${(item.h/10|0)}cm</div>`;
+  card.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', 'win:' + item.id);
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+  card.addEventListener('dblclick', () => {
+    // 더블클릭 → 첫 방의 북측 벽 중앙에 추가
+    const d = store.design;
+    if (!d.rooms.length) return;
+    const r = d.rooms[0];
+    store.commit((dd) => {
+      dd.openings.push({
+        id: 'o' + Date.now().toString(36),
+        roomId: r.id, side: 'n', pos: Math.round(r.w / 2),
+        winType: item.id, w: item.w, h: item.h, sill: item.sill, color: '#4a5560',
+      });
+      store.selectedOpening = dd.openings[dd.openings.length - 1].id;
+      store.selectedRoom = store.selectedFurniture = null;
+    });
+  });
+  return card;
 }
 
 function winThumb(item, isDoor) {
@@ -281,14 +316,15 @@ function renderProperties(editor) {
   const ops = d.openings || [];
   const winListHtml = ops.length
     ? `<div class="win-list">${ops.map((o) => {
-        const r = d.rooms.find((rr) => rr.id === o.roomId);
         const t = WINDOW_TYPES[o.winType] || {};
+        const where = o.onOutline ? '외벽' : (() => { const r = d.rooms.find((rr) => rr.id === o.roomId); return r ? esc(r.name) : '-'; })();
+        const sideTxt = o.onOutline ? '' : ` · ${sideKo[o.side] || o.side}`;
         return `<button class="win-item" data-id="${o.id}">
           <span class="wi-name">${t.label || '창호'}</span>
-          <span class="wi-meta">${r ? esc(r.name) : '-'} · ${sideKo[o.side] || o.side} · ${o.w}×${o.h}</span>
+          <span class="wi-meta">${where}${sideTxt} · ${o.w}×${o.h}</span>
         </button>`;
       }).join('')}</div>`
-    : `<p class="hint">좌측 <b>창호</b> 탭에서 벽으로 드래그해 추가하세요.</p>`;
+    : `<p class="hint">좌측 <b>창호</b> 패널(창문·문)에서 방 벽이나 외벽으로 드래그해 추가하세요.</p>`;
   panel.innerHTML = `
     <div class="prop-empty">
       <p class="ph">도면 정보</p>
@@ -353,14 +389,19 @@ function showRoof() { applyOuter('showRoof', true); }
 function openingForm(o) {
   const typeOpts = Object.entries(WINDOW_TYPES)
     .map(([k, t]) => `<option value="${k}" ${k === o.winType ? 'selected' : ''}>${t.label}</option>`).join('');
+  const onOutline = !!o.onOutline;
   const sideOpts = [['n', '북(상)'], ['s', '남(하)'], ['e', '동(우)'], ['w', '서(좌)']]
     .map(([k, l]) => `<option value="${k}" ${k === o.side ? 'selected' : ''}>${l}</option>`).join('');
-  const room = (store.design.rooms || []).find((r) => r.id === o.roomId);
+  const room = onOutline ? null : (store.design.rooms || []).find((r) => r.id === o.roomId);
+  const where = onOutline ? '외벽' : (room ? esc(room.name) : '');
+  const sideField = onOutline
+    ? `<div class="info-row"><span>부착 위치</span><b>외벽(외곽)</b></div>`
+    : `<label class="fld"><span>부착 벽면</span><select id="o-side">${sideOpts}</select></label>`;
   return `
     <button class="mini" id="o-back">← 창호 목록</button>
-    <p class="ph">창호 속성${room ? ` · ${esc(room.name)}` : ''}</p>
+    <p class="ph">창호 속성${where ? ` · ${where}` : ''}</p>
     <label class="fld"><span>종류</span><select id="o-type">${typeOpts}</select></label>
-    <label class="fld"><span>부착 벽면</span><select id="o-side">${sideOpts}</select></label>
+    ${sideField}
     <div class="grid2">
       <label class="fld"><span>폭 W (mm)</span><input id="o-w" type="number" step="100" value="${o.w}"></label>
       <label class="fld"><span>높이 H (mm)</span><input id="o-h" type="number" step="100" value="${o.h}"></label>
@@ -385,7 +426,8 @@ function bindOpeningForm(o) {
     const t = WINDOW_TYPES[e.target.value];
     o.w = t.w; o.h = t.h; o.sill = t.sill;
   });
-  document.getElementById('o-side').onchange = (e) => upd(() => o.side = e.target.value);
+  const sideEl = document.getElementById('o-side');
+  if (sideEl) sideEl.onchange = (e) => upd(() => o.side = e.target.value);
   document.getElementById('o-w').onchange = (e) => upd(() => o.w = Math.max(300, +e.target.value || 300));
   document.getElementById('o-h').onchange = (e) => upd(() => o.h = Math.max(300, +e.target.value || 300));
   document.getElementById('o-sill').onchange = (e) => upd(() => o.sill = Math.max(0, +e.target.value || 0));
@@ -1202,8 +1244,10 @@ function printDesign(editor, viewer) {
 
   const openRows = (d.openings || []).map((o) => {
     const t = WINDOW_TYPES[o.winType] || {};
-    const room = d.rooms.find((rr) => rr.id === o.roomId);
-    return `<tr><td>${t.label || ''}</td><td>${esc(room ? room.name : '-')} / ${sideLabel[o.side] || ''}</td><td>${o.w}×${o.h}</td><td>하단 ${o.sill}mm</td></tr>`;
+    let where;
+    if (o.onOutline) { where = '외벽'; }
+    else { const room = d.rooms.find((rr) => rr.id === o.roomId); where = `${esc(room ? room.name : '-')} / ${sideLabel[o.side] || ''}`; }
+    return `<tr><td>${t.label || ''}</td><td>${where}</td><td>${o.w}×${o.h}</td><td>하단 ${o.sill}mm</td></tr>`;
   }).join('') || `<tr><td colspan="4" style="color:#888">등록된 창호 없음</td></tr>`;
 
   const ex = d.exterior || {}, roof = d.roof || {};

@@ -260,6 +260,17 @@ export function opening(roomId, side, pos, winType = 'double') {
   };
 }
 
+// 외벽(외곽)에 직접 부착되는 개구부 — 방 없이 외벽에 바로 창/문을 냄
+// pathIndex: outlineShapes 인덱스, edgeIndex: 변 인덱스, pos: 변 시작점에서 중심까지 거리(mm)
+export function openingOutline(pathIndex, edgeIndex, pos, winType = 'door') {
+  const t = WINDOW_TYPES[winType] || WINDOW_TYPES.double;
+  return {
+    id: 'o' + (Date.now().toString(36)) + (_o++),
+    onOutline: true, pathIndex, edgeIndex, pos, winType,
+    w: t.w, h: t.h, sill: t.sill, color: '#4a5560',
+  };
+}
+
 // 저장본/구버전 도면 보정 (새 필드 기본값 채움)
 export function normalize(design) {
   if (!design.exterior) design.exterior = { material: 'metal', color: EXTERIOR_MATERIALS.metal.color };

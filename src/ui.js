@@ -15,6 +15,7 @@ let _viewer = null; // 외장/지붕 자동 표시용
 export function buildUI({ editor, viewer, onModeChange }) {
   _editor = editor;
   _viewer = viewer;
+  buildLeftRail();
   buildWindows();
   buildLibrary();
   buildRoomPalette();
@@ -23,6 +24,21 @@ export function buildUI({ editor, viewer, onModeChange }) {
   store.subscribe(() => renderProperties(editor));
   renderProperties(editor);
   handleShareLink();
+}
+
+// ---------------------------------------------------------------------------
+// 좌측 아이콘 레일 — 도면 / 창호 / 가구 패널 전환
+// ---------------------------------------------------------------------------
+function buildLeftRail() {
+  const rail = document.getElementById('left-rail');
+  const secs = { tools: 'sec-tools', win: 'sec-win', furn: 'sec-furn' };
+  rail.querySelectorAll('.rail-btn').forEach((btn) => {
+    btn.onclick = () => {
+      const sec = btn.dataset.sec;
+      rail.querySelectorAll('.rail-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      for (const [k, id] of Object.entries(secs)) document.getElementById(id).classList.toggle('hidden', k !== sec);
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

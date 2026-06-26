@@ -43,25 +43,32 @@
   </header>
 
   <div class="layout">
-    <!-- 좌측 라이브러리 -->
+    <!-- 좌측: 아이콘 레일 + 전환 패널 -->
     <aside class="left">
-      <section class="panel">
-        <h3>도면 그리기</h3>
-        <p class="panel-sub">도구를 고르고 도면을 그리세요</p>
-        <div id="room-palette" class="room-palette"></div>
-      </section>
-      <section class="panel">
-        <h3>창호 (창문 · 문)</h3>
-        <div id="win-tabs" class="lib-tabs"></div>
-        <div id="win-grid" class="lib-grid lib-grid-compact"></div>
-        <p class="panel-sub small">벽(방 가장자리)으로 드래그하거나 더블클릭으로 배치</p>
-      </section>
-      <section class="panel grow">
-        <h3>가구 · 가전 라이브러리</h3>
-        <div id="lib-tabs" class="lib-tabs"></div>
-        <div id="lib-grid" class="lib-grid"></div>
-        <p class="panel-sub small">도면으로 드래그하거나 더블클릭으로 배치</p>
-      </section>
+      <nav class="rail" id="left-rail">
+        <button class="rail-btn active" data-sec="tools" title="도면 그리기"><span class="ri">📐</span><span class="rt">도면</span></button>
+        <button class="rail-btn" data-sec="win" title="창문·문"><span class="ri">🚪</span><span class="rt">창호</span></button>
+        <button class="rail-btn" data-sec="furn" title="가구·가전"><span class="ri">🛋</span><span class="rt">가구</span></button>
+      </nav>
+      <div class="left-content">
+        <section id="sec-tools" class="panel grow">
+          <h3>도면 그리기</h3>
+          <p class="panel-sub">도구를 고르고 도면을 그리세요</p>
+          <div id="room-palette" class="room-palette"></div>
+        </section>
+        <section id="sec-win" class="panel grow hidden">
+          <h3>창호 (창문 · 문)</h3>
+          <div id="win-tabs" class="lib-tabs"></div>
+          <div id="win-grid" class="lib-grid"></div>
+          <p class="panel-sub small">벽(방 가장자리)으로 드래그하거나 더블클릭으로 배치</p>
+        </section>
+        <section id="sec-furn" class="panel grow hidden">
+          <h3>가구 · 가전 라이브러리</h3>
+          <div id="lib-tabs" class="lib-tabs"></div>
+          <div id="lib-grid" class="lib-grid"></div>
+          <p class="panel-sub small">도면으로 드래그하거나 더블클릭으로 배치</p>
+        </section>
+      </div>
     </aside>
 
     <!-- 중앙 스테이지 -->

@@ -53,8 +53,22 @@ body {
 
 /* ---------- 레이아웃 ---------- */
 .layout { flex: 1 1 auto; display: flex; min-height: 0; }
-.left, .right { background: var(--panel); flex: 0 0 auto; overflow-y: auto; }
-.left { width: 252px; border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.left, .right { background: var(--panel); flex: 0 0 auto; }
+.right { overflow-y: auto; }
+.left { width: 304px; border-right: 1px solid var(--line); display: flex; flex-direction: row; }
+/* 좌측 아이콘 레일 */
+.rail { width: 56px; flex: 0 0 auto; background: #f6f7f9; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 8px 0; gap: 2px; }
+.rail-btn {
+  border: 0; background: transparent; cursor: pointer; font-family: inherit;
+  padding: 9px 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  color: var(--muted); border-left: 3px solid transparent;
+}
+.rail-btn .ri { font-size: 18px; line-height: 1; }
+.rail-btn .rt { font-size: 10px; }
+.rail-btn:hover { background: #eef0f3; color: var(--ink); }
+.rail-btn.active { color: var(--seum-red); border-left-color: var(--seum-red); background: var(--panel); }
+.left-content { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.left-content > .panel.hidden { display: none; }
 .right { width: 270px; border-left: 1px solid var(--line); }
 .stage { flex: 1 1 auto; position: relative; min-width: 0; overflow: hidden; }
 

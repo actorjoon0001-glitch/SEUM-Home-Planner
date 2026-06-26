@@ -64,7 +64,26 @@ body {
 .panel h3 { margin: 0 0 4px; font-size: 13px; color: var(--ink); }
 .panel-sub { margin: 0 0 10px; font-size: 11px; color: var(--muted); }
 .panel-sub.small { margin: 8px 0 0; }
-.room-palette { display: flex; flex-wrap: wrap; gap: 6px; }
+.room-palette { display: block; }
+/* Archisketch 스타일 도구 리스트 */
+.tool-group { margin-bottom: 12px; }
+.tool-group-label { font-size: 11px; font-weight: 700; color: var(--muted); margin: 6px 0 5px; }
+.tool-group-label small { font-weight: 400; color: var(--muted); }
+.tool-row {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 8px 10px; margin-bottom: 4px; border: 1px solid var(--line); border-radius: 8px;
+  background: #fff; cursor: pointer; font-family: inherit; font-size: 13px; color: var(--ink);
+}
+.tool-row:hover { border-color: var(--seum-red); background: #fff7f6; }
+.tool-row.on { background: var(--seum-red); color: #fff; border-color: var(--seum-red); }
+.tool-row .ti { width: 18px; text-align: center; flex: 0 0 auto; }
+.tool-row .tl { flex: 1 1 auto; }
+.tool-row .kbd {
+  flex: 0 0 auto; font-size: 10px; font-weight: 700; color: var(--muted);
+  background: #f1f2f4; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; min-width: 16px; text-align: center;
+}
+.tool-row.on .kbd { background: rgba(255,255,255,.25); color: #fff; border-color: transparent; }
+.room-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .room-chip {
   border: 1px solid rgba(0,0,0,.12); border-radius: 6px; padding: 7px 9px;
   font-size: 12px; cursor: pointer; font-family: inherit; color: #33373d; font-weight: 500;

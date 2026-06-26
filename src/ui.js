@@ -34,6 +34,7 @@ function buildRoomPalette() {
   let mode = 'select';          // select | outline | draw | wall
   let drawType = 'room';
   const chips = {};
+  const toolBtns = {};
 
   const syncChips = () => {
     for (const [k, b] of Object.entries(chips)) b.classList.toggle('active', mode === 'draw' && k === drawType);
@@ -41,17 +42,14 @@ function buildRoomPalette() {
   const setHint = () => {
     if (!hint) return;
     hint.textContent =
-      mode === 'outline' ? '모서리 클릭으로 외벽을 이어 그림(길이 표시). 더블클릭=한 벽 마침→여러 벽 누적, 시작점 클릭=닫기, Esc=취소'
-      : mode === 'draw' ? '방 종류를 고르고, 외벽 안에서 대각선으로 드래그해 방을 그리세요'
-      : mode === 'wall' ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리돼 통로가 뚫림)'
-      : '🖱️ 선택/이동 모드 — 방을 클릭해 선택하고 드래그로 옮기세요. 방 칩을 외벽 안으로 드래그도 가능';
+      mode === 'outline' ? '모서리 클릭으로 외벽을 이어 그림(길이 표시). 더블클릭=벽 마침(누적), 시작점 클릭=닫기, Esc=취소'
+      : mode === 'draw' ? '공간을 고르고, 외벽 안에서 대각선으로 드래그해 방을 그리세요'
+      : mode === 'wall' ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리됨)'
+      : '선택/이동 모드 — 방을 클릭해 선택하고 드래그로 옮기세요';
   };
   const setMode = (m) => {
     mode = m;
-    selectToggle.classList.toggle('on', m === 'select');
-    outlineToggle.classList.toggle('on', m === 'outline');
-    drawToggle.classList.toggle('on', m === 'draw');
-    wallToggle.classList.toggle('on', m === 'wall');
+    for (const [k, b] of Object.entries(toolBtns)) b.classList.toggle('on', k === m);
     if (_editor) {
       _editor.setDrawOutline(m === 'outline');
       _editor.setDrawRoom(m === 'draw' ? drawType : null);
@@ -60,31 +58,32 @@ function buildRoomPalette() {
     syncChips(); setHint();
   };
 
-  // 모드 버튼: 선택/이동(기본) · 집 외곽 · 방 그리기 · 벽 트기/막기
-  const selectToggle = document.createElement('button');
-  selectToggle.className = 'draw-toggle mode-select on';
-  selectToggle.textContent = '🖱️ 선택 / 이동 (기본)';
-  selectToggle.onclick = () => setMode('select');
-  wrap.appendChild(selectToggle);
+  // 도구 그룹 (Archisketch 스타일: 아이콘 + 이름 + 단축키)
+  const toolGroup = document.createElement('div');
+  toolGroup.className = 'tool-group';
+  toolGroup.innerHTML = '<div class="tool-group-label">도구</div>';
+  const TOOLS = [
+    { m: 'select',  ic: '🖱️', label: '선택 / 이동', key: 'Esc' },
+    { m: 'outline', ic: '🏠', label: '집 외곽(외벽)', key: 'O' },
+    { m: 'draw',    ic: '✏️', label: '방 그리기', key: 'F' },
+    { m: 'wall',    ic: '🧱', label: '벽 트기 / 막기', key: 'W' },
+  ];
+  for (const tdef of TOOLS) {
+    const r = document.createElement('button');
+    r.className = 'tool-row' + (tdef.m === 'select' ? ' on' : '');
+    r.innerHTML = `<span class="ti">${tdef.ic}</span><span class="tl">${tdef.label}</span><span class="kbd">${tdef.key}</span>`;
+    r.onclick = () => setMode(mode === tdef.m && tdef.m !== 'select' ? 'select' : tdef.m);
+    toolBtns[tdef.m] = r;
+    toolGroup.appendChild(r);
+  }
+  wrap.appendChild(toolGroup);
 
-  const outlineToggle = document.createElement('button');
-  outlineToggle.className = 'draw-toggle';
-  outlineToggle.textContent = '🏠 집 외곽(외벽) 그리기';
-  outlineToggle.onclick = () => setMode(mode === 'outline' ? 'select' : 'outline');
-  wrap.appendChild(outlineToggle);
-
-  const drawToggle = document.createElement('button');
-  drawToggle.className = 'draw-toggle';
-  drawToggle.textContent = '✏️ 방 그리기';
-  drawToggle.onclick = () => setMode(mode === 'draw' ? 'select' : 'draw');
-  wrap.appendChild(drawToggle);
-
-  const wallToggle = document.createElement('button');
-  wallToggle.className = 'draw-toggle';
-  wallToggle.textContent = '🧱 벽 트기 / 막기';
-  wallToggle.onclick = () => setMode(mode === 'wall' ? 'select' : 'wall');
-  wrap.appendChild(wallToggle);
-
+  // 공간 추가 그룹 (색상 칩)
+  const roomGroup = document.createElement('div');
+  roomGroup.className = 'tool-group';
+  roomGroup.innerHTML = '<div class="tool-group-label">공간 추가 <small>클릭 추가 · 드래그로 외벽 안에</small></div>';
+  const chipWrap = document.createElement('div');
+  chipWrap.className = 'room-chips';
   for (const key of ROOM_PALETTE_TYPES) {
     const t = ROOM_TYPES[key]; if (!t) continue;
     const b = document.createElement('button');
@@ -102,7 +101,23 @@ function buildRoomPalette() {
       else addRoom(key);
     };
     chips[key] = b;
-    wrap.appendChild(b);
+    chipWrap.appendChild(b);
+  }
+  roomGroup.appendChild(chipWrap);
+  wrap.appendChild(roomGroup);
+
+  // 단축키: ESC=선택, O=외곽, F=방그리기, W=벽
+  if (!buildRoomPalette._keys) {
+    buildRoomPalette._keys = true;
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (e.key === 'Escape') setMode('select');
+      else if (k === 'o') setMode(mode === 'outline' ? 'select' : 'outline');
+      else if (k === 'f') setMode(mode === 'draw' ? 'select' : 'draw');
+      else if (k === 'w') setMode(mode === 'wall' ? 'select' : 'wall');
+    });
   }
 }
 

@@ -541,6 +541,12 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('tb-2d').onclick = () => onModeChange('2d');
   $('tb-3d').onclick = () => onModeChange('3d');
 
+  // 하단 줌 버튼 — 활성 화면(2D/3D)에 맞춰 동작
+  const zoom = (f) => { if (viewer.active) viewer.zoom(f); else editor.zoomBy(f); };
+  $('zoom-in').onclick = () => zoom(1.15);
+  $('zoom-out').onclick = () => zoom(1 / 1.15);
+  $('zoom-fit').onclick = () => { editor.fit(); viewer._needCam = true; viewer.dirty = true; if (viewer.active) viewer.resetCamera(); };
+
   $('tb-fit').onclick = () => { editor.fit(); viewer._needCam = true; viewer.dirty = true; };
   $('tb-undo').onclick = () => store.undo();
   $('tb-redo').onclick = () => store.redo();

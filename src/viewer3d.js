@@ -134,6 +134,14 @@ export class Viewer3D {
     else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
   }
 
+  // 카메라 줌 (하단 줌 버튼) — 타깃 기준 당기기/밀기
+  zoom(factor) {
+    const t = this.controls.target;
+    const dir = this.camera.position.clone().sub(t).multiplyScalar(1 / factor);
+    this.camera.position.copy(t).add(dir);
+    this.controls.update();
+  }
+
   resetCamera(b) {
     b = b || this._bounds();
     const dist = Math.max(b.w, b.h) * 1.1 + 5000;

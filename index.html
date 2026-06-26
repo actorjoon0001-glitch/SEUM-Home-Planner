@@ -40,10 +40,6 @@
       <button id="tb-shot" class="tb-btn">📷 캡처</button>
       <button id="tb-print" class="tb-btn">🖨 인쇄</button>
     </div>
-    <div class="mode-toggle">
-      <button id="tb-2d" class="mode-btn active">2D 도면</button>
-      <button id="tb-3d" class="mode-btn">3D 입체</button>
-    </div>
   </header>
 
   <div class="layout">
@@ -85,6 +81,19 @@
           <button id="tb-roof" class="vp">천장 보기</button>
         </div>
         <div class="stage-hint">드래그: 회전 · 휠: 줌 · 우클릭 드래그: 이동</div>
+      </div>
+
+      <!-- 하단 바: 2D/3D 전환(좌) + 줌(우) -->
+      <div class="stage-bottombar">
+        <div class="mode-toggle">
+          <button id="tb-2d" class="mode-btn active">2D 도면</button>
+          <button id="tb-3d" class="mode-btn">3D 입체</button>
+        </div>
+        <div class="zoom-ctrl">
+          <button id="zoom-out" class="zb" title="축소">−</button>
+          <button id="zoom-fit" class="zb zb-fit" title="화면맞춤">화면맞춤</button>
+          <button id="zoom-in" class="zb" title="확대">＋</button>
+        </div>
       </div>
     </main>
 

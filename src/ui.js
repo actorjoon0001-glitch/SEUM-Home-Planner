@@ -62,6 +62,7 @@ function buildRoomPalette() {
       mode === 'outline' ? '모서리 클릭으로 외벽을 이어 그림(길이 표시). 더블클릭=벽 마침(누적), 시작점 클릭=닫기, Esc=취소'
       : mode === 'draw' ? '공간을 고르고, 외벽 안에서 대각선으로 드래그해 방을 그리세요'
       : mode === 'wall' ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리됨)'
+      : mode === 'measure' ? '두 점을 클릭해 거리를 재세요 (방·외벽 꼭짓점에 자동 스냅). Esc=끝'
       : '선택/이동 모드 — 방을 클릭해 선택하고 드래그로 옮기세요';
   };
   const setMode = (m) => {
@@ -71,6 +72,7 @@ function buildRoomPalette() {
       _editor.setDrawOutline(m === 'outline');
       _editor.setDrawRoom(m === 'draw' ? drawType : null);
       _editor.setWallEdit(m === 'wall');
+      _editor.setMeasure(m === 'measure');
     }
     syncChips(); setHint();
   };
@@ -84,6 +86,7 @@ function buildRoomPalette() {
     { m: 'outline', ic: '🏠', label: '집 외곽(외벽)', key: 'O' },
     { m: 'draw',    ic: '✏️', label: '방 그리기', key: 'F' },
     { m: 'wall',    ic: '🧱', label: '벽 트기 / 막기', key: 'W' },
+    { m: 'measure', ic: '📏', label: '측정 (거리)', key: 'M' },
   ];
   for (const tdef of TOOLS) {
     const r = document.createElement('button');
@@ -134,6 +137,7 @@ function buildRoomPalette() {
       else if (k === 'o') setMode(mode === 'outline' ? 'select' : 'outline');
       else if (k === 'f') setMode(mode === 'draw' ? 'select' : 'draw');
       else if (k === 'w') setMode(mode === 'wall' ? 'select' : 'wall');
+      else if (k === 'm') setMode(mode === 'measure' ? 'select' : 'measure');
     });
   }
 }

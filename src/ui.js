@@ -19,6 +19,7 @@ export function buildUI({ editor, viewer, onModeChange }) {
   buildWindows();
   buildLibrary();
   buildRoomPalette();
+  buildFinish();
   buildToolbar({ editor, viewer, onModeChange });
   buildCloud();
   store.subscribe(() => renderProperties(editor));
@@ -29,16 +30,32 @@ export function buildUI({ editor, viewer, onModeChange }) {
 // ---------------------------------------------------------------------------
 // 좌측 아이콘 레일 — 도면 / 창호 / 가구 패널 전환
 // ---------------------------------------------------------------------------
+const SECTIONS = { tools: 'sec-tools', furn: 'sec-furn', finish: 'sec-finish' };
+// 좌측 패널 전환 (레일 버튼이 없는 섹션도 호출 가능)
+function showSection(sec) {
+  const rail = document.getElementById('left-rail');
+  rail.querySelectorAll('.rail-btn').forEach((b) => b.classList.toggle('active', b.dataset.sec === sec));
+  for (const [k, id] of Object.entries(SECTIONS)) {
+    const el = document.getElementById(id); if (el) el.classList.toggle('hidden', k !== sec);
+  }
+}
+// 제품 탭 안의 서브탭(가구·가전 / 창호) 전환
+function showProduct(sub) {
+  document.querySelectorAll('#prod-subtabs .sub-tab').forEach((b) => b.classList.toggle('active', b.dataset.prod === sub));
+  const f = document.getElementById('prod-furn'), w = document.getElementById('prod-win');
+  if (f) f.classList.toggle('hidden', sub !== 'furn');
+  if (w) w.classList.toggle('hidden', sub !== 'win');
+}
 function buildLeftRail() {
   const rail = document.getElementById('left-rail');
-  const secs = { tools: 'sec-tools', win: 'sec-win', furn: 'sec-furn' };
   rail.querySelectorAll('.rail-btn').forEach((btn) => {
     btn.onclick = () => {
-      const sec = btn.dataset.sec;
-      rail.querySelectorAll('.rail-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      for (const [k, id] of Object.entries(secs)) document.getElementById(id).classList.toggle('hidden', k !== sec);
+      if (btn.dataset.sec) showSection(btn.dataset.sec);
+      else if (btn.dataset.act === 'template') openTemplateDialog();
+      else if (btn.dataset.soon) flash(`'${btn.dataset.soon}'은(는) 곧 추가됩니다`);
     };
   });
+  document.querySelectorAll('#prod-subtabs .sub-tab').forEach((b) => b.onclick = () => showProduct(b.dataset.prod));
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +96,7 @@ function buildRoomPalette() {
 
   // --- 액션들 ---
   const soon = (name) => flash(`'${name}'은(는) 곧 추가됩니다`);
-  const switchRail = (sec) => { const b = document.querySelector(`.rail-btn[data-sec="${sec}"]`); if (b) b.click(); };
+  const openWindows = () => { showSection('furn'); showProduct('win'); };
   const del = () => {
     if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
     else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });
@@ -102,7 +119,7 @@ function buildRoomPalette() {
     { label: '구조물 그리기', items: [
       { ic: '⬛', label: '사각 기둥 그리기', key: 'R', soon: true },
       { ic: '⚫', label: '원형 기둥 그리기', key: 'C', soon: true },
-      { ic: '🚪', label: '개구부(창·문)', action: () => switchRail('win') },
+      { ic: '🚪', label: '개구부(창·문)', action: openWindows },
       { ic: '⬚', label: '바닥 통로 그리기', soon: true },
       { ic: '⬛', label: '천장 통로 그리기', soon: true },
     ] },
@@ -388,7 +405,7 @@ function renderProperties(editor) {
           <span class="wi-meta">${where}${sideTxt} · ${o.w}×${o.h}</span>
         </button>`;
       }).join('')}</div>`
-    : `<p class="hint">좌측 <b>창호</b> 패널(창문·문)에서 방 벽이나 외벽으로 드래그해 추가하세요.</p>`;
+    : `<p class="hint">좌측 <b>제품 › 창호(창문·문)</b>에서 방 벽이나 외벽으로 드래그해 추가하세요.</p>`;
   panel.innerHTML = `
     <div class="prop-empty">
       <p class="ph">도면 정보</p>
@@ -459,6 +476,52 @@ function applyOuter(flag, on) {
 // 자재/색상을 바꾸면 외관을 자동으로 켜서 변화가 바로 보이게 함
 function showExterior() { applyOuter('showExterior', true); }
 function showRoof() { applyOuter('showRoof', true); }
+
+// ---------------------------------------------------------------------------
+// 좌측 '마감재' 패널 — 외장재/지붕 자재·색상 선택 (3D 외관 자동 표시)
+// ---------------------------------------------------------------------------
+function buildFinish() {
+  const wrap = document.getElementById('finish-body');
+  if (!wrap) return;
+  const render = () => {
+    const d = store.design;
+    const ex = d.exterior || {};
+    const roof = d.roof || {};
+    const exCards = Object.entries(EXTERIOR_MATERIALS).map(([k, m]) =>
+      `<button class="fin-card ${k === ex.material ? 'on' : ''}" data-mat="${k}">
+        <span class="fc-sw" style="background:${m.color}"></span><span class="fc-name">${m.label}</span></button>`).join('');
+    const rfCards = Object.entries(ROOF_TYPES).map(([k, t]) =>
+      `<button class="fin-card ${k === roof.type ? 'on' : ''}" data-roof="${k}"><span class="fc-name">${t.label}</span></button>`).join('');
+    wrap.innerHTML = `
+      <div class="tool-group">
+        <div class="tool-group-label">외장재 (벽 마감)</div>
+        <div class="fin-cards">${exCards}</div>
+        <div class="tool-group-label" style="margin-top:8px">외장 색상</div>
+        <div class="swatches" id="fin-ex-sw">${EXTERIOR_PALETTE.map((c) => `<button class="sw ${c === ex.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
+      </div>
+      <div class="tool-group">
+        <div class="tool-group-label">지붕</div>
+        <div class="fin-cards">${rfCards}</div>
+        <div class="tool-group-label" style="margin-top:8px">지붕 색상</div>
+        <div class="swatches" id="fin-rf-sw">${ROOF_PALETTE.map((c) => `<button class="sw ${c === roof.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
+      </div>`;
+    wrap.querySelectorAll('.fin-card[data-mat]').forEach((b) => b.onclick = () => {
+      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.material = b.dataset.mat; dd.exterior.color = EXTERIOR_MATERIALS[b.dataset.mat].color; });
+      showExterior();
+    });
+    wrap.querySelectorAll('#fin-ex-sw .sw').forEach((b) => b.onclick = () => {
+      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.color = b.dataset.c; }); showExterior();
+    });
+    wrap.querySelectorAll('.fin-card[data-roof]').forEach((b) => b.onclick = () => {
+      store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.type = b.dataset.roof; }); showRoof();
+    });
+    wrap.querySelectorAll('#fin-rf-sw .sw').forEach((b) => b.onclick = () => {
+      store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.color = b.dataset.c; }); showRoof();
+    });
+  };
+  render();
+  store.subscribe(render);
+}
 
 function openingForm(o) {
   const typeOpts = Object.entries(WINDOW_TYPES)

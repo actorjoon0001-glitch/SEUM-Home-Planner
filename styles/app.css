@@ -67,6 +67,19 @@ body {
 .rail-btn .rt { font-size: 10px; }
 .rail-btn:hover { background: #eef0f3; color: var(--ink); }
 .rail-btn.active { color: var(--seum-red); border-left-color: var(--seum-red); background: var(--panel); }
+.rail-btn .rt { text-align: center; line-height: 1.2; }
+.rail-spacer { flex: 1 1 auto; }
+.sub-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.sub-tab { flex: 1 1 0; border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 6px 4px; font-family: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.sub-tab:hover { border-color: var(--seum-red); color: var(--ink); }
+.sub-tab.active { background: var(--seum-red); color: #fff; border-color: var(--seum-red); font-weight: 600; }
+.fin-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fin-card { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 7px 8px; font-family: inherit; font-size: 12px; color: var(--ink); cursor: pointer; }
+.fin-card:hover { border-color: var(--seum-red); }
+.fin-card.on { border-color: var(--seum-red); box-shadow: 0 0 0 1px var(--seum-red) inset; font-weight: 600; }
+.fin-card .fc-sw { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(0,0,0,.15); flex: 0 0 auto; }
+.fin-card .fc-name { flex: 1 1 auto; }
+.sw.on { outline: 2px solid var(--seum-red); outline-offset: 1px; }
 .left-content { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; }
 .left-content > .panel.hidden { display: none; }
 .right { width: 270px; border-left: 1px solid var(--line); }

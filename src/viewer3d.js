@@ -35,6 +35,7 @@ export class Viewer3D {
     this.showRoof = false;
     this.showExterior = false;
     this.wallOpacity = 1;       // 3D 벽 투명도 (1=불투명) — 내부 들여다보기
+    this.floorOpacity = 1;      // 3D 바닥 투명도 (1=불투명)
 
     store.subscribe(() => { this.dirty = true; });
     window.addEventListener('resize', () => this._resize());
@@ -172,6 +173,7 @@ export class Viewer3D {
     );
     floor.position.set(px + room.w / 2, 30, pz + room.d / 2);
     floor.receiveShadow = true;
+    if (this.floorOpacity < 1) { floor.material.transparent = true; floor.material.opacity = this.floorOpacity; }
     this.modelGroup.add(floor);
 
     if (isOpen) return; // 발코니는 벽 생략(난간 느낌)

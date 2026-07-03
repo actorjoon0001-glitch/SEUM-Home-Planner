@@ -97,6 +97,9 @@ body {
   background: #f1f2f4; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; min-width: 16px; text-align: center;
 }
 .tool-row.on .kbd { background: rgba(255,255,255,.25); color: #fff; border-color: transparent; }
+.tool-row .kbd.soon { color: #b0b3b8; background: #f7f7f8; font-weight: 500; }
+.tool-row:has(.kbd.soon) { opacity: .72; }
+.tool-row:has(.kbd.soon):hover { opacity: 1; border-color: var(--line); background: #fafafa; }
 .room-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .room-chip {
   border: 1px solid rgba(0,0,0,.12); border-radius: 6px; padding: 7px 9px;

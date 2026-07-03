@@ -77,26 +77,69 @@ function buildRoomPalette() {
     syncChips(); setHint();
   };
 
-  // 도구 그룹 (Archisketch 스타일: 아이콘 + 이름 + 단축키)
-  const toolGroup = document.createElement('div');
-  toolGroup.className = 'tool-group';
-  toolGroup.innerHTML = '<div class="tool-group-label">도구</div>';
-  const TOOLS = [
-    { m: 'select',  ic: '🖱️', label: '선택 / 이동', key: 'Esc' },
-    { m: 'outline', ic: '🏠', label: '집 외곽(외벽)', key: 'O' },
-    { m: 'draw',    ic: '✏️', label: '방 그리기', key: 'F' },
-    { m: 'wall',    ic: '🧱', label: '벽 트기 / 막기', key: 'W' },
-    { m: 'measure', ic: '📏', label: '측정 (거리)', key: 'M' },
+  // --- 액션들 ---
+  const soon = (name) => flash(`'${name}'은(는) 곧 추가됩니다`);
+  const switchRail = (sec) => { const b = document.querySelector(`.rail-btn[data-sec="${sec}"]`); if (b) b.click(); };
+  const del = () => {
+    if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
+    else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });
+    else if (store.selectedOpening) store.commit((d) => { d.openings = d.openings.filter((o) => o.id !== store.selectedOpening); store.selectedOpening = null; });
+    else flash('삭제할 항목을 먼저 선택하세요');
+  };
+
+  // Archisketch 사이드바 구조 (그룹별 도구)
+  const GROUPS = [
+    { label: '특수 기능', items: [
+      { ic: '🖼️', label: '도면 이미지 업로드', action: () => openUnderlayDialog(_editor) },
+      { ic: '🔍', label: '도면 검색', action: () => openTemplateDialog() },
+    ] },
+    { label: '방 만들기', items: [
+      { ic: '📐', label: '벽 그리기', key: 'L', mode: 'outline' },
+      { ic: '✏️', label: '방 그리기', key: 'F', mode: 'draw' },
+      { ic: '🧱', label: '벽 트기 / 막기', key: 'W', mode: 'wall' },
+      { ic: '🗑️', label: '삭제', key: 'D', action: del },
+    ] },
+    { label: '구조물 그리기', items: [
+      { ic: '⬛', label: '사각 기둥 그리기', key: 'R', soon: true },
+      { ic: '⚫', label: '원형 기둥 그리기', key: 'C', soon: true },
+      { ic: '🚪', label: '개구부(창·문)', action: () => switchRail('win') },
+      { ic: '⬚', label: '바닥 통로 그리기', soon: true },
+      { ic: '⬛', label: '천장 통로 그리기', soon: true },
+    ] },
+    { label: '보조선 그리기', items: [
+      { ic: '📏', label: '보조선 그리기', key: 'E', soon: true },
+      { ic: '📐', label: '측정', key: 'M', mode: 'measure' },
+    ] },
+    { label: '도면 반전', items: [
+      { ic: '◧', label: '좌우 반전', soon: true },
+      { ic: '⬍', label: '상하 반전', soon: true },
+    ] },
+    { label: '도면 회전', items: [
+      { ic: '↺', label: '반시계 방향 회전', soon: true },
+      { ic: '↻', label: '시계 방향 회전', soon: true },
+    ] },
+    { label: '일반', items: [
+      { ic: '🖱️', label: '선택 / 이동', key: 'Esc', mode: 'select' },
+      { ic: '🔗', label: '그룹화', key: 'Shift', soon: true },
+    ] },
   ];
-  for (const tdef of TOOLS) {
-    const r = document.createElement('button');
-    r.className = 'tool-row' + (tdef.m === 'select' ? ' on' : '');
-    r.innerHTML = `<span class="ti">${tdef.ic}</span><span class="tl">${tdef.label}</span><span class="kbd">${tdef.key}</span>`;
-    r.onclick = () => setMode(mode === tdef.m && tdef.m !== 'select' ? 'select' : tdef.m);
-    toolBtns[tdef.m] = r;
-    toolGroup.appendChild(r);
+  for (const g of GROUPS) {
+    const grp = document.createElement('div');
+    grp.className = 'tool-group';
+    grp.innerHTML = `<div class="tool-group-label">${g.label}</div>`;
+    for (const it of g.items) {
+      const r = document.createElement('button');
+      r.className = 'tool-row';
+      const badge = it.key ? `<span class="kbd${it.soon ? ' soon' : ''}">${it.key}</span>` : (it.soon ? '<span class="kbd soon">곧</span>' : '');
+      r.innerHTML = `<span class="ti">${it.ic}</span><span class="tl">${it.label}</span>${badge}`;
+      if (it.mode) { toolBtns[it.mode] = r; r.onclick = () => setMode(mode === it.mode && it.mode !== 'select' ? 'select' : it.mode); }
+      else if (it.soon) r.onclick = () => soon(it.label);
+      else if (it.action) r.onclick = it.action;
+      grp.appendChild(r);
+    }
+    wrap.appendChild(grp);
   }
-  wrap.appendChild(toolGroup);
+  setMode('select');
 
   // 공간 추가 그룹 (색상 칩)
   const roomGroup = document.createElement('div');
@@ -126,7 +169,7 @@ function buildRoomPalette() {
   roomGroup.appendChild(chipWrap);
   wrap.appendChild(roomGroup);
 
-  // 단축키: ESC=선택, O=외곽, F=방그리기, W=벽
+  // 단축키: ESC=선택, L=벽그리기, F=방그리기, W=벽트기, D=삭제, M=측정
   if (!buildRoomPalette._keys) {
     buildRoomPalette._keys = true;
     window.addEventListener('keydown', (e) => {
@@ -134,10 +177,11 @@ function buildRoomPalette() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (e.key === 'Escape') setMode('select');
-      else if (k === 'o') setMode(mode === 'outline' ? 'select' : 'outline');
+      else if (k === 'l' || k === 'o') setMode(mode === 'outline' ? 'select' : 'outline');
       else if (k === 'f') setMode(mode === 'draw' ? 'select' : 'draw');
       else if (k === 'w') setMode(mode === 'wall' ? 'select' : 'wall');
       else if (k === 'm') setMode(mode === 'measure' ? 'select' : 'measure');
+      else if (k === 'd') del();
     });
   }
 }

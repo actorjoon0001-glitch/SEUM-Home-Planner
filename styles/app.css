@@ -73,12 +73,15 @@ body {
 .sub-tab { flex: 1 1 0; border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 6px 4px; font-family: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
 .sub-tab:hover { border-color: var(--seum-red); color: var(--ink); }
 .sub-tab.active { background: var(--seum-red); color: #fff; border-color: var(--seum-red); font-weight: 600; }
-.fin-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.fin-card { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 7px 8px; font-family: inherit; font-size: 12px; color: var(--ink); cursor: pointer; }
-.fin-card:hover { border-color: var(--seum-red); }
-.fin-card.on { border-color: var(--seum-red); box-shadow: 0 0 0 1px var(--seum-red) inset; font-weight: 600; }
-.fin-card .fc-sw { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(0,0,0,.15); flex: 0 0 auto; }
-.fin-card .fc-name { flex: 1 1 auto; }
+.fin-search { margin-bottom: 10px; }
+.fin-search input { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 13px; }
+.fin-search input:focus { outline: none; border-color: var(--seum-red); }
+.mat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mat-card { display: flex; flex-direction: column; gap: 5px; border: 1px solid var(--line); background: #fff; border-radius: 9px; padding: 6px; font-family: inherit; cursor: pointer; }
+.mat-card:hover { border-color: var(--seum-red); }
+.mat-card.on { border-color: var(--seum-red); box-shadow: 0 0 0 1px var(--seum-red) inset; }
+.mat-card .mat-thumb { width: 100%; aspect-ratio: 1 / 1; border-radius: 6px; object-fit: cover; display: block; background: #eee; border: 1px solid rgba(0,0,0,.06); }
+.mat-card .mat-name { font-size: 12px; font-weight: 500; color: var(--ink); text-align: left; }
 .sw.on { outline: 2px solid var(--seum-red); outline-offset: 1px; }
 .left-content { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; }
 .left-content > .panel.hidden { display: none; }

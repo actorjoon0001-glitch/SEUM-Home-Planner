@@ -336,3 +336,19 @@ export function furnitureMaterial(finish, color, wMM, hMM) {
       { roughness: 0.65, bumpScale: 0.7 });
   return null;
 }
+
+// 외장재 id → 패턴 종류 (마감재 라이브러리 썸네일용)
+export { EXT_KIND };
+
+// 마감재 미리보기 썸네일 (grayscale 패턴 × 색상 → dataURL)
+// kind: 'metalSiding' | 'brick' | 'stucco' | 'shingle' | 'floorTile' ... (draw()가 아는 종류)
+export function swatchDataURL(kind, color = '#cccccc', size = 88) {
+  const c = newCanvas(size);
+  const x = c.getContext('2d');
+  draw(kind, x, size);
+  x.globalCompositeOperation = 'multiply';   // 무채색 질감 위에 색을 곱해 입힘
+  x.fillStyle = color;
+  x.fillRect(0, 0, size, size);
+  x.globalCompositeOperation = 'source-over';
+  return c.toDataURL();
+}

@@ -8,6 +8,7 @@ import {
 import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
 import { dxfToUnderlay } from './dxf.js';
+import { swatchDataURL, EXT_KIND } from './textures.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
@@ -478,49 +479,71 @@ function showExterior() { applyOuter('showExterior', true); }
 function showRoof() { applyOuter('showRoof', true); }
 
 // ---------------------------------------------------------------------------
-// 좌측 '마감재' 패널 — 외장재/지붕 자재·색상 선택 (3D 외관 자동 표시)
+// 좌측 '마감재' 패널 — 재질 썸네일 라이브러리 (외장재/지붕) · 검색 지원
 // ---------------------------------------------------------------------------
 function buildFinish() {
   const wrap = document.getElementById('finish-body');
   if (!wrap) return;
-  const render = () => {
-    const d = store.design;
-    const ex = d.exterior || {};
-    const roof = d.roof || {};
-    const exCards = Object.entries(EXTERIOR_MATERIALS).map(([k, m]) =>
-      `<button class="fin-card ${k === ex.material ? 'on' : ''}" data-mat="${k}">
-        <span class="fc-sw" style="background:${m.color}"></span><span class="fc-name">${m.label}</span></button>`).join('');
-    const rfCards = Object.entries(ROOF_TYPES).map(([k, t]) =>
-      `<button class="fin-card ${k === roof.type ? 'on' : ''}" data-roof="${k}"><span class="fc-name">${t.label}</span></button>`).join('');
-    wrap.innerHTML = `
-      <div class="tool-group">
-        <div class="tool-group-label">외장재 (벽 마감)</div>
-        <div class="fin-cards">${exCards}</div>
-        <div class="tool-group-label" style="margin-top:8px">외장 색상</div>
-        <div class="swatches" id="fin-ex-sw">${EXTERIOR_PALETTE.map((c) => `<button class="sw ${c === ex.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
-      </div>
-      <div class="tool-group">
-        <div class="tool-group-label">지붕</div>
-        <div class="fin-cards">${rfCards}</div>
-        <div class="tool-group-label" style="margin-top:8px">지붕 색상</div>
-        <div class="swatches" id="fin-rf-sw">${ROOF_PALETTE.map((c) => `<button class="sw ${c === roof.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
-      </div>`;
-    wrap.querySelectorAll('.fin-card[data-mat]').forEach((b) => b.onclick = () => {
+  const EXT = [
+    ['metal', '메탈사이딩'], ['cement', '시멘트사이딩'], ['ceramic', '세라믹사이딩'],
+    ['stucco', '스타코'], ['brick', '벽돌'], ['wood', '목재 사이딩'], ['stone', '석재'],
+  ];
+  // 썸네일 캐시 (패턴 생성 비용 절감)
+  const cache = {};
+  const extThumb = (k) => cache['e:' + k] || (cache['e:' + k] = swatchDataURL(EXT_KIND[k], EXTERIOR_MATERIALS[k].color));
+  const roofThumb = (c) => cache['r:' + c] || (cache['r:' + c] = swatchDataURL('shingle', c));
+
+  let query = '';
+  wrap.innerHTML = `
+    <div class="fin-search"><input id="fin-q" type="text" placeholder="🔍 마감재 검색 (예: 벽돌, 목재)"></div>
+    <div class="tool-group-label">외장재 (벽 마감)</div>
+    <div class="mat-grid" id="fin-ext"></div>
+    <div class="tool-group-label" style="margin-top:12px">외장 색상</div>
+    <div class="swatches" id="fin-ex-sw"></div>
+    <div class="tool-group-label" style="margin-top:14px">지붕</div>
+    <div class="mat-grid" id="fin-roof"></div>
+    <div class="tool-group-label" style="margin-top:12px">지붕 색상</div>
+    <div class="swatches" id="fin-rf-sw"></div>
+    <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>`;
+  const qi = wrap.querySelector('#fin-q');
+  qi.oninput = () => { query = qi.value.trim(); renderCards(); };
+
+  function renderCards() {
+    const d = store.design, ex = d.exterior || {}, roof = d.roof || {};
+    const match = (label) => !query || label.includes(query);
+
+    const extEl = wrap.querySelector('#fin-ext');
+    extEl.innerHTML = EXT.filter(([, l]) => match(l)).map(([k, l]) =>
+      `<button class="mat-card ${k === ex.material ? 'on' : ''}" data-mat="${k}">
+        <img class="mat-thumb" src="${extThumb(k)}" alt=""><span class="mat-name">${l}</span></button>`).join('')
+      || `<p class="panel-sub small">검색 결과가 없습니다.</p>`;
+    extEl.querySelectorAll('.mat-card').forEach((b) => b.onclick = () => {
       store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.material = b.dataset.mat; dd.exterior.color = EXTERIOR_MATERIALS[b.dataset.mat].color; });
       showExterior();
     });
-    wrap.querySelectorAll('#fin-ex-sw .sw').forEach((b) => b.onclick = () => {
-      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.color = b.dataset.c; }); showExterior();
-    });
-    wrap.querySelectorAll('.fin-card[data-roof]').forEach((b) => b.onclick = () => {
+
+    const roofEl = wrap.querySelector('#fin-roof');
+    roofEl.innerHTML = Object.entries(ROOF_TYPES).filter(([, t]) => match(t.label)).map(([k, t]) =>
+      `<button class="mat-card ${k === roof.type ? 'on' : ''}" data-roof="${k}">
+        <img class="mat-thumb" src="${roofThumb(roof.color || '#3a3f44')}" alt=""><span class="mat-name">${t.label}</span></button>`).join('')
+      || `<p class="panel-sub small">검색 결과가 없습니다.</p>`;
+    roofEl.querySelectorAll('.mat-card').forEach((b) => b.onclick = () => {
       store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.type = b.dataset.roof; }); showRoof();
     });
-    wrap.querySelectorAll('#fin-rf-sw .sw').forEach((b) => b.onclick = () => {
+
+    const exSw = wrap.querySelector('#fin-ex-sw');
+    exSw.innerHTML = EXTERIOR_PALETTE.map((c) => `<button class="sw ${c === ex.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
+    exSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
+      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.color = b.dataset.c; }); showExterior();
+    });
+    const rfSw = wrap.querySelector('#fin-rf-sw');
+    rfSw.innerHTML = ROOF_PALETTE.map((c) => `<button class="sw ${c === roof.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
+    rfSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
       store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.color = b.dataset.c; }); showRoof();
     });
-  };
-  render();
-  store.subscribe(render);
+  }
+  renderCards();
+  store.subscribe(renderCards);
 }
 
 function openingForm(o) {

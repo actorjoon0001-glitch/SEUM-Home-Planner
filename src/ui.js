@@ -385,83 +385,128 @@ function renderProperties(editor) {
   if (furn) { panel.innerHTML = furnForm(furn); bindFurnForm(furn); return; }
   if (op)   { panel.innerHTML = openingForm(op); bindOpeningForm(op); return; }
 
-  // 선택 없음 → 도면 전체 정보 + 외장/지붕
-  const totalArea = d.rooms.reduce((s, r) => s + r.w * r.d, 0) / 1e6;
-  const ex = d.exterior || {};
-  const roof = d.roof || {};
-  const matOpts = Object.entries(EXTERIOR_MATERIALS)
-    .map(([k, m]) => `<option value="${k}" ${k === ex.material ? 'selected' : ''}>${m.label}</option>`).join('');
-  const roofOpts = Object.entries(ROOF_TYPES)
-    .map(([k, t]) => `<option value="${k}" ${k === roof.type ? 'selected' : ''}>${t.label}</option>`).join('');
-  // 창호 목록 (클릭하면 선택 → 편집 폼) — 속성란에서 바로 수정
-  const sideKo = { n: '북', s: '남', e: '동', w: '서' };
+  // 선택 없음 → 미니맵 + 층 관리 + 상세 설정 (Archisketch 우측 패널 구조)
   const ops = d.openings || [];
-  const winListHtml = ops.length
-    ? `<div class="win-list">${ops.map((o) => {
-        const t = WINDOW_TYPES[o.winType] || {};
-        const where = o.onOutline ? '외벽' : (() => { const r = d.rooms.find((rr) => rr.id === o.roomId); return r ? esc(r.name) : '-'; })();
-        const sideTxt = o.onOutline ? '' : ` · ${sideKo[o.side] || o.side}`;
-        return `<button class="win-item" data-id="${o.id}">
-          <span class="wi-name">${t.label || '창호'}</span>
-          <span class="wi-meta">${where}${sideTxt} · ${o.w}×${o.h}</span>
-        </button>`;
-      }).join('')}</div>`
-    : `<p class="hint">좌측 <b>제품 › 창호(창문·문)</b>에서 방 벽이나 외벽으로 드래그해 추가하세요.</p>`;
+  const netArea = d.rooms.reduce((s, r) => s + r.w * r.d, 0) / 1e6;      // 실면적(방 합)
+  let grossArea = netArea;                                               // 실면적+내외벽(외곽 폴리곤 면적)
+  const paths = (d.outline && d.outline.paths) || [];
+  for (const p of paths) {
+    const pts = p.points || [];
+    if (pts.length >= 3) grossArea = Math.max(grossArea, Math.abs(polyArea(pts)) / 1e6);
+  }
+  const woVal = _viewer ? _viewer.wallOpacity : 1;
+  const foVal = _viewer ? _viewer.floorOpacity : 1;
   panel.innerHTML = `
     <div class="prop-empty">
-      <p class="ph">도면 정보</p>
+      <div class="mini-wrap">
+        <div class="mini-label">미니맵</div>
+        <canvas id="mini-cv" class="minimap-cv" width="248" height="150"></canvas>
+      </div>
+
       <label class="fld"><span>도면 이름</span><input id="p-name" value="${esc(d.name)}"></label>
-      <label class="fld"><span>천장 높이 (mm)</span><input id="p-ceil" type="number" step="50" value="${d.ceilingHeight}"></label>
-      <div class="info-row"><span>전체 면적</span><b>${totalArea.toFixed(1)} m² (${(totalArea/3.305).toFixed(1)}평)</b></div>
-      <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${(d.openings||[]).length}</b></div>
 
-      <p class="ph mt">3D 보기</p>
-      <label class="fld"><span>벽 투명도 <small id="wo-val">${Math.round((_viewer ? _viewer.wallOpacity : 1) * 100)}%</small></span>
-        <input id="wo-range" type="range" min="0.2" max="1" step="0.05" value="${_viewer ? _viewer.wallOpacity : 1}"></label>
+      <p class="ph">층 관리</p>
+      <label class="fld"><span>현재 층</span><select id="p-floor"><option>Floor 1</option></select></label>
+      <button id="p-addfloor" class="wide-btn">층 추가하기</button>
+      <label class="fld"><span>층 높이 (mm)</span><input id="p-ceil" type="number" step="50" value="${d.ceilingHeight}"></label>
 
-      <p class="ph mt">외장재 · 색상</p>
-      <label class="fld toggle"><span>3D 외관(외장재) 표시</span><input id="ex-show" type="checkbox"></label>
-      <label class="fld"><span>외장재 종류</span><select id="ex-mat">${matOpts}</select></label>
-      <label class="fld"><span>외장 색상</span><input id="ex-color" type="color" value="${ex.color || '#8d96a0'}"></label>
-      <div class="swatches" id="ex-sw">${EXTERIOR_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
+      <p class="ph mt">상세 설정</p>
+      <div class="seg" id="area-seg">
+        <button class="seg-btn active" data-a="net">실면적</button>
+        <button class="seg-btn" data-a="gross">실면적+내외벽</button>
+      </div>
+      <div class="area-box"><b id="area-num">${netArea.toFixed(1)}</b> m² <small id="area-py">(${(netArea/3.305).toFixed(1)}평)</small></div>
+      <label class="fld"><span>슬래브 두께 (mm)</span><input id="p-slab" type="number" step="10" value="${d.slabThickness || 0}"></label>
+      <label class="fld"><span>벽 투명도 <small id="wo-val">${Math.round(woVal*100)}%</small></span>
+        <input id="wo-range" type="range" min="0.2" max="1" step="0.05" value="${woVal}"></label>
+      <label class="fld"><span>바닥 투명도 <small id="fo-val">${Math.round(foVal*100)}%</small></span>
+        <input id="fo-range" type="range" min="0.2" max="1" step="0.05" value="${foVal}"></label>
 
-      <p class="ph mt">지붕</p>
-      <label class="fld toggle"><span>3D 지붕 표시</span><input id="rf-show" type="checkbox"></label>
-      <label class="fld"><span>지붕 형태</span><select id="rf-type">${roofOpts}</select></label>
-      <label class="fld"><span>지붕 색상</span><input id="rf-color" type="color" value="${roof.color || '#3a3f44'}"></label>
-      <div class="swatches" id="rf-sw">${ROOF_PALETTE.map((c) => `<button class="sw" style="background:${c}" data-c="${c}"></button>`).join('')}</div>
-
-      <p class="ph mt">창호 (${ops.length})</p>
-      ${winListHtml}
-
-      <p class="hint">· 위 창호를 누르면 속성에서 종류·크기·위치를 바로 수정할 수 있어요.<br>· 자재·색상을 고르면 3D에서 <b>외관</b>이 자동으로 켜집니다.</p>
+      <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${ops.length}</b></div>
+      <p class="hint">· 외장재·지붕 마감은 좌측 <b>마감재</b> 패널에서 고르세요.<br>· 슬래브 두께는 구조 정보용으로 저장됩니다.</p>
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
+  document.getElementById('p-slab').onchange = (e) => store.commit((dd) => dd.slabThickness = Math.max(0, +e.target.value || 0));
+  document.getElementById('p-addfloor').onclick = () => flash('여러 층(다층) 설계 기능은 곧 추가됩니다');
   const woRange = document.getElementById('wo-range');
   if (woRange) woRange.oninput = (e) => {
     const v = parseFloat(e.target.value);
     document.getElementById('wo-val').textContent = Math.round(v * 100) + '%';
     if (_viewer) { _viewer.wallOpacity = v; _viewer.dirty = true; }
   };
-  document.getElementById('ex-mat').onchange = (e) => { store.commit((dd) => {
-    dd.exterior.material = e.target.value;
-    dd.exterior.color = EXTERIOR_MATERIALS[e.target.value].color;
-  }); showExterior(); };
-  document.getElementById('ex-color').oninput = (e) => { store.commit((dd) => dd.exterior.color = e.target.value); showExterior(); };
-  document.getElementById('rf-type').onchange = (e) => { store.commit((dd) => dd.roof.type = e.target.value); showRoof(); };
-  document.getElementById('rf-color').oninput = (e) => { store.commit((dd) => dd.roof.color = e.target.value); showRoof(); };
-  document.querySelectorAll('#ex-sw .sw').forEach((b) => b.onclick = () => { store.commit((dd) => dd.exterior.color = b.dataset.c); showExterior(); });
-  document.querySelectorAll('#rf-sw .sw').forEach((b) => b.onclick = () => { store.commit((dd) => dd.roof.color = b.dataset.c); showRoof(); });
-  // 외관/지붕 표시 ON·OFF (현재 viewer 상태 반영, 끄기도 여기서 가능)
-  const exShow = document.getElementById('ex-show');
-  exShow.checked = !!(_viewer && _viewer.showExterior);
-  exShow.onchange = (e) => applyOuter('showExterior', e.target.checked);
-  const rfShow = document.getElementById('rf-show');
-  rfShow.checked = !!(_viewer && _viewer.showRoof);
-  rfShow.onchange = (e) => applyOuter('showRoof', e.target.checked);
-  // 창호 목록 항목 클릭 → 해당 창 선택(편집 폼 표시)
-  document.querySelectorAll('.win-item').forEach((b) => b.onclick = () => store.select(null, null, b.dataset.id));
+  const foRange = document.getElementById('fo-range');
+  if (foRange) foRange.oninput = (e) => {
+    const v = parseFloat(e.target.value);
+    document.getElementById('fo-val').textContent = Math.round(v * 100) + '%';
+    if (_viewer) { _viewer.floorOpacity = v; _viewer.dirty = true; }
+  };
+  // 실면적 / 실면적+내외벽 전환
+  document.querySelectorAll('#area-seg .seg-btn').forEach((b) => b.onclick = () => {
+    document.querySelectorAll('#area-seg .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    const a = b.dataset.a === 'gross' ? grossArea : netArea;
+    document.getElementById('area-num').textContent = a.toFixed(1);
+    document.getElementById('area-py').textContent = `(${(a/3.305).toFixed(1)}평)`;
+  });
+  // 미니맵 그리기 (뷰포트 사각형 실시간 갱신)
+  const mini = document.getElementById('mini-cv');
+  if (mini) { const tick = () => { if (!mini.isConnected) return; drawMinimap(mini, editor); requestAnimationFrame(tick); }; tick(); }
+}
+
+// 다각형 면적 (신발끈 공식, mm²)
+function polyArea(pts) {
+  let a = 0;
+  for (let i = 0, n = pts.length; i < n; i++) {
+    const p = pts[i], q = pts[(i + 1) % n];
+    a += p.x * q.y - q.x * p.y;
+  }
+  return a / 2;
+}
+
+// 미니맵 — 도면 개요 + 현재 2D 뷰포트 사각형
+function drawMinimap(cv, editor) {
+  const ctx = cv.getContext('2d');
+  const d = store.design;
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#eef1f6'; ctx.fillRect(0, 0, W, H);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const acc = (x, y) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); };
+  for (const r of d.rooms) { acc(r.x, r.y); acc(r.x + r.w, r.y + r.d); }
+  for (const p of (d.outline && d.outline.paths) || []) for (const pt of p.points || []) acc(pt.x, pt.y);
+  if (!isFinite(minX)) {
+    ctx.fillStyle = '#9aa4b0'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('도면이 비어 있습니다', W / 2, H / 2); ctx.textAlign = 'start';
+    return;
+  }
+  const pad = 12, bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+  const s = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh);
+  const ox = (W - bw * s) / 2 - minX * s, oy = (H - bh * s) / 2 - minY * s;
+  const X = (x) => x * s + ox, Y = (y) => y * s + oy;
+  // 외곽선
+  ctx.strokeStyle = '#9aa4b0'; ctx.lineWidth = 1.5;
+  for (const p of (d.outline && d.outline.paths) || []) {
+    const pts = p.points || []; if (!pts.length) continue;
+    ctx.beginPath(); ctx.moveTo(X(pts[0].x), Y(pts[0].y));
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(X(pts[i].x), Y(pts[i].y));
+    if (p.closed) ctx.closePath();
+    ctx.stroke();
+  }
+  // 방
+  for (const r of d.rooms) {
+    const t = ROOM_TYPES[r.type] || {};
+    ctx.globalAlpha = 0.85; ctx.fillStyle = t.color || '#cbd5e1';
+    ctx.fillRect(X(r.x), Y(r.y), r.w * s, r.d * s);
+    ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+    ctx.strokeRect(X(r.x), Y(r.y), r.w * s, r.d * s);
+  }
+  // 현재 2D 뷰포트
+  if (editor && editor.scale && editor.cssW) {
+    const [wx0, wy0] = editor.toMm(0, 0);
+    const [wx1, wy1] = editor.toMm(editor.cssW, editor.cssH);
+    ctx.strokeStyle = '#2b6cff'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(X(wx0), Y(wy0), (wx1 - wx0) * s, (wy1 - wy0) * s);
+  }
 }
 
 // 외장/지붕 표시 상태를 한 곳에서 제어 — 플로팅 버튼 + 패널 토글을 함께 동기화

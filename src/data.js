@@ -283,6 +283,7 @@ export function normalize(design) {
   if (!('thumb' in design)) design.thumb = null;                 // 썸네일 dataURL
   if (!('underlay' in design)) design.underlay = null;           // 밑그림(PDF/이미지) 참조 도면
   if (!('outline' in design)) design.outline = null;             // 집 외곽(외벽) {x,y,w,d}
+  if (typeof design.slabThickness !== 'number') design.slabThickness = 0; // 슬래브 두께(mm, 구조 정보)
   return design;
 }
 

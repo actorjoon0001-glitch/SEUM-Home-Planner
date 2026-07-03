@@ -132,6 +132,8 @@ export class Editor2D {
 
     // 축척 보정 중 클릭 점/선 표시
     if (this.calib) this._drawCalib();
+    // 측정 자
+    if (this.measureMode) this._drawMeasures();
     // 방 그리기 미리보기
     if (this.drag && this.drag.mode === 'drawnew') this._drawNewPreview(this.drag);
 
@@ -560,6 +562,15 @@ export class Editor2D {
       return;
     }
 
+    // 측정 모드: 두 점을 클릭해 거리 측정
+    if (this.measureMode) {
+      const pt = this._measureSnap(px, py);
+      if (!this.measureStart) this.measureStart = pt;
+      else { this.measures.push([this.measureStart, pt]); this.measureStart = null; }
+      this.measureCursor = pt; this.draw();
+      return;
+    }
+
     // 벽 편집 모드: 클릭한 벽을 트기↔막기
     if (this.wallEdit) {
       const hit = this._hitWall(px, py);
@@ -626,6 +637,12 @@ export class Editor2D {
 
   _move(e) {
     const [px, py] = this._pos(e);
+    // 측정 모드: 스냅 커서 추적 (시작점 있으면 고무줄)
+    if (this.measureMode) {
+      this.measureCursor = this._measureSnap(px, py);
+      this.draw();
+      return;
+    }
     // 외곽 그리기 중: 마지막 점 → 커서 고무줄 미리보기
     if (this.drawOutline && this.outlineDraft) {
       const [mx, my] = this.toMm(px, py);
@@ -783,10 +800,52 @@ export class Editor2D {
     return { x: nx, y: ny };
   }
 
+  // 측정 모드 on/off — 두 점 클릭으로 거리 측정 (임시 표시, 저장 안 됨)
+  setMeasure(on) {
+    this.measureMode = !!on;
+    this.measureStart = null; this.measureCursor = null;
+    this.measures = on ? [] : null;
+    if (on) { this.drawRoom = null; this.wallEdit = false; this.drawOutline = false; this.calib = null; }
+    this.canvas.style.cursor = on ? 'crosshair' : 'default';
+    this.draw();
+  }
+
+  // 측정 점 스냅 — 방/외곽 꼭짓점에 붙거나 격자(100mm)
+  _measureSnap(px, py) {
+    let best = null, bd = 12;
+    const test = (c) => { const [cx, cy] = this.toPx(c[0], c[1]); const dd = Math.hypot(px - cx, py - cy); if (dd < bd) { bd = dd; best = c; } };
+    for (const r of store.design.rooms) { test([r.x, r.y]); test([r.x + r.w, r.y]); test([r.x, r.y + r.d]); test([r.x + r.w, r.y + r.d]); }
+    for (const { pts } of outlineShapes(store.design.outline)) for (const p of pts) test(p);
+    if (best) return [best[0], best[1]];
+    const [mx, my] = this.toMm(px, py);
+    return [this.snap(mx), this.snap(my)];
+  }
+
+  _drawMeasures() {
+    const ctx = this.ctx;
+    const one = (a, b, color) => {
+      const [ax, ay] = this.toPx(a[0], a[1]), [bx, by] = this.toPx(b[0], b[1]);
+      ctx.save();
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      for (const [x, y] of [[ax, ay], [bx, by]]) { ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+      this._segLabel(a, b, color);
+    };
+    for (const [a, b] of (this.measures || [])) one(a, b, '#2c6e49');
+    if (this.measureStart && this.measureCursor) one(this.measureStart, this.measureCursor, '#c8102e');
+    else if (this.measureCursor) { // 시작 전 스냅 커서 표시
+      const [x, y] = this.toPx(this.measureCursor[0], this.measureCursor[1]);
+      ctx.save(); ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+  }
+
   // 방 그리기 모드 on/off (type=방종류 키 또는 null)
   setDrawRoom(type) {
     this.drawRoom = type || null;
-    if (this.drawRoom) { this.calib = null; this.wallEdit = false; this.drawOutline = false; this._hoverWall = null; }
+    if (this.drawRoom) { this.calib = null; this.wallEdit = false; this.drawOutline = false; this.measureMode = false; this._hoverWall = null; }
     this.canvas.style.cursor = this.drawRoom ? 'crosshair' : 'default';
     this.draw();
   }

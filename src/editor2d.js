@@ -19,6 +19,11 @@ export class Editor2D {
     this.hoverHandle = null;
     this.showFurniture = true;
 
+    // 벽 그리기 옵션 (Archisketch 스타일)
+    this.snapMode = true;    // 격자/직각 스냅
+    this.orthoMode = false;  // 직교(90°) 강제
+    this.onOutlineChange = null; // 그리는 중 길이 입력 상자 위치/값 콜백
+
     this._bind();
     this._resize();
     window.addEventListener('resize', () => { this._resize(); this.draw(); });
@@ -515,10 +520,12 @@ export class Editor2D {
     // 집 외곽(다각형) 그리기: 더블클릭으로 완료, Esc로 취소
     cv.addEventListener('dblclick', () => { if (this.drawOutline && this.outlineDraft) this._finishOutlinePoly(false); });
     window.addEventListener('keydown', (e) => {
+      const tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return; // 길이 입력 등 폼에선 무시
       if (!this.drawOutline || !this.outlineDraft) return;
-      if (e.key === 'Escape') { this.outlineDraft = null; this.draw(); }
+      if (e.key === 'Escape') { this.outlineDraft = null; this._outlineCursor = null; this._emitOutline(); this.draw(); }
       else if (e.key === 'Enter') { this._finishOutlinePoly(false); }
-      else if (e.key === 'Backspace') { e.preventDefault(); this.outlineDraft.pop(); if (!this.outlineDraft.length) this.outlineDraft = null; this.draw(); }
+      else if (e.key === 'Backspace') { e.preventDefault(); this.outlineDraft.pop(); if (!this.outlineDraft.length) this.outlineDraft = null; this._emitOutline(); this.draw(); }
     });
   }
 
@@ -647,6 +654,7 @@ export class Editor2D {
     if (this.drawOutline && this.outlineDraft) {
       const [mx, my] = this.toMm(px, py);
       this._outlineCursor = this._outlineSnap(mx, my);
+      this._emitOutline();
       this.draw();
       return;
     }
@@ -730,20 +738,69 @@ export class Editor2D {
     this.outlineDraft = null; this._outlineCursor = null;
     if (on) { this.drawRoom = null; this.wallEdit = false; this.calib = null; this._hoverWall = null; }
     this.canvas.style.cursor = on ? 'crosshair' : 'default';
+    this._emitOutline();
     this.draw();
   }
 
-  // 외곽 점 스냅: 격자(100mm) + 직전 점과 거의 수평/수직이면 직각으로 정렬
+  // 벽 두께 (mm) — 도면에 저장, 없으면 기본 200
+  wallThickness() { return (store.design && store.design.wallThickness) || 200; }
+  setWallThickness(mm) {
+    const v = Math.max(50, Math.min(600, Math.round((+mm || 200) / 10) * 10));
+    store.commit((d) => { d.wallThickness = v; });
+    this.draw();
+    return v;
+  }
+  setSnapMode(on) { this.snapMode = !!on; this.draw(); }
+  setOrthoMode(on) { this.orthoMode = !!on; this.draw(); }
+
+  // 외곽 점 스냅: (스냅 모드) 격자 100mm + 직전 점과 거의 수평/수직이면 직각 정렬
+  //             (직교 모드) 직전 점 기준 무조건 수평/수직으로 강제
   _outlineSnap(mx, my) {
-    let x = this.snap(mx), y = this.snap(my);
+    let x = this.snapMode ? this.snap(mx) : Math.round(mx);
+    let y = this.snapMode ? this.snap(my) : Math.round(my);
     const draft = this.outlineDraft;
     if (draft && draft.length) {
       const last = draft[draft.length - 1];
       const dx = x - last[0], dy = y - last[1];
-      if (Math.abs(dx) < 700 && Math.abs(dx) <= Math.abs(dy)) x = last[0];      // 수직 벽
-      else if (Math.abs(dy) < 700) y = last[1];                                 // 수평 벽
+      if (this.orthoMode) {
+        if (Math.abs(dx) >= Math.abs(dy)) y = last[1]; else x = last[0];        // 강제 직교
+      } else if (this.snapMode) {
+        if (Math.abs(dx) < 700 && Math.abs(dx) <= Math.abs(dy)) x = last[0];    // 수직 벽
+        else if (Math.abs(dy) < 700) y = last[1];                              // 수평 벽
+      }
     }
     return [x, y];
+  }
+
+  // 길이 직접 입력 → 현재 커서 방향으로 정확한 mm 거리에 점을 찍음
+  commitOutlineLength(mm) {
+    const len = +mm;
+    if (!this.drawOutline || !this.outlineDraft || !this.outlineDraft.length || !this._outlineCursor || !(len > 0)) return false;
+    const last = this.outlineDraft[this.outlineDraft.length - 1];
+    let dx = this._outlineCursor[0] - last[0], dy = this._outlineCursor[1] - last[1];
+    const d = Math.hypot(dx, dy);
+    if (d < 1) return false;               // 방향이 없으면 무시
+    const nx = Math.round(last[0] + (dx / d) * len);
+    const ny = Math.round(last[1] + (dy / d) * len);
+    this.outlineDraft.push([nx, ny]);
+    this._outlineCursor = [nx, ny];
+    this.draw();
+    return true;
+  }
+
+  // 그리는 중 상태를 UI(길이 입력 상자)에 알림
+  _emitOutline() {
+    if (!this.onOutlineChange) return;
+    const draft = this.outlineDraft;
+    if (this.drawOutline && draft && draft.length && this._outlineCursor) {
+      const last = draft[draft.length - 1], cur = this._outlineCursor;
+      const lenMm = Math.round(Math.hypot(cur[0] - last[0], cur[1] - last[1]));
+      const [ax, ay] = this.toPx(last[0], last[1]);
+      const [bx, by] = this.toPx(cur[0], cur[1]);
+      this.onOutlineChange({ active: true, lengthMm: lenMm, x: (ax + bx) / 2, y: (ay + by) / 2 });
+    } else {
+      this.onOutlineChange({ active: false });
+    }
   }
 
   // 외곽 그리기 클릭 처리 (점 추가 / 시작점 클릭 시 닫기)
@@ -757,6 +814,8 @@ export class Editor2D {
       if (this.outlineDraft.length >= 3 && Math.hypot(px - fx, py - fy) < 16) { this._finishOutlinePoly(true); return; }
       this.outlineDraft.push(pt);
     }
+    this._outlineCursor = pt;
+    this._emitOutline();
     this.draw();
   }
 
@@ -777,6 +836,7 @@ export class Editor2D {
       });
     }
     this.outlineDraft = null; this._outlineCursor = null;
+    this._emitOutline();
     this.draw();
   }
 
@@ -947,7 +1007,7 @@ export class Editor2D {
   // 집 외곽(외벽) 2D 표시 — 직선 구간 벽 + 치수 + 그리는 중 미리보기
   _drawOutline() {
     const ctx = this.ctx;
-    const t = Math.max(3, 200 * this.scale); // 외벽 두께 200mm
+    const t = Math.max(3, this.wallThickness() * this.scale); // 외벽 두께(도면 설정)
     for (const { pts, closed } of outlineShapes(store.design.outline)) {
       ctx.save();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';

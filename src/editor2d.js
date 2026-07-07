@@ -905,13 +905,6 @@ export class Editor2D {
     return [];
   }
 
-  _distToSeg(px, py, x1, y1, x2, y2) {
-    const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
-    let t = L2 ? ((px - x1) * dx + (py - y1) * dy) / L2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-  }
-
   // 커서에 가장 가까운 외곽 변 {pathIndex, edgeIndex} (임계 픽셀 내)
   _nearestOutlineEdge(px, py) {
     const paths = this._outlineEditPaths(store.design);
@@ -921,7 +914,7 @@ export class Editor2D {
       for (let e = 0; e < eMax; e++) {
         const a = this.toPx(pts[e][0], pts[e][1]);
         const c = this.toPx(pts[(e + 1) % n][0], pts[(e + 1) % n][1]);
-        const dd = this._distToSeg(px, py, a[0], a[1], c[0], c[1]);
+        const dd = this._distToSeg(px, py, a[0], a[1], c[0], c[1]).dist;
         if (dd < bd) { bd = dd; best = { pathIndex: pi, edgeIndex: e }; }
       }
     });
@@ -1227,23 +1220,27 @@ export class Editor2D {
     return [cx / (6 * a), cy / (6 * a)];
   }
 
+  // 방 그리기 미리보기 — 형광펜 스타일(반투명 퍼플) + 가로·세로 치수
   _drawNewPreview(drag) {
     const x0 = this.snap(Math.min(drag.ax, drag.cx)), y0 = this.snap(Math.min(drag.ay, drag.cy));
     const x1 = this.snap(Math.max(drag.ax, drag.cx)), y1 = this.snap(Math.max(drag.ay, drag.cy));
     const [px, py] = this.toPx(x0, y0);
     const w = (x1 - x0) * this.scale, h = (y1 - y0) * this.scale;
-    const isOutline = drag.mode === 'drawoutline';
     const ctx = this.ctx;
+    const HL = '#6c5ce7';
     ctx.save();
-    ctx.fillStyle = isOutline ? 'rgba(58,63,68,0.12)' : (ROOM_TYPES[this.drawRoom] || ROOM_TYPES.living).color + 'aa';
+    ctx.fillStyle = 'rgba(108,92,231,0.12)';
     ctx.fillRect(px, py, w, h);
-    ctx.strokeStyle = isOutline ? '#3a3f44' : '#c8102e';
-    ctx.lineWidth = isOutline ? Math.max(3, 200 * this.scale) : 2; ctx.setLineDash([6, 4]);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(108,92,231,0.40)';         // 형광펜 halo
+    ctx.lineWidth = Math.max(8, Math.min(this.wallThickness() * this.scale, 22));
     ctx.strokeRect(px, py, w, h);
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#c8102e'; ctx.font = '12px sans-serif';
-    ctx.fillText(`${x1 - x0}×${y1 - y0}`, px + 4, py + 14);
+    ctx.strokeStyle = HL; ctx.lineWidth = 2;           // 중심선
+    ctx.strokeRect(px, py, w, h);
     ctx.restore();
+    // 가로·세로 치수 (퍼플)
+    if (x1 - x0 > 0) this._segLabel([x0, y0], [x1, y0], HL);
+    if (y1 - y0 > 0) this._segLabel([x1, y0], [x1, y1], HL);
   }
 
   _wheel(e) {

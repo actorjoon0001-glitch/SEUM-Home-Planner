@@ -21,6 +21,7 @@ export function buildUI({ editor, viewer, onModeChange }) {
   buildLibrary();
   buildRoomPalette();
   buildFinish();
+  buildWallTools(editor);
   buildToolbar({ editor, viewer, onModeChange });
   buildCloud();
   store.subscribe(() => renderProperties(editor));
@@ -92,6 +93,8 @@ function buildRoomPalette() {
       _editor.setWallEdit(m === 'wall');
       _editor.setMeasure(m === 'measure');
     }
+    const wt = document.getElementById('wall-toolbar');
+    if (wt) wt.classList.toggle('hidden', m !== 'outline');
     syncChips(); setHint();
   };
 
@@ -202,6 +205,51 @@ function buildRoomPalette() {
       else if (k === 'd') del();
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// 벽 그리기 컨텍스트 툴바 + 길이 직접 입력 상자 (Archisketch 스타일)
+// ---------------------------------------------------------------------------
+function buildWallTools(editor) {
+  const bar = document.getElementById('wall-toolbar');
+  const lenBox = document.getElementById('wall-len');
+  if (!bar || !lenBox) return;
+  const thick = document.getElementById('wt-thick');
+  const snap = document.getElementById('wt-snap');
+  const ortho = document.getElementById('wt-ortho');
+
+  // 초기값 반영
+  thick.value = editor.wallThickness();
+  snap.checked = editor.snapMode;
+  ortho.checked = editor.orthoMode;
+  thick.onchange = () => { thick.value = editor.setWallThickness(thick.value); };
+  snap.onchange = () => editor.setSnapMode(snap.checked);
+  ortho.onchange = () => editor.setOrthoMode(ortho.checked);
+
+  let typing = false;
+  lenBox.addEventListener('focus', () => { typing = true; });
+  lenBox.addEventListener('blur', () => { typing = false; });
+  lenBox.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); if (editor.commitOutlineLength(parseFloat(lenBox.value))) lenBox.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); lenBox.blur(); }
+  });
+
+  // 그리는 중 숫자를 누르면 바로 길이 입력 모드로
+  window.addEventListener('keydown', (e) => {
+    if (!editor.drawOutline || !editor.outlineDraft) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (/^[0-9]$/.test(e.key)) { e.preventDefault(); lenBox.classList.remove('hidden'); lenBox.value = e.key; lenBox.focus(); }
+  });
+
+  // 편집기가 알려주는 현재 구간 길이/위치를 상자에 반영
+  editor.onOutlineChange = (st) => {
+    if (!st || !st.active) { lenBox.classList.add('hidden'); return; }
+    lenBox.classList.remove('hidden');
+    lenBox.style.left = Math.round(st.x + 12) + 'px';
+    lenBox.style.top = Math.round(st.y - 12) + 'px';
+    if (!typing && document.activeElement !== lenBox) lenBox.value = st.lengthMm;
+  };
 }
 
 function addRoom(type) {

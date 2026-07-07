@@ -1023,25 +1023,32 @@ export class Editor2D {
       for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) this._segLabel(pts[i], pts[(i + 1) % pts.length], '#3a3f44');
       if (closed && pts.length >= 3) this._outlineAreaLabel(pts);
     }
-    // 그리는 중(draft) — 직선 + 치수 + 점
+    // 그리는 중(draft) — 형광펜 스타일(두껍고 반투명한 퍼플) + 치수 + 점
     const draft = this.outlineDraft;
     if (draft && draft.length) {
+      const HL = '#6c5ce7';                                    // 형광 퍼플
+      const pxs = draft.map((p) => this.toPx(p[0], p[1]));
+      const cur = this._outlineCursor ? this.toPx(this._outlineCursor[0], this._outlineCursor[1]) : null;
+      const path = () => { ctx.beginPath(); pxs.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); if (cur) ctx.lineTo(cur[0], cur[1]); };
       ctx.save();
-      ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      draft.forEach((p, i) => { const [x, y] = this.toPx(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-      if (this._outlineCursor) { const [cx, cy] = this.toPx(this._outlineCursor[0], this._outlineCursor[1]); ctx.lineTo(cx, cy); }
-      ctx.stroke(); ctx.setLineDash([]);
-      draft.forEach((p, i) => {
-        const [x, y] = this.toPx(p[0], p[1]);
-        ctx.fillStyle = (i === 0 && draft.length >= 3) ? '#c8102e' : '#fff';
-        ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(x, y, i === 0 ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      // 형광펜 halo (두껍고 반투명)
+      ctx.strokeStyle = 'rgba(108,92,231,0.40)';
+      ctx.lineWidth = Math.max(9, Math.min(this.wallThickness() * this.scale, 24));
+      path(); ctx.stroke();
+      // 중심선 (방향 명확히)
+      ctx.strokeStyle = HL; ctx.lineWidth = 2;
+      path(); ctx.stroke();
+      // 꼭짓점 점 (시작점은 닫기 후보라 강조)
+      pxs.forEach((p, i) => {
+        ctx.fillStyle = (i === 0 && draft.length >= 3) ? HL : '#fff';
+        ctx.strokeStyle = HL; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p[0], p[1], i === 0 ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       });
       ctx.restore();
       // 놓인 구간 치수 + 현재(고무줄) 구간 길이 실시간 표시
-      for (let i = 0; i < draft.length - 1; i++) this._segLabel(draft[i], draft[i + 1], '#c8102e');
-      if (this._outlineCursor) this._segLabel(draft[draft.length - 1], this._outlineCursor, '#c8102e');
+      for (let i = 0; i < draft.length - 1; i++) this._segLabel(draft[i], draft[i + 1], HL);
+      if (this._outlineCursor) this._segLabel(draft[draft.length - 1], this._outlineCursor, HL);
     }
   }
 

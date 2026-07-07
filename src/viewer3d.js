@@ -388,10 +388,15 @@ export class Viewer3D {
         const shape = new THREE.Shape();
         P.forEach((p, i) => (i ? shape.lineTo(p[0], p[1]) : shape.moveTo(p[0], p[1])));
         shape.closePath();
-        const floor = new THREE.Mesh(
-          new THREE.ShapeGeometry(shape),
-          new THREE.MeshStandardMaterial({ color: '#e8e4dc', roughness: 0.9, side: THREE.DoubleSide })
-        );
+        const geo = new THREE.ShapeGeometry(shape);
+        // ShapeGeometry UV(=mm 좌표)를 bbox 0..1 로 정규화 → 강화마루 판재가 자연스럽게 반복
+        geo.computeBoundingBox();
+        const bb = geo.boundingBox;
+        const sx = Math.max(1, bb.max.x - bb.min.x), sy = Math.max(1, bb.max.y - bb.min.y);
+        const uv = geo.attributes.uv, pos = geo.attributes.position;
+        for (let k = 0; k < uv.count; k++) uv.setXY(k, (pos.getX(k) - bb.min.x) / sx, (pos.getY(k) - bb.min.y) / sy);
+        uv.needsUpdate = true;
+        const floor = new THREE.Mesh(geo, TEX.floorMaterial('living', '#caa877', sx, sy)); // 강화마루(오크)
         floor.rotation.x = Math.PI / 2;
         floor.position.y = 20;
         floor.receiveShadow = true;

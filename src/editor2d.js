@@ -1004,21 +1004,24 @@ export class Editor2D {
     ctx.restore();
   }
 
-  // 집 외곽(외벽) 2D 표시 — 직선 구간 벽 + 치수 + 그리는 중 미리보기
+  // 집 외곽(외벽) 2D 표시 — 닫힌 공간은 강화마루 바닥 + 면적, 벽 + 치수
   _drawOutline() {
     const ctx = this.ctx;
     const t = Math.max(3, this.wallThickness() * this.scale); // 외벽 두께(도면 설정)
     for (const { pts, closed } of outlineShapes(store.design.outline)) {
+      const px = pts.map((p) => this.toPx(p[0], p[1]));
+      if (closed && pts.length >= 3) this._fillLaminate(px);   // 강화마루 바닥(기본)
       ctx.save();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
       ctx.strokeStyle = '#3a3f44'; ctx.lineWidth = t;
       ctx.beginPath();
-      pts.forEach((p, i) => { const [x, y] = this.toPx(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      px.forEach((p, i) => { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
       if (closed) ctx.closePath();
       ctx.stroke();
       ctx.restore();
       // 각 변 치수
       for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) this._segLabel(pts[i], pts[(i + 1) % pts.length], '#3a3f44');
+      if (closed && pts.length >= 3) this._outlineAreaLabel(pts);
     }
     // 그리는 중(draft) — 직선 + 치수 + 점
     const draft = this.outlineDraft;
@@ -1040,6 +1043,58 @@ export class Editor2D {
       for (let i = 0; i < draft.length - 1; i++) this._segLabel(draft[i], draft[i + 1], '#c8102e');
       if (this._outlineCursor) this._segLabel(draft[draft.length - 1], this._outlineCursor, '#c8102e');
     }
+  }
+
+  // 닫힌 공간 내부를 강화마루(오크) 질감으로 채움 — px: 화면좌표 꼭짓점 배열
+  _fillLaminate(px) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    px.forEach((p, i) => { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
+    ctx.closePath();
+    ctx.clip();
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const [x, y] of px) { if (x < minx) minx = x; if (y < miny) miny = y; if (x > maxx) maxx = x; if (y > maxy) maxy = y; }
+    ctx.fillStyle = '#d9b489';                              // 강화마루 베이스(라이트 오크)
+    ctx.fillRect(minx, miny, maxx - minx, maxy - miny);
+    const plank = Math.max(9, 190 * this.scale);            // 판재 폭 ≈190mm
+    ctx.strokeStyle = 'rgba(140,100,60,0.22)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let y = miny; y <= maxy; y += plank) { ctx.moveTo(minx, y); ctx.lineTo(maxx, y); }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 닫힌 공간 중앙에 면적 라벨
+  _outlineAreaLabel(pts) {
+    const a = Math.abs(this._polyAreaMm(pts)) / 1e6;
+    if (a < 0.01) return;
+    const c = this._polyCentroid(pts);
+    const [cx, cy] = this.toPx(c[0], c[1]);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = '600 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const txt = `${a.toFixed(1)} m² (${(a / 3.305).toFixed(1)}평)`;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeText(txt, cx, cy);
+    ctx.fillStyle = '#5b4a36'; ctx.fillText(txt, cx, cy);
+    ctx.restore();
+  }
+
+  _polyAreaMm(pts) {
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; s += p[0] * q[1] - q[0] * p[1]; }
+    return s / 2;
+  }
+  _polyCentroid(pts) {
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      const cr = p[0] * q[1] - q[0] * p[1];
+      a += cr; cx += (p[0] + q[0]) * cr; cy += (p[1] + q[1]) * cr;
+    }
+    a *= 0.5;
+    if (Math.abs(a) < 1e-6) { let sx = 0, sy = 0; for (const p of pts) { sx += p[0]; sy += p[1]; } return [sx / pts.length, sy / pts.length]; }
+    return [cx / (6 * a), cy / (6 * a)];
   }
 
   _drawNewPreview(drag) {

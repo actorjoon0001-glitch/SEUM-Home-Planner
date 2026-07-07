@@ -396,7 +396,9 @@ export class Viewer3D {
         const uv = geo.attributes.uv, pos = geo.attributes.position;
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (pos.getX(k) - bb.min.x) / sx, (pos.getY(k) - bb.min.y) / sy);
         uv.needsUpdate = true;
-        const floor = new THREE.Mesh(geo, TEX.floorMaterial('living', '#caa877', sx, sy)); // 강화마루(오크)
+        const floorMat = TEX.floorMaterial('living', '#caa877', sx, sy); // 강화마루(오크)
+        floorMat.side = THREE.DoubleSide;   // 회전 후 위에서도 보이도록 양면 렌더
+        const floor = new THREE.Mesh(geo, floorMat);
         floor.rotation.x = Math.PI / 2;
         floor.position.y = 20;
         floor.receiveShadow = true;

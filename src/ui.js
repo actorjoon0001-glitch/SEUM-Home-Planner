@@ -116,11 +116,7 @@ function buildRoomPalette() {
       { ic: '🗑️', label: '삭제', key: 'D', mode: 'erase' },
     ] },
     { label: '구조물 그리기', items: [
-      { ic: '⬛', label: '사각 기둥 그리기', key: 'R', soon: true },
-      { ic: '⚫', label: '원형 기둥 그리기', key: 'C', soon: true },
       { ic: '🚪', label: '개구부(창·문)', action: openWindows },
-      { ic: '⬚', label: '바닥 통로 그리기', soon: true },
-      { ic: '⬛', label: '천장 통로 그리기', soon: true },
     ] },
     { label: '보조선 그리기', items: [
       { ic: '📏', label: '보조선 그리기', key: 'E', soon: true },

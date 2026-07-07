@@ -8,50 +8,86 @@ const subs = new Set();
 
 const cfg = (typeof window !== 'undefined' && window.SEUM_CONFIG) || {};
 
+// Supabase 라이브러리를 여러 CDN에서 순차 시도 (한 곳이 막혀도 다음 것으로)
+async function loadSupabase() {
+  // jsDelivr /+esm 는 단일 번들(요청 1회)이라 가장 견고 → 우선. 실패 시 esm.sh/skypack 폴백.
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+    'https://esm.sh/@supabase/supabase-js@2',
+    'https://cdn.skypack.dev/@supabase/supabase-js@2',
+  ];
+  let lastErr;
+  for (const u of urls) {
+    try {
+      const mod = await import(/* @vite-ignore */ u);
+      if (mod && typeof mod.createClient === 'function') return mod;
+      lastErr = new Error('createClient 없음: ' + u);
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('Supabase 라이브러리를 불러오지 못했습니다.');
+}
+
 export const cloud = {
   configured() { return !!(cfg.supabaseUrl && cfg.supabaseAnonKey); },
   ready() { return ready; },
   user: null,
 
-  // Supabase 클라이언트 동적 로드 (CDN ESM)
+  lastError: null,
+
+  // Supabase 클라이언트 동적 로드 (CDN ESM) — 여러 CDN 폴백으로 실패에 견고하게
   async init() {
     if (!this.configured()) return false;
     if (client) return true;
-    try {
-      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-      client = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
-        auth: {
-          persistSession: true,     // 세션을 브라우저에 저장 → 재접속 시 자동 로그인
-          autoRefreshToken: true,   // 만료 전 토큰 자동 갱신 → 로그인 유지
-          detectSessionInUrl: false,
-        },
-      });
-      const { data } = await client.auth.getSession();
-      this.user = data?.session?.user || null;
-      client.auth.onAuthStateChange((_ev, session) => {
-        this.user = session?.user || null;
+    if (this._initPromise) return this._initPromise;   // 동시 호출 시 중복 로드 방지
+    this._initPromise = (async () => {
+      try {
+        const { createClient } = await loadSupabase();
+        client = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+          auth: {
+            persistSession: true,     // 세션을 브라우저에 저장 → 재접속 시 자동 로그인
+            autoRefreshToken: true,   // 만료 전 토큰 자동 갱신 → 로그인 유지
+            detectSessionInUrl: false,
+          },
+        });
+        const { data } = await client.auth.getSession();
+        this.user = data?.session?.user || null;
+        client.auth.onAuthStateChange((_ev, session) => {
+          this.user = session?.user || null;
+          this._emit();
+        });
+        ready = true;
+        this.lastError = null;
         this._emit();
-      });
-      ready = true;
-      this._emit();
-      return true;
-    } catch (e) {
-      console.error('[cloud] init 실패:', e);
-      return false;
-    }
+        return true;
+      } catch (e) {
+        console.error('[cloud] init 실패:', e);
+        this.lastError = e;
+        this._initPromise = null;   // 다음 시도 때 다시 로드할 수 있도록
+        return false;
+      }
+    })();
+    return this._initPromise;
   },
 
   onChange(fn) { subs.add(fn); return () => subs.delete(fn); },
   _emit() { subs.forEach((fn) => fn(this)); },
 
   // --- 인증 ---
+  _requireClient() {
+    if (!client) {
+      const why = this.lastError ? ` (${this.lastError.message || this.lastError})` : '';
+      throw new Error('인증 서버에 연결하지 못했습니다. 네트워크를 확인하고 다시 시도하세요.' + why);
+    }
+  },
   async signIn(email, password) {
     await this.init();
+    this._requireClient();
     const { error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
   },
   async signUp(email, password) {
     await this.init();
+    this._requireClient();
     const { error } = await client.auth.signUp({ email, password });
     if (error) throw error;
   },

@@ -82,6 +82,7 @@ function buildRoomPalette() {
       : mode === 'draw' ? '공간을 고르고, 외벽 안에서 대각선으로 드래그해 방을 그리세요'
       : mode === 'wall' ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리됨)'
       : mode === 'measure' ? '두 점을 클릭해 거리를 재세요 (방·외벽 꼭짓점에 자동 스냅). Esc=끝'
+      : mode === 'erase' ? '지울 대상을 클릭하세요 — 벽은 선 한 칸씩, 방·가구·창호는 통째로 삭제. Esc=끝'
       : '선택/이동 모드 — 방을 클릭해 선택하고 드래그로 옮기세요';
   };
   const setMode = (m) => {
@@ -92,6 +93,7 @@ function buildRoomPalette() {
       _editor.setDrawRoom(m === 'draw' ? drawType : null);
       _editor.setWallEdit(m === 'wall');
       _editor.setMeasure(m === 'measure');
+      _editor.setErase(m === 'erase');
     }
     const wt = document.getElementById('wall-toolbar');
     if (wt) wt.classList.toggle('hidden', m !== 'outline');
@@ -101,12 +103,6 @@ function buildRoomPalette() {
   // --- 액션들 ---
   const soon = (name) => flash(`'${name}'은(는) 곧 추가됩니다`);
   const openWindows = () => { showSection('furn'); showProduct('win'); };
-  const del = () => {
-    if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
-    else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });
-    else if (store.selectedOpening) store.commit((d) => { d.openings = d.openings.filter((o) => o.id !== store.selectedOpening); store.selectedOpening = null; });
-    else flash('삭제할 항목을 먼저 선택하세요');
-  };
 
   // Archisketch 사이드바 구조 (그룹별 도구)
   const GROUPS = [
@@ -117,8 +113,7 @@ function buildRoomPalette() {
     { label: '방 만들기', items: [
       { ic: '📐', label: '벽 그리기', key: 'L', mode: 'outline' },
       { ic: '✏️', label: '방 그리기', key: 'F', mode: 'draw' },
-      { ic: '🧱', label: '벽 트기 / 막기', key: 'W', mode: 'wall' },
-      { ic: '🗑️', label: '삭제', key: 'D', action: del },
+      { ic: '🗑️', label: '삭제', key: 'D', mode: 'erase' },
     ] },
     { label: '구조물 그리기', items: [
       { ic: '⬛', label: '사각 기둥 그리기', key: 'R', soon: true },
@@ -200,9 +195,8 @@ function buildRoomPalette() {
       if (e.key === 'Escape') setMode('select');
       else if (k === 'l' || k === 'o') setMode(mode === 'outline' ? 'select' : 'outline');
       else if (k === 'f') setMode(mode === 'draw' ? 'select' : 'draw');
-      else if (k === 'w') setMode(mode === 'wall' ? 'select' : 'wall');
       else if (k === 'm') setMode(mode === 'measure' ? 'select' : 'measure');
-      else if (k === 'd') del();
+      else if (k === 'd') setMode(mode === 'erase' ? 'select' : 'erase');
     });
   }
 }

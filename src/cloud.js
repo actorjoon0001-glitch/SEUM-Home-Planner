@@ -19,7 +19,13 @@ export const cloud = {
     if (client) return true;
     try {
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-      client = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+      client = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+        auth: {
+          persistSession: true,     // 세션을 브라우저에 저장 → 재접속 시 자동 로그인
+          autoRefreshToken: true,   // 만료 전 토큰 자동 갱신 → 로그인 유지
+          detectSessionInUrl: false,
+        },
+      });
       const { data } = await client.auth.getSession();
       this.user = data?.session?.user || null;
       client.auth.onAuthStateChange((_ev, session) => {

@@ -30,13 +30,21 @@ const gate = document.getElementById('auth-gate');
 const authForm = document.getElementById('auth-form');
 const authErr = document.getElementById('auth-err');
 const authSubmit = document.getElementById('auth-submit');
+const authEmail = document.getElementById('auth-email');
+const authPass = document.getElementById('auth-pass');
+const authKeep = document.getElementById('auth-keep');
 const logoutBtn = document.getElementById('tb-logout');
+
+const KEEP_KEY = 'seum_keep_login';   // '0' 이면 자동 로그인 끔
+const EMAIL_KEY = 'seum_last_email';  // 마지막 로그인 이메일 (자동 채움)
+const keepLogin = () => { try { return localStorage.getItem(KEEP_KEY) !== '0'; } catch { return true; } };
+const lastEmail = () => { try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; } };
 
 function reflectAuth() {
   const loggedIn = !!cloud.user;
   gate.classList.toggle('hidden', loggedIn);
   logoutBtn.classList.toggle('hidden', !loggedIn);
-  if (loggedIn) authForm.reset();
+  if (loggedIn) authPass.value = '';   // 비밀번호만 비움 (이메일/체크박스는 유지)
 }
 
 // Supabase 인증 오류 → 사용자 친화 메시지
@@ -52,18 +60,26 @@ function authErrorText(e) {
 async function initAuth() {
   // 클라우드(Supabase) 미설정이면 게이트 없이 사용 (로그인 불가 상태로 잠기지 않도록)
   if (!cloud.configured()) { gate.classList.add('hidden'); logoutBtn.classList.add('hidden'); return; }
+  // 지난 로그인 이메일 자동 채움 + '자동 로그인 유지' 상태 복원
+  if (lastEmail()) authEmail.value = lastEmail();
+  if (authKeep) authKeep.checked = keepLogin();
   authErr.textContent = '로그인 확인 중…';
   try { await cloud.init(); } catch { /* init 실패해도 로그인 폼은 표시 */ }
   authErr.textContent = '';
+  // 자동 로그인 꺼짐 → 저장된 세션이 있어도 로그아웃해 매번 로그인하도록
+  if (cloud.user && !keepLogin()) { try { await cloud.signOut(); } catch { /* noop */ } }
   reflectAuth();
   cloud.onChange(reflectAuth);   // 로그인/로그아웃 시 게이트 자동 표시·숨김
 }
 
 authForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const email = document.getElementById('auth-email').value.trim();
-  const pass = document.getElementById('auth-pass').value;
+  const email = authEmail.value.trim();
+  const pass = authPass.value;
   if (!email || !pass) { authErr.textContent = '이메일과 비밀번호를 모두 입력하세요.'; return; }
+  // 자동 로그인 유지 여부 + 이메일 저장
+  const keep = authKeep ? authKeep.checked : true;
+  try { localStorage.setItem(KEEP_KEY, keep ? '1' : '0'); localStorage.setItem(EMAIL_KEY, email); } catch { /* noop */ }
   authErr.textContent = '';
   authSubmit.disabled = true; authSubmit.textContent = '로그인 중…';
   try {

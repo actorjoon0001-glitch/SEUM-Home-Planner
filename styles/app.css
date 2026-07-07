@@ -83,7 +83,9 @@ body {
 .right { overflow-y: auto; }
 .left { width: 304px; border-right: 1px solid var(--line); display: flex; flex-direction: row; }
 /* 좌측 아이콘 레일 */
-.rail { width: 56px; flex: 0 0 auto; background: #f6f7f9; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 8px 0; gap: 2px; }
+/* 아이콘 레일을 도구 목록 오른쪽(가운데)으로 배치 — 벤치마크와 동일 순서 */
+.rail { order: 2; width: 56px; flex: 0 0 auto; background: #f6f7f9; border-left: 1px solid var(--line); display: flex; flex-direction: column; padding: 8px 0; gap: 2px; }
+.left-content { order: 1; }
 .rail-btn {
   border: 0; background: transparent; cursor: pointer; font-family: inherit;
   padding: 9px 0; display: flex; flex-direction: column; align-items: center; gap: 2px;

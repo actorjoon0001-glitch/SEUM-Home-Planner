@@ -139,6 +139,8 @@ export class Editor2D {
     if (this.calib) this._drawCalib();
     // 측정 자
     if (this.measureMode) this._drawMeasures();
+    // 삭제 모드 hover 강조
+    if (this.eraseMode && this._eraseHover) this._drawEraseHover();
     // 방 그리기 미리보기
     if (this.drag && this.drag.mode === 'drawnew') this._drawNewPreview(this.drag);
 
@@ -569,6 +571,13 @@ export class Editor2D {
       return;
     }
 
+    // 삭제(지우개) 모드: 클릭한 대상 삭제 (벽 선은 한 칸)
+    if (this.eraseMode) {
+      const hit = this._eraseHitTest(px, py);
+      if (hit) { this._eraseAt(hit); this._eraseHover = null; this.draw(); }
+      return;
+    }
+
     // 측정 모드: 두 점을 클릭해 거리 측정
     if (this.measureMode) {
       const pt = this._measureSnap(px, py);
@@ -644,6 +653,13 @@ export class Editor2D {
 
   _move(e) {
     const [px, py] = this._pos(e);
+    // 삭제 모드: 커서 아래 삭제 대상 하이라이트
+    if (this.eraseMode) {
+      this._eraseHover = this._eraseHitTest(px, py);
+      this.canvas.style.cursor = this._eraseHover ? 'pointer' : 'crosshair';
+      this.draw();
+      return;
+    }
     // 측정 모드: 스냅 커서 추적 (시작점 있으면 고무줄)
     if (this.measureMode) {
       this.measureCursor = this._measureSnap(px, py);
@@ -868,6 +884,113 @@ export class Editor2D {
     if (on) { this.drawRoom = null; this.wallEdit = false; this.drawOutline = false; this.calib = null; }
     this.canvas.style.cursor = on ? 'crosshair' : 'default';
     this.draw();
+  }
+
+  // 지우개(삭제) 모드 on/off — 벽 선은 한 칸씩, 방·가구·창호는 통째로 클릭 삭제
+  setErase(on) {
+    this.eraseMode = !!on;
+    this._eraseHover = null;
+    if (on) { this.drawRoom = null; this.drawOutline = false; this.wallEdit = false; this.measureMode = false; this.calib = null; this.outlineDraft = null; }
+    this.canvas.style.cursor = on ? 'crosshair' : 'default';
+    this.draw();
+  }
+
+  // 편집 가능한 외곽 경로 목록 (좌표는 [x,y] 배열로 정규화)
+  _outlineEditPaths(d) {
+    const cur = d.outline;
+    const P = (pt) => (Array.isArray(pt) ? [pt[0], pt[1]] : [pt.x, pt.y]);
+    if (cur && Array.isArray(cur.paths)) return cur.paths.map((p) => ({ points: (p.points || []).map(P), closed: !!p.closed }));
+    if (cur && Array.isArray(cur.points)) return [{ points: cur.points.map(P), closed: cur.closed !== false && cur.points.length >= 3 }];
+    if (cur && ('w' in cur)) { const { x, y, w, d: dd } = cur; return [{ points: [[x, y], [x + w, y], [x + w, y + dd], [x, y + dd]], closed: true }]; }
+    return [];
+  }
+
+  _distToSeg(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
+    let t = L2 ? ((px - x1) * dx + (py - y1) * dy) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  // 커서에 가장 가까운 외곽 변 {pathIndex, edgeIndex} (임계 픽셀 내)
+  _nearestOutlineEdge(px, py) {
+    const paths = this._outlineEditPaths(store.design);
+    let best = null, bd = Math.max(10, this.wallThickness() * this.scale / 2 + 6);
+    paths.forEach((path, pi) => {
+      const pts = path.points, n = pts.length, eMax = path.closed ? n : n - 1;
+      for (let e = 0; e < eMax; e++) {
+        const a = this.toPx(pts[e][0], pts[e][1]);
+        const c = this.toPx(pts[(e + 1) % n][0], pts[(e + 1) % n][1]);
+        const dd = this._distToSeg(px, py, a[0], a[1], c[0], c[1]);
+        if (dd < bd) { bd = dd; best = { pathIndex: pi, edgeIndex: e }; }
+      }
+    });
+    return best;
+  }
+
+  // 삭제 대상 히트테스트 — 가구 > 창호 > 벽 선 > 방
+  _eraseHitTest(px, py) {
+    const f = this._hitFurniture(px, py); if (f) return { kind: 'furniture', id: f.id };
+    const o = this._hitOpening(px, py); if (o) return { kind: 'opening', id: o.id };
+    const edge = this._nearestOutlineEdge(px, py); if (edge) return { kind: 'edge', ...edge };
+    const r = this._hitRoom(px, py); if (r) return { kind: 'room', id: r.id };
+    return null;
+  }
+
+  // 외곽 변 1개 삭제 — 닫힌 폴리곤은 열리고, 열린 선은 분할됨
+  _eraseEdge(pathIndex, edgeIndex) {
+    store.commit((d) => {
+      const paths = this._outlineEditPaths(d);
+      const path = paths[pathIndex];
+      if (!path) return;
+      const pts = path.points, n = pts.length;
+      const pieces = [];
+      if (path.closed) {
+        const rot = [];
+        for (let k = 1; k <= n; k++) rot.push(pts[(edgeIndex + k) % n]); // 제거된 변의 두 끝점이 양끝
+        pieces.push({ points: rot, closed: false });
+      } else {
+        const left = pts.slice(0, edgeIndex + 1);
+        const right = pts.slice(edgeIndex + 1);
+        if (left.length >= 2) pieces.push({ points: left, closed: false });
+        if (right.length >= 2) pieces.push({ points: right, closed: false });
+      }
+      paths.splice(pathIndex, 1, ...pieces);
+      d.outline = { paths: paths.filter((p) => p.points.length >= 2) };
+    });
+  }
+
+  _eraseAt(hit) {
+    if (!hit) return;
+    if (hit.kind === 'edge') { this._eraseEdge(hit.pathIndex, hit.edgeIndex); return; }
+    store.commit((d) => {
+      if (hit.kind === 'room') d.rooms = d.rooms.filter((r) => r.id !== hit.id);
+      else if (hit.kind === 'furniture') d.furniture = d.furniture.filter((f) => f.id !== hit.id);
+      else if (hit.kind === 'opening') d.openings = (d.openings || []).filter((o) => o.id !== hit.id);
+    });
+    if (store.selectedRoom === hit.id || store.selectedFurniture === hit.id || store.selectedOpening === hit.id) store.select(null, null);
+  }
+
+  // 삭제 모드에서 hover 대상 강조(빨강)
+  _drawEraseHover() {
+    const h = this._eraseHover; if (!h) return;
+    const ctx = this.ctx, d = store.design;
+    ctx.save();
+    ctx.strokeStyle = '#e01e37'; ctx.fillStyle = 'rgba(224,30,55,0.16)'; ctx.lineCap = 'round';
+    if (h.kind === 'edge') {
+      const path = this._outlineEditPaths(d)[h.pathIndex];
+      if (path) {
+        const n = path.points.length;
+        const a = this.toPx(path.points[h.edgeIndex][0], path.points[h.edgeIndex][1]);
+        const c = this.toPx(path.points[(h.edgeIndex + 1) % n][0], path.points[(h.edgeIndex + 1) % n][1]);
+        ctx.lineWidth = Math.max(6, this.wallThickness() * this.scale + 4);
+        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.stroke();
+      }
+    } else if (h.kind === 'room') {
+      const r = d.rooms.find((x) => x.id === h.id);
+      if (r) { const [x, y] = this.toPx(r.x, r.y); ctx.lineWidth = 2; ctx.fillRect(x, y, r.w * this.scale, r.d * this.scale); ctx.strokeRect(x, y, r.w * this.scale, r.d * this.scale); }
+    }
+    ctx.restore();
   }
 
   // 측정 점 스냅 — 방/외곽 꼭짓점에 붙거나 격자(100mm)

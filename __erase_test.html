@@ -1,0 +1,18 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body><canvas id="c" width="600" height="600"></canvas>
+<script type="module">
+import { store } from '/src/store.js';
+import { Editor2D } from '/src/editor2d.js';
+let L=''; const log=(m)=>{L+=m+'\n';window.__log=L;};
+store.commit((d)=>{ d.outline={paths:[{points:[[0,0],[4000,0],[4000,3000],[0,3000]],closed:true}]}; d.rooms=[];d.furniture=[];d.openings=[]; });
+const ed = new Editor2D(document.getElementById('c'));
+ed.scale=0.1; ed.ox=50; ed.oy=50; ed.cssW=600; ed.cssH=600;
+ed.setErase(true);
+const hit=ed._eraseHitTest(250,50); log('hit(top edge)='+JSON.stringify(hit));
+if(hit&&hit.kind==='edge'){ ed._eraseEdge(hit.pathIndex,hit.edgeIndex); log('afterErase='+JSON.stringify(store.design.outline)); }
+// 열린 선 중간 변 삭제 테스트
+store.commit((d)=>{ d.outline={paths:[{points:[[0,0],[1000,0],[2000,0],[3000,0]],closed:false}]}; });
+const hit2=ed._eraseHitTest(ed.toPx(1500,0)[0], ed.toPx(1500,0)[1]); log('hit(open mid)='+JSON.stringify(hit2));
+if(hit2&&hit2.kind==='edge'){ ed._eraseEdge(hit2.pathIndex,hit2.edgeIndex); log('afterSplit='+JSON.stringify(store.design.outline)); }
+log('DONE');
+</script></body></html>

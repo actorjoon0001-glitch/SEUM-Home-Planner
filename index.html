@@ -129,12 +129,8 @@
         <div class="stage-hint">드래그: 회전 · 휠: 줌 · 우클릭 드래그: 이동</div>
       </div>
 
-      <!-- 하단 바: 2D/3D 전환(좌) + 줌(우) -->
+      <!-- 하단 바: 줌 컨트롤 -->
       <div class="stage-bottombar">
-        <div class="mode-toggle">
-          <button id="tb-2d" class="mode-btn active">2D 도면</button>
-          <button id="tb-3d" class="mode-btn">3D 입체</button>
-        </div>
         <div class="zoom-ctrl">
           <button id="zoom-out" class="zb" title="축소">−</button>
           <button id="zoom-fit" class="zb zb-fit" title="화면맞춤">화면맞춤</button>
@@ -145,6 +141,12 @@
 
     <!-- 우측 속성 패널 -->
     <aside class="right">
+      <div class="right-modebar">
+        <div class="mode-toggle">
+          <button id="tb-2d" class="mode-btn active">2D 도면</button>
+          <button id="tb-3d" class="mode-btn">3D 입체</button>
+        </div>
+      </div>
       <div class="prop-head">속성</div>
       <div id="prop-body" class="prop-body"></div>
     </aside>

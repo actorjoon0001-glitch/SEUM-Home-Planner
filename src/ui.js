@@ -524,12 +524,16 @@ function renderProperties(editor) {
   if (mini) { const tick = () => { if (!mini.isConnected) return; drawMinimap(mini, editor); requestAnimationFrame(tick); }; tick(); }
 }
 
+// 외곽 점은 [x,y] 배열로 저장됨 (구버전 {x,y}도 안전 처리)
+const ptX = (p) => (Array.isArray(p) ? p[0] : p.x);
+const ptY = (p) => (Array.isArray(p) ? p[1] : p.y);
+
 // 다각형 면적 (신발끈 공식, mm²)
 function polyArea(pts) {
   let a = 0;
   for (let i = 0, n = pts.length; i < n; i++) {
     const p = pts[i], q = pts[(i + 1) % n];
-    a += p.x * q.y - q.x * p.y;
+    a += ptX(p) * ptY(q) - ptX(q) * ptY(p);
   }
   return a / 2;
 }
@@ -544,7 +548,7 @@ function drawMinimap(cv, editor) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const acc = (x, y) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); };
   for (const r of d.rooms) { acc(r.x, r.y); acc(r.x + r.w, r.y + r.d); }
-  for (const p of (d.outline && d.outline.paths) || []) for (const pt of p.points || []) acc(pt.x, pt.y);
+  for (const p of (d.outline && d.outline.paths) || []) for (const pt of p.points || []) acc(ptX(pt), ptY(pt));
   if (!isFinite(minX)) {
     ctx.fillStyle = '#9aa4b0'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('도면이 비어 있습니다', W / 2, H / 2); ctx.textAlign = 'start';
@@ -554,14 +558,14 @@ function drawMinimap(cv, editor) {
   const s = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh);
   const ox = (W - bw * s) / 2 - minX * s, oy = (H - bh * s) / 2 - minY * s;
   const X = (x) => x * s + ox, Y = (y) => y * s + oy;
-  // 외곽선
-  ctx.strokeStyle = '#9aa4b0'; ctx.lineWidth = 1.5;
+  // 외곽선 (닫힌 공간은 채움)
   for (const p of (d.outline && d.outline.paths) || []) {
     const pts = p.points || []; if (!pts.length) continue;
-    ctx.beginPath(); ctx.moveTo(X(pts[0].x), Y(pts[0].y));
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(X(pts[i].x), Y(pts[i].y));
+    ctx.beginPath(); ctx.moveTo(X(ptX(pts[0])), Y(ptY(pts[0])));
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(X(ptX(pts[i])), Y(ptY(pts[i])));
     if (p.closed) ctx.closePath();
-    ctx.stroke();
+    if (p.closed) { ctx.fillStyle = 'rgba(217,180,137,0.7)'; ctx.fill(); }  // 강화마루 톤
+    ctx.strokeStyle = '#5b5f66'; ctx.lineWidth = 1.5; ctx.stroke();
   }
   // 방
   for (const r of d.rooms) {

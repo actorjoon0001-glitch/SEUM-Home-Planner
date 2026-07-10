@@ -71,6 +71,8 @@ export class Viewer3D {
   setActive(on) {
     this.active = on;
     if (on) {
+      this._appliedW = 0;                     // 숨김 후 복구 시 캔버스 크기 강제 재적용
+      if (this.dirty) this._needCam = true;   // 도면이 바뀐 뒤 3D 진입 → 카메라 전체 다시 맞춤(빈 화면 방지)
       this._resize();
       if (this.dirty) this.rebuild();
       // 탭 전환 직후 레이아웃이 아직 안 잡혔을 수 있어 다음 프레임에 한 번 더 맞춤

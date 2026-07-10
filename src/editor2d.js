@@ -29,6 +29,8 @@ export class Editor2D {
     this.editingLabel = null;
     this.onLabelEdit = null; // (label, [px,py]) → UI가 입력창 표시
 
+    this.showDims = false;   // 벽 치수 표시(고객용 기본=OFF, 시공용=ON)
+
     this._bind();
     this._resize();
     window.addEventListener('resize', () => { this._resize(); this.draw(); });
@@ -264,7 +266,9 @@ export class Editor2D {
       ctx.fillText(room.name || t.label, x + w / 2, y + h / 2 - big * 0.5);
       ctx.font = `${big * 0.8}px "Noto Sans KR", sans-serif`;
       ctx.fillStyle = '#6b7079';
-      ctx.fillText(area.toFixed(1) + 'm²', x + w / 2, y + h / 2 + big * 0.6);
+      // 고객 친숙 단위(평) 우선 + 시공 치수 토글 시 m² 병기
+      const txt = this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`;
+      ctx.fillText(txt, x + w / 2, y + h / 2 + big * 0.6);
     }
 
     // 치수선 (선택 시)
@@ -829,6 +833,7 @@ export class Editor2D {
   }
   setSnapMode(on) { this.snapMode = !!on; this.draw(); }
   setOrthoMode(on) { this.orthoMode = !!on; this.draw(); }
+  setShowDims(on) { this.showDims = !!on; this.draw(); }
 
   // 외곽 점 스냅: (스냅 모드) 격자 100mm + 직전 점과 거의 수평/수직이면 직각 정렬
   //             (직교 모드) 직전 점 기준 무조건 수평/수직으로 강제
@@ -1273,8 +1278,8 @@ export class Editor2D {
       if (closed) ctx.closePath();
       ctx.stroke();
       ctx.restore();
-      // 각 변 치수
-      for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) this._segLabel(pts[i], pts[(i + 1) % pts.length], '#3a3f44');
+      // 각 변 치수 (고객용은 숨김, '치수' 토글 시 표시)
+      if (this.showDims) for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) this._segLabel(pts[i], pts[(i + 1) % pts.length], '#3a3f44');
       if (closed && pts.length >= 3) this._outlineAreaLabel(pts);
     }
     // 그리는 중(draft) — 형광펜 스타일(두껍고 반투명한 퍼플) + 치수 + 점
@@ -1335,7 +1340,7 @@ export class Editor2D {
     const ctx = this.ctx;
     ctx.save();
     ctx.font = '600 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const txt = `${a.toFixed(1)} m² (${(a / 3.305).toFixed(1)}평)`;
+    const txt = this.showDims ? `${(a / 3.305).toFixed(1)}평 · ${a.toFixed(1)}m²` : `${(a / 3.305).toFixed(1)}평`;
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeText(txt, cx, cy);
     ctx.fillStyle = '#5b4a36'; ctx.fillText(txt, cx, cy);
     ctx.restore();

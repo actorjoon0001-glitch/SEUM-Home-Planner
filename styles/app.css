@@ -238,13 +238,20 @@ body {
   background: rgba(31,34,39,.82); color: #fff; font-size: 11.5px;
   padding: 5px 12px; border-radius: 14px; pointer-events: none; white-space: nowrap;
 }
-/* 하단 바 (줌) */
+/* 하단 바 (치수 토글 + 줌) */
 .stage-bottombar {
   position: absolute; left: 0; right: 0; bottom: 0; height: 48px;
-  display: flex; align-items: center; justify-content: flex-end;
+  display: flex; align-items: center; justify-content: space-between;
   padding: 0 14px; pointer-events: none;
 }
 .stage-bottombar > * { pointer-events: auto; }
+.dim-toggle {
+  background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px;
+  font-family: inherit; font-size: 12.5px; color: var(--muted); cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,.12);
+}
+.dim-toggle:hover { color: var(--ink); border-color: var(--seum-red); }
+.dim-toggle.on { background: var(--seum-red); color: #fff; border-color: var(--seum-red); font-weight: 600; }
 /* 우측 패널 상단 2D/3D 전환 (미니맵 위) */
 .right-modebar { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .right-modebar .mode-toggle { margin: 0; width: 100%; }

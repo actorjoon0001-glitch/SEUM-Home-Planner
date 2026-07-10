@@ -22,6 +22,7 @@ export function buildUI({ editor, viewer, onModeChange }) {
   buildRoomPalette();
   buildFinish();
   buildWallTools(editor);
+  buildLabelTool(editor);
   buildToolbar({ editor, viewer, onModeChange });
   buildCloud();
   store.subscribe(() => renderProperties(editor));
@@ -83,6 +84,7 @@ function buildRoomPalette() {
       : mode === 'wall' ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리됨)'
       : mode === 'measure' ? '두 점을 클릭해 거리를 재세요 (방·외벽 꼭짓점에 자동 스냅). Esc=끝'
       : mode === 'erase' ? '지울 대상을 클릭하세요 — 벽은 선 한 칸씩, 방·가구·창호는 통째로 삭제. Esc=끝'
+      : mode === 'label' ? '도면 위를 클릭해 이름(라벨)을 쓰세요. 드래그로 이동 · 더블클릭 수정 · 삭제 모드로 제거'
       : '선택/이동 모드 — 방을 클릭해 선택하고 드래그로 옮기세요';
   };
   const setMode = (m) => {
@@ -94,6 +96,7 @@ function buildRoomPalette() {
       _editor.setWallEdit(m === 'wall');
       _editor.setMeasure(m === 'measure');
       _editor.setErase(m === 'erase');
+      _editor.setLabelMode(m === 'label');
     }
     const wt = document.getElementById('wall-toolbar');
     if (wt) wt.classList.toggle('hidden', m !== 'outline');
@@ -132,6 +135,7 @@ function buildRoomPalette() {
     ] },
     { label: '일반', items: [
       { ic: '🖱️', label: '선택 / 이동', key: 'Esc', mode: 'select' },
+      { ic: '🏷️', label: '이름표(라벨)', key: 'T', mode: 'label' },
       { ic: '🔗', label: '그룹화', key: 'Shift', soon: true },
     ] },
   ];
@@ -193,6 +197,7 @@ function buildRoomPalette() {
       else if (k === 'f') setMode(mode === 'draw' ? 'select' : 'draw');
       else if (k === 'm') setMode(mode === 'measure' ? 'select' : 'measure');
       else if (k === 'd') setMode(mode === 'erase' ? 'select' : 'erase');
+      else if (k === 't') setMode(mode === 'label' ? 'select' : 'label');
     });
   }
 }
@@ -239,6 +244,34 @@ function buildWallTools(editor) {
     lenBox.style.left = Math.round(st.x + 12) + 'px';
     lenBox.style.top = Math.round(st.y - 12) + 'px';
     if (!typing && document.activeElement !== lenBox) lenBox.value = st.lengthMm;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 텍스트 라벨(방 이름) 입력 상자 관리
+// ---------------------------------------------------------------------------
+function buildLabelTool(editor) {
+  const box = document.getElementById('label-edit');
+  if (!box) return;
+  let active = false;
+  const finish = (commit) => {
+    if (!active) return;
+    active = false;
+    box.classList.add('hidden');
+    if (commit) editor.commitLabel(box.value); else editor.cancelLabel();
+  };
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  box.addEventListener('blur', () => finish(true));   // 포커스 잃으면 저장
+  editor.onLabelEdit = (label, [px, py]) => {
+    active = true;
+    box.value = label.text || '';
+    box.style.left = Math.round(px) + 'px';
+    box.style.top = Math.round(py) + 'px';
+    box.classList.remove('hidden');
+    box.focus(); box.select();
   };
 }
 

@@ -24,6 +24,11 @@ export class Editor2D {
     this.orthoMode = false;  // 직교(90°) 강제
     this.onOutlineChange = null; // 그리는 중 길이 입력 상자 위치/값 콜백
 
+    // 텍스트 라벨(방 이름 등)
+    this.labelMode = false;
+    this.editingLabel = null;
+    this.onLabelEdit = null; // (label, [px,py]) → UI가 입력창 표시
+
     this._bind();
     this._resize();
     window.addEventListener('resize', () => { this._resize(); this.draw(); });
@@ -134,6 +139,9 @@ export class Editor2D {
 
     // 가구
     if (this.showFurniture) for (const f of d.furniture) this._drawFurniture(f);
+
+    // 텍스트 라벨 (방 이름 등)
+    this._drawLabels();
 
     // 축척 보정 중 클릭 점/선 표시
     if (this.calib) this._drawCalib();
@@ -547,7 +555,12 @@ export class Editor2D {
     cv.addEventListener('drop', (e) => this._drop(e));
 
     // 집 외곽(다각형) 그리기: 더블클릭으로 완료, Esc로 취소
-    cv.addEventListener('dblclick', () => { if (this.drawOutline && this.outlineDraft) this._finishOutlinePoly(false); });
+    cv.addEventListener('dblclick', (e) => {
+      if (this.drawOutline && this.outlineDraft) { this._finishOutlinePoly(false); return; }
+      const [px, py] = this._pos(e);
+      const lb = this._hitLabel(px, py);      // 라벨 더블클릭 → 이름 수정
+      if (lb) this._beginLabelEdit(lb);
+    });
     window.addEventListener('keydown', (e) => {
       const tag = e.target && e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return; // 길이 입력 등 폼에선 무시
@@ -598,6 +611,17 @@ export class Editor2D {
       return;
     }
 
+    // 라벨 모드: 기존 라벨 클릭=편집, 빈 곳=새 라벨
+    if (this.labelMode) {
+      const existing = this._hitLabel(px, py);
+      if (existing) this._beginLabelEdit(existing);
+      else {
+        const [mx, my] = this.toMm(px, py);
+        this._beginLabelEdit({ id: 'lb' + Date.now().toString(36), x: this.snap(mx), y: this.snap(my), text: '', _new: true });
+      }
+      return;
+    }
+
     // 삭제(지우개) 모드: 클릭한 대상 삭제 (벽 선은 한 칸)
     if (this.eraseMode) {
       const hit = this._eraseHitTest(px, py);
@@ -628,6 +652,14 @@ export class Editor2D {
     if (this.drawRoom) {
       const [mx, my] = this.toMm(px, py);
       this.drag = { mode: 'drawnew', ax: mx, ay: my, cx: mx, cy: my };
+      return;
+    }
+
+    // 라벨 드래그(선택/이동 모드) — 라벨을 다른 항목보다 먼저 잡음
+    const hitLabel = this._hitLabel(px, py);
+    if (hitLabel) {
+      const [mx, my] = this.toMm(px, py);
+      this.drag = { mode: 'movelabel', label: hitLabel, dx: mx - hitLabel.x, dy: my - hitLabel.y };
       return;
     }
 
@@ -723,7 +755,9 @@ export class Editor2D {
     // 실제 편집이 시작되는 첫 이동에서만 되돌리기 스냅샷 기록
     if (!drag.snapped) { store.snapshot(); drag.snapped = true; }
 
-    if (drag.mode === 'mover') {
+    if (drag.mode === 'movelabel') {
+      store.liveUpdate(() => { drag.label.x = this.snap(mx - drag.dx); drag.label.y = this.snap(my - drag.dy); });
+    } else if (drag.mode === 'mover') {
       const sn = this._snapRoomMove(drag.room, this.snap(mx - drag.dx), this.snap(my - drag.dy));
       store.liveUpdate(() => { drag.room.x = sn.x; drag.room.y = sn.y; });
     } else if (drag.mode === 'movef') {
@@ -948,8 +982,9 @@ export class Editor2D {
     return best;
   }
 
-  // 삭제 대상 히트테스트 — 가구 > 창호 > 벽 선 > 방
+  // 삭제 대상 히트테스트 — 라벨 > 가구 > 창호 > 벽 선 > 방
   _eraseHitTest(px, py) {
+    const lb = this._hitLabel(px, py); if (lb) return { kind: 'label', id: lb.id };
     const f = this._hitFurniture(px, py); if (f) return { kind: 'furniture', id: f.id };
     const o = this._hitOpening(px, py); if (o) return { kind: 'opening', id: o.id };
     const edge = this._nearestOutlineEdge(px, py); if (edge) return { kind: 'edge', ...edge };
@@ -987,6 +1022,7 @@ export class Editor2D {
       if (hit.kind === 'room') d.rooms = d.rooms.filter((r) => r.id !== hit.id);
       else if (hit.kind === 'furniture') d.furniture = d.furniture.filter((f) => f.id !== hit.id);
       else if (hit.kind === 'opening') d.openings = (d.openings || []).filter((o) => o.id !== hit.id);
+      else if (hit.kind === 'label') d.labels = (d.labels || []).filter((l) => l.id !== hit.id);
     });
     if (store.selectedRoom === hit.id || store.selectedFurniture === hit.id || store.selectedOpening === hit.id) store.select(null, null);
   }
@@ -1009,9 +1045,84 @@ export class Editor2D {
     } else if (h.kind === 'room') {
       const r = d.rooms.find((x) => x.id === h.id);
       if (r) { const [x, y] = this.toPx(r.x, r.y); ctx.lineWidth = 2; ctx.fillRect(x, y, r.w * this.scale, r.d * this.scale); ctx.strokeRect(x, y, r.w * this.scale, r.d * this.scale); }
+    } else if (h.kind === 'label') {
+      const lb = (d.labels || []).find((x) => x.id === h.id);
+      if (lb) { ctx.font = '600 13px sans-serif'; const w = ctx.measureText(lb.text || '라벨').width + 14; const [x, y] = this.toPx(lb.x, lb.y); ctx.lineWidth = 2; this._roundRect(x - w / 2, y - 13, w, 26, 7); ctx.fill(); ctx.stroke(); }
     }
     ctx.restore();
   }
+
+  // ---- 텍스트 라벨 (방 이름 등) ----
+  setLabelMode(on) {
+    this.labelMode = !!on;
+    if (on) { this.drawRoom = null; this.drawOutline = false; this.wallEdit = false; this.measureMode = false; this.eraseMode = false; this.calib = null; this.outlineDraft = null; }
+    this.canvas.style.cursor = on ? 'text' : 'default';
+    this.draw();
+  }
+
+  _roundRect(x, y, w, h, r) {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  _hitLabel(px, py) {
+    const ctx = this.ctx;
+    ctx.save(); ctx.font = '600 13px sans-serif';
+    let hit = null;
+    const labels = store.design.labels || [];
+    for (let i = labels.length - 1; i >= 0; i--) {
+      const lb = labels[i];
+      const [x, y] = this.toPx(lb.x, lb.y);
+      const w = ctx.measureText(lb.text || '라벨').width + 14;
+      if (px >= x - w / 2 && px <= x + w / 2 && py >= y - 13 && py <= y + 13) { hit = lb; break; }
+    }
+    ctx.restore();
+    return hit;
+  }
+
+  _drawLabels() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = '600 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const lb of store.design.labels || []) {
+      if (this.editingLabel && lb.id === this.editingLabel.id) continue; // 편집 중엔 입력창이 대신
+      const [x, y] = this.toPx(lb.x, lb.y);
+      const w = ctx.measureText(lb.text).width + 14;
+      ctx.fillStyle = 'rgba(255,255,255,0.82)'; ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 1;
+      this._roundRect(x - w / 2, y - 13, w, 26, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#20242a'; ctx.fillText(lb.text, x, y);
+    }
+    ctx.restore();
+  }
+
+  _beginLabelEdit(label) {
+    this.editingLabel = label;
+    this.draw();
+    if (this.onLabelEdit) this.onLabelEdit(label, this.toPx(label.x, label.y));
+  }
+
+  commitLabel(text) {
+    const lb = this.editingLabel; if (!lb) return;
+    const t = (text || '').trim();
+    store.commit((d) => {
+      d.labels = d.labels || [];
+      if (lb._new) { if (t) d.labels.push({ id: lb.id, x: lb.x, y: lb.y, text: t }); }
+      else {
+        const ex = d.labels.find((l) => l.id === lb.id);
+        if (ex) { if (t) ex.text = t; else d.labels = d.labels.filter((l) => l.id !== lb.id); }
+      }
+    });
+    this.editingLabel = null;
+    this.draw();
+  }
+
+  cancelLabel() { this.editingLabel = null; this.draw(); }
 
   // 측정 점 스냅 — 방/외곽 꼭짓점에 붙거나 격자(100mm)
   _measureSnap(px, py) {

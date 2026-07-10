@@ -23,7 +23,7 @@ body {
   background: #1f2227; color: #fff;
   flex: 0 0 auto;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; flex: 0 0 auto; white-space: nowrap; }
 .logo {
   font-weight: 800; font-size: 22px; letter-spacing: 2px;
   color: #fff; padding: 2px 8px; background: var(--seum-red); border-radius: 4px;
@@ -55,11 +55,18 @@ body {
 .auth-btn:hover { filter: brightness(1.06); }
 .auth-btn:disabled { opacity: .6; cursor: default; }
 .auth-err { min-height: 16px; margin: 0; font-size: 12.5px; color: var(--seum-red); line-height: 1.5; }
-.tb-group { display: flex; align-items: center; gap: 4px; margin-left: 8px; flex-wrap: wrap; }
+/* 작은 화면: 줄바꿈 대신 가로 스크롤 → 버튼 글씨가 잘리지 않음 */
+.tb-group {
+  display: flex; align-items: center; gap: 4px; margin-left: 8px;
+  flex-wrap: nowrap; flex: 1 1 auto; min-width: 0; overflow-x: auto;
+  scrollbar-width: thin; scrollbar-color: #4a4f57 transparent;
+}
+.tb-group::-webkit-scrollbar { height: 6px; }
+.tb-group::-webkit-scrollbar-thumb { background: #4a4f57; border-radius: 3px; }
 .tb-btn {
   background: #2c3036; color: #d7dbe0; border: 1px solid #3a3f47;
   border-radius: 6px; padding: 6px 10px; font-size: 12.5px; cursor: pointer;
-  font-family: inherit;
+  font-family: inherit; white-space: nowrap; flex: 0 0 auto;
 }
 .tb-btn:hover { background: #3a3f47; color: #fff; }
 /* 되돌리기/다시 — 나이 드신 분들도 쉽게 누르도록 크고 또렷하게 */
@@ -69,7 +76,9 @@ body {
 }
 .tb-btn.tb-big:hover { background: #fff; border-color: var(--seum-red); color: var(--seum-red); }
 .tb-btn.tb-big:disabled { background: #34383f; color: #6b7079; border-color: #3a3f47; cursor: default; opacity: .6; }
-.sep { width: 1px; height: 22px; background: #3a3f47; margin: 0 4px; }
+.sep { width: 1px; height: 22px; background: #3a3f47; margin: 0 4px; flex: 0 0 auto; }
+/* 아주 좁은 화면에선 부제목 숨겨 공간 확보 */
+@media (max-width: 820px) { .brand-sub { display: none; } }
 .mode-toggle { margin-left: auto; display: flex; background: #14161a; border-radius: 8px; padding: 3px; }
 .mode-btn {
   border: 0; background: transparent; color: #aeb4bd; font-family: inherit;

@@ -823,6 +823,10 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('zoom-out').onclick = () => zoom(1 / 1.15);
   $('zoom-fit').onclick = () => { editor.fit(); viewer._needCam = true; viewer.dirty = true; if (viewer.active) viewer.resetCamera(); };
 
+  // 치수 표시 토글 (고객용 기본 OFF ↔ 시공용 ON)
+  const dimBtn = $('tb-dims');
+  if (dimBtn) dimBtn.onclick = () => { const on = !editor.showDims; editor.setShowDims(on); dimBtn.classList.toggle('on', on); };
+
   $('tb-fit').onclick = () => { editor.fit(); viewer._needCam = true; viewer.dirty = true; };
   $('tb-undo').onclick = () => store.undo();
   $('tb-redo').onclick = () => store.redo();

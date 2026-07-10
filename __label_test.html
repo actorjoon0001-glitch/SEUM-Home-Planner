@@ -1,0 +1,25 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body><canvas id="c" width="600" height="600" style="position:absolute;left:0;top:0"></canvas>
+<script type="module">
+import { store } from '/src/store.js';
+import { Editor2D } from '/src/editor2d.js';
+let L=''; const log=(m)=>{L+=m+'\n';window.__log=L;};
+store.commit((d)=>{ d.rooms=[];d.furniture=[];d.openings=[];d.labels=[]; d.outline={paths:[]}; });
+const ed = new Editor2D(document.getElementById('c'));
+ed.scale=0.1; ed.ox=50; ed.oy=50; ed.cssW=600; ed.cssH=600;
+let editCall=null;
+ed.onLabelEdit = (label,pos) => { editCall={id:label.id,isNew:!!label._new,pos}; };
+ed.setLabelMode(true);
+log('labelMode='+ed.labelMode);
+const evt=(x,y)=>({clientX:x, clientY:y, button:0, altKey:false, target:document.getElementById('c')});
+ed._down(evt(250,150));                 // 빈 곳 클릭 → 새 라벨 편집 시작
+log('editStarted new='+(editCall&&editCall.isNew)+' pos='+JSON.stringify(editCall&&editCall.pos));
+ed.commitLabel('거실');                  // 이름 확정
+log('labels after commit='+JSON.stringify(store.design.labels));
+const hit=ed._hitLabel(250,150); log('hitLabel='+JSON.stringify(hit&&hit.text));
+const er=ed._eraseHitTest(250,150); log('eraseHit='+JSON.stringify(er));
+// 드래그 이동
+ed.setLabelMode(false);
+ed._down(evt(250,150)); log('dragMode='+(ed.drag&&ed.drag.mode));
+log('DONE');
+</script></body></html>

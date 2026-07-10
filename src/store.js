@@ -117,7 +117,7 @@ class Store {
   }
   // design 을 주면 그 도면을, 안 주면 현재 도면을 내 기본 도면으로 등록
   // keepUnderlay: PDF/이미지 기반 '밑그림 도면'은 배경을 살려둠
-  addLocalTemplate({ title, productType, design, keepUnderlay = false } = {}) {
+  addLocalTemplate({ title, productType, showroom, design, keepUnderlay = false } = {}) {
     const list = this.localTemplates();
     const src = design ? normalize(JSON.parse(JSON.stringify(design))) : JSON.parse(JSON.stringify(this.design));
     if (!Array.isArray(src.rooms)) throw new Error('도면 형식이 아닙니다.');
@@ -125,7 +125,7 @@ class Store {
     src.productType = productType || src.productType || '';
     const name = (title || src.name || '내 기본 도면').trim();
     src.name = name;
-    const entry = { id: 't' + Date.now().toString(36) + Math.floor(Math.random() * 1000), title: name, productType: src.productType, savedAt: Date.now(), data: src };
+    const entry = { id: 't' + Date.now().toString(36) + Math.floor(Math.random() * 1000), title: name, productType: src.productType, showroom: (showroom || '').trim(), savedAt: Date.now(), data: src };
     list.push(entry);
     localStorage.setItem(LS_TPL, JSON.stringify(list));
     return entry;

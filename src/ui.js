@@ -949,16 +949,26 @@ async function openTemplateDialog() {
   const builtin = listTemplates();
   const ptypeOpts = PRODUCT_TYPES.map((p) =>
     `<option value="${esc(p)}"${(store.design.productType || '') === p ? ' selected' : ''}>${p}</option>`).join('');
-  body.innerHTML = `<p class="m-sub">기본 도면을 선택하면 현재 화면에 불러와 바로 수정할 수 있습니다.</p>
+  // 전시장 목록 (내장 + 내 저장에서 수집) → 입력 자동완성
+  const collectShowrooms = () => {
+    const set = new Set();
+    for (const t of builtin) if (t.showroom) set.add(t.showroom);
+    for (const t of store.localTemplates()) if (t.showroom) set.add(t.showroom);
+    return [...set].sort();
+  };
+  const srOpts = collectShowrooms().map((s) => `<option value="${esc(s)}">`).join('');
+  body.innerHTML = `<p class="m-sub">전시장별로 기본 도면을 저장·정리합니다. 현재 2D 도면을 전시장을 지정해 1개씩 추가하세요.</p>
     <div class="tpl-add">
       <div class="tpl-add-btns">
-        <button class="mini primary" id="tpl-add-btn">➕ 현재 도면을 기본 도면으로 추가</button>
+        <button class="mini primary" id="tpl-add-btn">➕ 현재 도면을 기본 도면으로 저장</button>
         <button class="mini" id="tpl-file-btn">📁 파일 등록 (.json · PDF · 이미지 · DXF)</button>
       </div>
       <div class="tpl-add-form" id="tpl-add-form" style="display:none">
-        <input id="tpl-add-title" placeholder="기본 도면 이름" value="${esc(store.design.name || '')}">
+        <input id="tpl-add-title" placeholder="도면 이름" value="${esc(store.design.name || '')}">
+        <input id="tpl-add-showroom" placeholder="전시장 (예: 경기, 제천)" list="tpl-sr-list" autocomplete="off">
+        <datalist id="tpl-sr-list">${srOpts}</datalist>
         <select id="tpl-add-ptype">${ptypeOpts}</select>
-        <button class="mini primary" id="tpl-add-save">추가</button>
+        <button class="mini primary" id="tpl-add-save">저장</button>
         <button class="mini" id="tpl-add-cancel">취소</button>
       </div>
     </div>
@@ -977,17 +987,18 @@ async function openTemplateDialog() {
   let cloudTpls = [];
   let filter = '';
 
-  const matches = (cat) => !filter || cat === filter;
+  // 전시장 기준 필터
+  const matches = (sr) => !filter || (sr || '') === filter;
 
   const renderBuiltin = () => {
     const grid = body.querySelector('#tpl-builtin');
     grid.innerHTML = '';
     for (const t of builtin) {
-      if (!matches(t.category)) continue;
+      if (!matches(t.showroom)) continue;
       const card = document.createElement('button');
       card.className = 'tpl-card';
       card.innerHTML = `<div class="tpl-ico">${PRODUCT_ICON[t.category] || '🏠'}</div><div class="tpl-name">${esc(t.title)}</div>
-        <div class="tpl-tags">${t.tags.map((x) => `#${esc(x)}`).join(' ')}</div>`;
+        <div class="tpl-tags">${t.showroom ? `🏢 ${esc(t.showroom)} · ` : ''}${esc(t.category || '주택')}</div>`;
       card.onclick = () => {
         if (!confirm(`'${t.title}' 기본 도면을 불러올까요? 현재 작업은 사라집니다.`)) return;
         const d = instantiateTemplate(t.id);
@@ -1000,18 +1011,19 @@ async function openTemplateDialog() {
   const renderLocal = () => {
     const wrap = body.querySelector('#tpl-local-wrap');
     const grid = body.querySelector('#tpl-local');
-    const shown = store.localTemplates().filter((t) => matches((t.productType || '').trim()));
+    const shown = store.localTemplates().filter((t) => matches(t.showroom || ''));
     wrap.style.display = shown.length ? '' : 'none';
     grid.innerHTML = '';
     for (const t of shown) {
       const ptype = (t.productType || '').trim();
+      const sr = (t.showroom || '').trim();
       const thumb = t.data && t.data.underlay && t.data.underlay.src;
       const card = document.createElement('div');
       card.className = 'tpl-card';
       card.innerHTML = `<button class="tpl-del" title="삭제">✕</button>
         <div class="tpl-thumb">${thumb ? `<img src="${thumb}" alt="">` : `<span class="tpl-ico">${PRODUCT_ICON[ptype] || '📌'}</span>`}</div>
         <div class="tpl-name">${esc(t.title)}</div>
-        <div class="tpl-tags">${thumb ? '밑그림 도면' : '내 기본 도면'}${ptype ? ` · ${esc(ptype)}` : ''}</div>`;
+        <div class="tpl-tags">${sr ? `🏢 ${esc(sr)}` : (thumb ? '밑그림 도면' : '내 기본 도면')}${ptype ? ` · ${esc(ptype)}` : ''}</div>`;
       card.onclick = () => {
         if (!confirm(`'${t.title}' 기본 도면을 불러올까요? 현재 작업은 사라집니다.`)) return;
         store.loadInto(t.data); dlg.close();
@@ -1030,7 +1042,7 @@ async function openTemplateDialog() {
   const renderCloud = () => {
     const wrap = body.querySelector('#tpl-cloud-wrap');
     const cg = body.querySelector('#tpl-cloud');
-    const shown = cloudTpls.filter((t) => matches((t.data?.productType || '').trim()));
+    const shown = cloudTpls.filter((t) => matches((t.data?.showroom || '').trim()));
     wrap.style.display = shown.length ? '' : 'none';
     cg.innerHTML = '';
     for (const t of shown) {
@@ -1049,9 +1061,9 @@ async function openTemplateDialog() {
 
   const renderFilter = () => {
     const bar = body.querySelector('#tpl-filter');
-    const cats = ['', ...PRODUCT_TYPES];
+    const cats = ['', ...collectShowrooms()];
     bar.innerHTML = cats.map((c) =>
-      `<button class="chip${filter === c ? ' on' : ''}" data-c="${esc(c)}">${c ? `${PRODUCT_ICON[c] || ''} ${esc(c)}` : '전체'}</button>`
+      `<button class="chip${filter === c ? ' on' : ''}" data-c="${esc(c)}">${c ? `🏢 ${esc(c)}` : '전체'}</button>`
     ).join('');
     bar.querySelectorAll('.chip').forEach((ch) => ch.onclick = () => {
       filter = ch.dataset.c;
@@ -1066,12 +1078,15 @@ async function openTemplateDialog() {
   body.querySelector('#tpl-add-save').onclick = () => {
     const title = body.querySelector('#tpl-add-title').value.trim();
     const productType = body.querySelector('#tpl-add-ptype').value;
+    const showroom = body.querySelector('#tpl-add-showroom').value.trim();
     if (!title) { body.querySelector('#tpl-add-title').focus(); return; }
     try {
-      store.addLocalTemplate({ title, productType });
+      store.addLocalTemplate({ title, productType, showroom });
       addForm.style.display = 'none';
-      filter = ''; renderFilter(); renderLocal();
-      flash(`'${title}' 기본 도면에 추가됨`);
+      // 새 전시장이면 자동완성 목록도 갱신
+      body.querySelector('#tpl-sr-list').innerHTML = collectShowrooms().map((s) => `<option value="${esc(s)}">`).join('');
+      filter = showroom || ''; renderFilter(); renderLocal(); renderBuiltin();
+      flash(`'${title}' 저장됨${showroom ? ` · 🏢 ${showroom}` : ''}`);
     } catch (e) { alert('저장 공간이 부족합니다. 기존 내 기본 도면을 정리해 주세요.'); }
   };
   // 기존에 가진 도면 파일을 골라 내 기본 도면으로 등록 (여러 개 가능)

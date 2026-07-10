@@ -33,7 +33,8 @@ export function buildUI({ editor, viewer, onModeChange }) {
 // ---------------------------------------------------------------------------
 // 좌측 아이콘 레일 — 도면 / 창호 / 가구 패널 전환
 // ---------------------------------------------------------------------------
-const SECTIONS = { tools: 'sec-tools', furn: 'sec-furn', finish: 'sec-finish' };
+// 창호(sec-win)는 도구 '개구부'로만 진입 (제품=가구·가전과 분리)
+const SECTIONS = { tools: 'sec-tools', furn: 'sec-furn', win: 'sec-win', finish: 'sec-finish' };
 // 좌측 패널 전환 (레일 버튼이 없는 섹션도 호출 가능)
 function showSection(sec) {
   const rail = document.getElementById('left-rail');
@@ -41,13 +42,6 @@ function showSection(sec) {
   for (const [k, id] of Object.entries(SECTIONS)) {
     const el = document.getElementById(id); if (el) el.classList.toggle('hidden', k !== sec);
   }
-}
-// 제품 탭 안의 서브탭(가구·가전 / 창호) 전환
-function showProduct(sub) {
-  document.querySelectorAll('#prod-subtabs .sub-tab').forEach((b) => b.classList.toggle('active', b.dataset.prod === sub));
-  const f = document.getElementById('prod-furn'), w = document.getElementById('prod-win');
-  if (f) f.classList.toggle('hidden', sub !== 'furn');
-  if (w) w.classList.toggle('hidden', sub !== 'win');
 }
 function buildLeftRail() {
   const rail = document.getElementById('left-rail');
@@ -58,7 +52,6 @@ function buildLeftRail() {
       else if (btn.dataset.soon) flash(`'${btn.dataset.soon}'은(는) 곧 추가됩니다`);
     };
   });
-  document.querySelectorAll('#prod-subtabs .sub-tab').forEach((b) => b.onclick = () => showProduct(b.dataset.prod));
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +98,7 @@ function buildRoomPalette() {
 
   // --- 액션들 ---
   const soon = (name) => flash(`'${name}'은(는) 곧 추가됩니다`);
-  const openWindows = () => { showSection('furn'); showProduct('win'); };
+  const openWindows = () => showSection('win');
 
   // Archisketch 사이드바 구조 (그룹별 도구)
   const GROUPS = [

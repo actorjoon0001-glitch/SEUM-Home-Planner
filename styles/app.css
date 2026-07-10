@@ -110,7 +110,6 @@ body {
 .sub-tab { flex: 1 1 0; border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 6px 4px; font-family: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
 .sub-tab:hover { border-color: var(--seum-red); color: var(--ink); }
 .sub-tab.active { background: var(--seum-red); color: #fff; border-color: var(--seum-red); font-weight: 600; }
-#prod-furn.hidden, #prod-win.hidden { display: none; }   /* 제품 서브탭 전환(가구 ↔ 창호) */
 .fin-search { margin-bottom: 10px; }
 .fin-search input { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 13px; }
 .fin-search input:focus { outline: none; border-color: var(--seum-red); }

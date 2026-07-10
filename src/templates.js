@@ -157,11 +157,59 @@ const T = [
       ],
     },
   },
+  {
+    // ㈜세움 디자인하우징 실도면 1층 평면도 (경기도 현장, 9,000×7,000) — 1차 초안, 방별로 다듬는 중
+    id: 'seum-gg-9x7',
+    title: '세움 경기 단독주택 (9,000×7,000) 1층',
+    category: '주택',
+    showroom: '경기',
+    tags: ['세움도면', '경기', '단독주택', '9000x7000'],
+    base: {
+      name: '세움 경기 단독주택 (9,000×7,000)',
+      productType: '주택',
+      ceilingHeight: 2400,
+      // 벽체 280t 메탈사이딩 / 지붕 260t 징크판넬(평지붕)
+      exterior: { material: 'metal', color: '#3d4651' },
+      roof: { type: 'flat', color: '#4a4a4a' },
+      rooms: [
+        // 후면(북) 밴드 — 다용도실 · 주방 · 욕실
+        { key: 'util', type: 'utility',  name: '다용도실', x: 0,     y: 0,    w: 2200, d: 2400 },
+        { key: 'kit',  type: 'kitchen',  name: '주방',     x: 2200,  y: 0,    w: 4600, d: 2400, open: ['s'] },
+        { key: 'bath', type: 'bath',     name: '욕실',     x: 6800,  y: 0,    w: 2200, d: 2400 },
+        // 중앙 밴드 — 거실 · 현관
+        { key: 'liv',  type: 'living',   name: '거실',     x: 0,     y: 2400, w: 6800, d: 1400, open: ['n'] },
+        { key: 'ent',  type: 'entrance', name: '현관',     x: 6800,  y: 2400, w: 2200, d: 1400 },
+        // 전면(남) 밴드 — 침실 3
+        { key: 'bed1', type: 'bedroom',  name: '침실1',    x: 0,     y: 3800, w: 2600, d: 3200 },
+        { key: 'bed2', type: 'bedroom',  name: '침실2',    x: 2600,  y: 3800, w: 3400, d: 3200 },
+        { key: 'bed3', type: 'bedroom',  name: '침실3',    x: 6000,  y: 3800, w: 3000, d: 3200 },
+        // 포치(7평) · 데크(4평)
+        { key: 'porch',type: 'porch',    name: '포치',     x: 0,     y: 7000, w: 9000, d: 2500 },
+        { key: 'deck', type: 'deck',     name: '데크',     x: -2000, y: 2400, w: 2000, d: 4600 },
+      ],
+      openings: [
+        { roomKey: 'kit',  side: 'n', pos: 800,  winType: 'double',    w: 1000, h: 900,  sill: 1000 },
+        { roomKey: 'kit',  side: 'n', pos: 2600, winType: 'double',    w: 1500, h: 600,  sill: 1300 },
+        { roomKey: 'bath', side: 'n', pos: 700,  winType: 'double',    w: 600,  h: 500,  sill: 1400 },
+        { roomKey: 'bath', side: 's', pos: 1100, winType: 'swingDoor', w: 700,  h: 2000 },
+        { roomKey: 'util', side: 's', pos: 1100, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'ent',  side: 'w', pos: 700,  winType: 'slideDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed1', side: 'n', pos: 1300, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed2', side: 'n', pos: 1700, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed3', side: 'n', pos: 1500, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed1', side: 's', pos: 1300, winType: 'double',    w: 1500, h: 1000, sill: 900 },
+        { roomKey: 'bed2', side: 's', pos: 1700, winType: 'double',    w: 2000, h: 2100, sill: 0 },
+        { roomKey: 'bed3', side: 's', pos: 1500, winType: 'fixed',     w: 1500, h: 1000, sill: 900 },
+        { roomKey: 'liv',  side: 'w', pos: 700,  winType: 'double',    w: 1500, h: 1000, sill: 900 },
+      ],
+      furniture: [],
+    },
+  },
 ];
 
 // 템플릿 목록 (썸네일/표시용 메타)
 export function listTemplates() {
-  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택' }));
+  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택', showroom: t.showroom || null }));
 }
 
 // 템플릿을 실제 편집 가능한 도면 객체로 인스턴스화 (새 id 부여)
@@ -180,7 +228,7 @@ export function instantiateTemplate(id) {
   const openings = (b.openings || []).map((o) => ({
     id: 'o' + Math.random().toString(36).slice(2, 9),
     roomId: keyToId[o.roomKey], side: o.side, pos: o.pos, winType: o.winType,
-    w: undefined, h: undefined, sill: undefined, color: '#4a5560',
+    w: o.w, h: o.h, sill: o.sill, color: '#4a5560',   // 템플릿에 명시하면 실제 치수 사용
   })).map((o) => fillWin(o));
   const furniture = (b.furniture || []).map((f) => ({ id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 }));
   return normalize({
@@ -193,8 +241,8 @@ export function instantiateTemplate(id) {
   });
 }
 
-// 창호 기본 치수 채우기 (WINDOW_TYPES 참조)
+// 창호 기본 치수 채우기 (템플릿에 명시한 w/h/sill 우선, 없으면 WINDOW_TYPES 기본값)
 function fillWin(o) {
   const t = WINDOW_TYPES[o.winType] || WINDOW_TYPES.double;
-  return { ...o, w: t.w, h: t.h, sill: t.sill };
+  return { ...o, w: o.w != null ? o.w : t.w, h: o.h != null ? o.h : t.h, sill: o.sill != null ? o.sill : t.sill };
 }

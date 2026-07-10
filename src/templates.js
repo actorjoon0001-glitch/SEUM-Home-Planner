@@ -158,49 +158,56 @@ const T = [
     },
   },
   {
-    // ㈜세움 디자인하우징 실도면 1층 평면도 (경기도 현장, 9,000×7,000) — 1차 초안, 방별로 다듬는 중
-    id: 'seum-gg-9x7',
-    title: '세움 경기 단독주택 (9,000×7,000) 1층',
+    // ㈜세움 디자인하우징 실시공도면 1층 평면도 (충북 제천 봉양, 이윤자님, 계약 25.04.26)
+    // 외곽 9,000×6,000(벽 280t) + 썬룸 9,000×2,500 + 데크 1,500×8,500(우측)
+    // ※ 사진 판독 기반 v2 — 시공 전달 전 치수 검증 필요
+    id: 'seum-jc-9x6',
+    title: '세움 제천 봉양 단독주택 (9,000×6,000) 1층',
     category: '주택',
-    showroom: '경기',
-    tags: ['세움도면', '경기', '단독주택', '9000x7000'],
+    showroom: '제천',
+    tags: ['세움도면', '제천', '봉양', '단독주택', '9000x6000', '썬룸'],
     base: {
-      name: '세움 경기 단독주택 (9,000×7,000)',
+      name: '세움 제천 봉양 (9,000×6,000)',
       productType: '주택',
       ceilingHeight: 2400,
-      // 벽체 280t 메탈사이딩 / 지붕 260t 징크판넬(평지붕)
+      // 벽체 280t 메탈사이딩(VS-04-010) / 지붕 T260 징크판넬 처마 400
       exterior: { material: 'metal', color: '#3d4651' },
       roof: { type: 'flat', color: '#4a4a4a' },
       rooms: [
-        // 후면(북) 밴드 — 다용도실 · 주방 · 욕실
-        { key: 'util', type: 'utility',  name: '다용도실', x: 0,     y: 0,    w: 2200, d: 2400 },
-        { key: 'kit',  type: 'kitchen',  name: '주방',     x: 2200,  y: 0,    w: 4600, d: 2400, open: ['s'] },
-        { key: 'bath', type: 'bath',     name: '욕실',     x: 6800,  y: 0,    w: 2200, d: 2400 },
+        // 후면(북) 밴드 — 욕실 · 주방/다이닝 · 세탁실
+        { key: 'bath', type: 'bath',     name: '욕실',       x: 0,    y: 0,    w: 1600, d: 2000 },
+        { key: 'kit',  type: 'kitchen',  name: '주방·다이닝', x: 1600, y: 0,    w: 4400, d: 2000, open: ['s'] },
+        { key: 'util', type: 'utility',  name: '세탁실',      x: 6000, y: 0,    w: 3000, d: 2000 },
         // 중앙 밴드 — 거실 · 현관
-        { key: 'liv',  type: 'living',   name: '거실',     x: 0,     y: 2400, w: 6800, d: 1400, open: ['n'] },
-        { key: 'ent',  type: 'entrance', name: '현관',     x: 6800,  y: 2400, w: 2200, d: 1400 },
+        { key: 'liv',  type: 'living',   name: '거실',       x: 0,    y: 2000, w: 6000, d: 1400, open: ['n'] },
+        { key: 'ent',  type: 'entrance', name: '현관',       x: 6000, y: 2000, w: 3000, d: 1400 },
         // 전면(남) 밴드 — 침실 3
-        { key: 'bed1', type: 'bedroom',  name: '침실1',    x: 0,     y: 3800, w: 2600, d: 3200 },
-        { key: 'bed2', type: 'bedroom',  name: '침실2',    x: 2600,  y: 3800, w: 3400, d: 3200 },
-        { key: 'bed3', type: 'bedroom',  name: '침실3',    x: 6000,  y: 3800, w: 3000, d: 3200 },
-        // 포치(7평) · 데크(4평)
-        { key: 'porch',type: 'porch',    name: '포치',     x: 0,     y: 7000, w: 9000, d: 2500 },
-        { key: 'deck', type: 'deck',     name: '데크',     x: -2000, y: 2400, w: 2000, d: 4600 },
+        { key: 'bed1', type: 'bedroom',  name: '침실1',      x: 0,    y: 3400, w: 2900, d: 2600 },
+        { key: 'bed2', type: 'bedroom',  name: '침실2',      x: 2900, y: 3400, w: 3200, d: 2600 },
+        { key: 'bed3', type: 'bedroom',  name: '침실3',      x: 6100, y: 3400, w: 2900, d: 2600 },
+        // 썬룸(하부, 난방없음) · 데크(우측)
+        { key: 'sun',  type: 'sunroom',  name: '썬룸',       x: 0,    y: 6000, w: 9000, d: 2500 },
+        { key: 'deck', type: 'deck',     name: '데크',       x: 9000, y: 0,    w: 1500, d: 8500 },
       ],
       openings: [
-        { roomKey: 'kit',  side: 'n', pos: 800,  winType: 'double',    w: 1000, h: 900,  sill: 1000 },
-        { roomKey: 'kit',  side: 'n', pos: 2600, winType: 'double',    w: 1500, h: 600,  sill: 1300 },
-        { roomKey: 'bath', side: 'n', pos: 700,  winType: 'double',    w: 600,  h: 500,  sill: 1400 },
-        { roomKey: 'bath', side: 's', pos: 1100, winType: 'swingDoor', w: 700,  h: 2000 },
-        { roomKey: 'util', side: 's', pos: 1100, winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'ent',  side: 'w', pos: 700,  winType: 'slideDoor', w: 900,  h: 2100 },
-        { roomKey: 'bed1', side: 'n', pos: 1300, winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'bed2', side: 'n', pos: 1700, winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'bed3', side: 'n', pos: 1500, winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'bed1', side: 's', pos: 1300, winType: 'double',    w: 1500, h: 1000, sill: 900 },
-        { roomKey: 'bed2', side: 's', pos: 1700, winType: 'double',    w: 2000, h: 2100, sill: 0 },
-        { roomKey: 'bed3', side: 's', pos: 1500, winType: 'fixed',     w: 1500, h: 1000, sill: 900 },
-        { roomKey: 'liv',  side: 'w', pos: 700,  winType: 'double',    w: 1500, h: 1000, sill: 900 },
+        // 후면 창/문
+        { roomKey: 'bath', side: 'n', pos: 800,  winType: 'double',    w: 600,  h: 1600, sill: 600 },
+        { roomKey: 'kit',  side: 'n', pos: 1000, winType: 'double',    w: 1800, h: 700,  sill: 1100 },
+        { roomKey: 'util', side: 'n', pos: 800,  winType: 'double',    w: 1000, h: 900,  sill: 1100 },
+        { roomKey: 'util', side: 's', pos: 2400, winType: 'swingDoor', w: 900,  h: 2000 },
+        // 현관 중문(3연동) · 침실 문(3틀)
+        { roomKey: 'ent',  side: 'w', pos: 700,  winType: 'slideDoor', w: 1350, h: 2100 },
+        { roomKey: 'bed1', side: 'n', pos: 1450, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed2', side: 'n', pos: 1600, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed3', side: 'n', pos: 1450, winType: 'swingDoor', w: 900,  h: 2100 },
+        // 침실 → 썬룸측 창 (거실 앞 포함)
+        { roomKey: 'bed1', side: 's', pos: 1450, winType: 'double',    w: 1500, h: 1000, sill: 1100 },
+        { roomKey: 'bed2', side: 's', pos: 1600, winType: 'double',    w: 2000, h: 2100, sill: 0 },
+        { roomKey: 'bed3', side: 's', pos: 1450, winType: 'double',    w: 1500, h: 1000, sill: 1100 },
+        // 썬룸 전면 대형창 (상부미닫이+하부픽스)
+        { roomKey: 'sun',  side: 's', pos: 1450, winType: 'sliding',   w: 2700, h: 2200, sill: 0 },
+        { roomKey: 'sun',  side: 's', pos: 4500, winType: 'sliding',   w: 3200, h: 2200, sill: 0 },
+        { roomKey: 'sun',  side: 's', pos: 7550, winType: 'sliding',   w: 2700, h: 2200, sill: 0 },
       ],
       furniture: [],
     },

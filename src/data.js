@@ -98,10 +98,16 @@ export const WINDOW_TYPES = {
   casement:  { label: '여닫이창',       w: 900,  h: 1300, sill: 900, panes: 1, slide: false, glass: true },
   casement2: { label: '여닫이창 2짝',   w: 1200, h: 1300, sill: 900, panes: 2, slide: false, glass: true },
   fixed:     { label: '고정창(픽스)',   w: 1200, h: 1500, sill: 700, panes: 1, slide: false, glass: true },
-  folding:   { label: '폴딩도어',       w: 3600, h: 2200, sill: 0,   panes: 4, slide: true,  glass: true, fold: true },
   foldWin:   { label: '폴딩창',         w: 2400, h: 1200, sill: 950, panes: 4, slide: true,  glass: true, fold: true },
   balcony:   { label: '발코니 대형창',  w: 2700, h: 2200, sill: 50,  panes: 3, slide: true,  glass: true },
+  // --- 문 ---
   door:      { label: '현관문',         w: 1000, h: 2100, sill: 0,   panes: 1, slide: false, glass: false },
+  swingDoor: { label: '여닫이문',       w: 900,  h: 2100, sill: 0,   panes: 1, slide: false, glass: false },
+  doubleDoor:{ label: '양개문',         w: 1500, h: 2100, sill: 0,   panes: 2, slide: false, glass: false, double: true },
+  slideDoor: { label: '슬라이딩도어',   w: 1600, h: 2100, sill: 0,   panes: 2, slide: true,  glass: false },
+  pocketDoor:{ label: '포켓도어',       w: 900,  h: 2100, sill: 0,   panes: 1, slide: true,  glass: false, pocket: true },
+  pivotDoor: { label: '피벗도어',       w: 1100, h: 2300, sill: 0,   panes: 1, slide: false, glass: false, pivot: true },
+  folding:   { label: '폴딩도어',       w: 3600, h: 2200, sill: 0,   panes: 4, slide: true,  glass: true, fold: true },
 };
 
 // 창호 라이브러리 카드용 목록

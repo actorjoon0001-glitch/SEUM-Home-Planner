@@ -404,11 +404,38 @@ export class Editor2D {
     ctx.fillRect(-len / 2, -thick / 2 - 1, len, thick + 2);
 
     if (isDoor) {
-      // 문: 문짝 + 열림 호
       ctx.strokeStyle = selected ? '#c8102e' : '#4a5560';
       ctx.lineWidth = selected ? 2.5 : 1.6;
-      ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(-len / 2, len); ctx.stroke();
-      ctx.beginPath(); ctx.arc(-len / 2, 0, len, 0, Math.PI / 2); ctx.stroke();
+      if (t.slide) {
+        // 슬라이딩/포켓 도어 — 트랙 + 문짝(절반)
+        ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(len / 2, 0); ctx.stroke();
+        ctx.lineWidth = selected ? 5 : 4;
+        ctx.beginPath(); ctx.moveTo(-len / 2, -1.5); ctx.lineTo(0, -1.5); ctx.stroke();
+        if (t.pocket) {                                    // 벽 속으로 들어가는 표시(점선)
+          ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, -thick / 2); ctx.lineTo(len / 2, -thick / 2);
+          ctx.moveTo(0, thick / 2);  ctx.lineTo(len / 2, thick / 2);
+          ctx.stroke(); ctx.setLineDash([]);
+        }
+      } else if (t.fold) {
+        // 폴딩 — 지그재그 패널
+        const n = Math.max(2, t.panes || 4), pw = len / n;
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) { const x0 = -len / 2 + i * pw; ctx.moveTo(x0, 0); ctx.lineTo(x0 + pw / 2, -pw * 0.5); ctx.lineTo(x0 + pw, 0); }
+        ctx.stroke();
+      } else if (t.double) {
+        // 양개문 — 양쪽 문짝 + 열림 호 2개
+        const half = len / 2;
+        ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(-len / 2, half); ctx.stroke();
+        ctx.beginPath(); ctx.arc(-len / 2, 0, half, 0, Math.PI / 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(len / 2, 0); ctx.lineTo(len / 2, half); ctx.stroke();
+        ctx.beginPath(); ctx.arc(len / 2, 0, half, Math.PI / 2, Math.PI); ctx.stroke();
+      } else {
+        // 여닫이(단문) / 피벗 — 문짝 + 열림 호
+        ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(-len / 2, len); ctx.stroke();
+        ctx.beginPath(); ctx.arc(-len / 2, 0, len, 0, Math.PI / 2); ctx.stroke();
+      }
     } else {
       // 창: 평행 이중선(유리) + 분할
       ctx.strokeStyle = selected ? '#c8102e' : (o.color || '#4a5560');

@@ -27,6 +27,11 @@ export class Viewer3D {
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI / 2.05;
 
+    // WebGL 컨텍스트 손실(반복 탭 전환/GPU 상황) → 흰 화면 방지: 복구 시 재빌드
+    const cv = this.renderer.domElement;
+    cv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false);
+    cv.addEventListener('webglcontextrestored', () => { this.dirty = true; this._appliedW = 0; this._resize(); }, false);
+
     this._lights();
 
     this.modelGroup = new THREE.Group();
@@ -76,13 +81,16 @@ export class Viewer3D {
   _resize() {
     const r = this.container.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) return;
-    // 픽셀비율 상한 2 — 초고해상도에서 드로잉버퍼가 과도하게 커져
-    // 렌더가 실패(흰 화면)하거나 느려지는 것을 방지
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    // updateStyle=true: 캔버스 CSS 크기를 컨테이너에 맞춤. (false 면 고해상도
-    // 화면에서 캔버스가 devicePixelRatio 배로 커져 사이드바를 덮어버림)
-    this.renderer.setSize(r.width, r.height, true);
-    this.camera.aspect = r.width / r.height;
+    const cw = Math.round(r.width), ch = Math.round(r.height);
+    const pr = Math.min(window.devicePixelRatio || 1, 2);
+    // 이미 같은 크기면 재적용 생략 (매 프레임 호출돼도 비용 없음)
+    if (this._appliedW === cw && this._appliedH === ch && this._appliedPR === pr) return;
+    this._appliedW = cw; this._appliedH = ch; this._appliedPR = pr;
+    // 픽셀비율 상한 2 — 초고해상도에서 드로잉버퍼가 과도하게 커져 흰 화면/느려짐 방지
+    this.renderer.setPixelRatio(pr);
+    // updateStyle=true: 캔버스 CSS 크기를 컨테이너에 맞춤
+    this.renderer.setSize(cw, ch, true);
+    this.camera.aspect = cw / ch;
     this.camera.updateProjectionMatrix();
   }
 
@@ -590,6 +598,7 @@ export class Viewer3D {
   _animate() {
     requestAnimationFrame(() => this._animate());
     if (!this.active) return;
+    this._resize();   // 매 활성 프레임에 컨테이너 크기와 동기화 (탭 전환 후 흰 화면 자가 복구)
     if (this.dirty) this.rebuild();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
@@ -607,7 +616,7 @@ export class Viewer3D {
     }
     this.renderer.render(this.scene, this.camera);
     const url = this.renderer.domElement.toDataURL('image/png');
-    if (!wasActive) this._resize();
+    if (!wasActive) { this._appliedW = 0; this._resize(); }   // 캡처용 임시 크기 무효화 → 다음에 재적용
     return url;
   }
 

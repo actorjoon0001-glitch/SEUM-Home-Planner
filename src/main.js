@@ -34,7 +34,26 @@ const authSubmit = document.getElementById('auth-submit');
 const authEmail = document.getElementById('auth-email');
 const authPass = document.getElementById('auth-pass');
 const authKeep = document.getElementById('auth-keep');
+const authSub = document.getElementById('auth-sub');
+const authKeepFld = document.getElementById('auth-keep-fld');
+const authSwitchQ = document.getElementById('auth-switch-q');
+const authSwitchBtn = document.getElementById('auth-switch-btn');
 const logoutBtn = document.getElementById('tb-logout');
+
+// 로그인 / 회원가입 모드 전환 (새 홈플래너 프로젝트에 직접 계정 생성)
+let authMode = 'login';   // 'login' | 'signup'
+function setAuthMode(m) {
+  authMode = m;
+  const signup = m === 'signup';
+  authSub.textContent = signup ? '세움 홈플래너 계정을 만드세요' : '세움 직원 계정으로 로그인하세요';
+  authSubmit.textContent = signup ? '회원가입' : '로그인';
+  authPass.setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+  authKeepFld.classList.toggle('hidden', signup);
+  authSwitchQ.textContent = signup ? '이미 계정이 있으신가요?' : '계정이 없으신가요?';
+  authSwitchBtn.textContent = signup ? '로그인' : '회원가입';
+  authErr.textContent = '';
+}
+authSwitchBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
 
 const KEEP_KEY = 'seum_keep_login';   // '0' 이면 자동 로그인 끔
 const EMAIL_KEY = 'seum_last_email';  // 마지막 로그인 이메일 (자동 채움)
@@ -58,10 +77,12 @@ function reflectAuth() {
 function authErrorText(e) {
   const m = (e && e.message) || String(e);
   if (/Invalid login credentials/i.test(m))
-    return '이메일 또는 비밀번호가 올바르지 않습니다. (세움OS 계정과 동일한지 확인하세요)';
-  if (/Email not confirmed/i.test(m)) return '이메일 인증이 완료되지 않은 계정입니다. 관리자에게 문의하세요.';
-  if (/Failed to fetch|NetworkError|network/i.test(m)) return '네트워크 오류로 로그인할 수 없습니다. 인터넷 연결을 확인하세요.';
-  return '로그인 실패: ' + m;
+    return '이메일 또는 비밀번호가 올바르지 않습니다. 계정이 없으면 아래 회원가입으로 만드세요.';
+  if (/User already registered/i.test(m)) return '이미 가입된 이메일입니다. 로그인해 주세요.';
+  if (/Password should be at least/i.test(m)) return '비밀번호는 6자 이상이어야 합니다.';
+  if (/Email not confirmed/i.test(m)) return '이메일 인증이 완료되지 않았습니다. 받은 편지함의 인증 메일을 확인하세요.';
+  if (/Failed to fetch|NetworkError|network/i.test(m)) return '네트워크 오류로 처리할 수 없습니다. 인터넷 연결을 확인하세요.';
+  return '오류: ' + m;
 }
 
 async function initAuth() {
@@ -88,13 +109,24 @@ authForm.addEventListener('submit', async (e) => {
   const keep = authKeep ? authKeep.checked : true;
   try { localStorage.setItem(KEEP_KEY, keep ? '1' : '0'); localStorage.setItem(EMAIL_KEY, email); } catch { /* noop */ }
   authErr.textContent = '';
-  authSubmit.disabled = true; authSubmit.textContent = '로그인 중…';
+  const signup = authMode === 'signup';
+  authSubmit.disabled = true; authSubmit.textContent = signup ? '가입 중…' : '로그인 중…';
   try {
-    await cloud.signIn(email, pass);   // 성공 시 onChange→reflectAuth 가 게이트를 닫음
+    if (signup) {
+      await cloud.signUp(email, pass);
+      if (!cloud.user) {
+        // 이메일 인증이 필요한 프로젝트: 세션이 바로 생기지 않음
+        authErr.textContent = '가입 완료! 이메일 인증 메일을 확인한 뒤 로그인하세요.';
+        setAuthMode('login');
+      }
+      // 인증 자동확인(auto-confirm)이 켜져 있으면 cloud.user 가 채워지고 onChange→reflectAuth 가 게이트를 닫음
+    } else {
+      await cloud.signIn(email, pass);   // 성공 시 onChange→reflectAuth 가 게이트를 닫음
+    }
   } catch (err) {
     authErr.textContent = authErrorText(err);
   } finally {
-    authSubmit.disabled = false; authSubmit.textContent = '로그인';
+    authSubmit.disabled = false; authSubmit.textContent = signup ? '회원가입' : '로그인';
   }
 });
 

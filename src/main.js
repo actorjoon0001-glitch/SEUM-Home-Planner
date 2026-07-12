@@ -2,7 +2,7 @@
 import { store } from './store.js';
 import { Editor2D } from './editor2d.js';
 import { Viewer3D } from './viewer3d.js';
-import { buildUI } from './ui.js';
+import { buildUI, showDashboard } from './ui.js';
 import { cloud } from './cloud.js';
 
 const editor = new Editor2D(document.getElementById('canvas2d'));
@@ -40,11 +40,17 @@ const EMAIL_KEY = 'seum_last_email';  // 마지막 로그인 이메일 (자동 �
 const keepLogin = () => { try { return localStorage.getItem(KEEP_KEY) !== '0'; } catch { return true; } };
 const lastEmail = () => { try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; } };
 
+let _dashShown = false;
 function reflectAuth() {
   const loggedIn = !!cloud.user;
   gate.classList.toggle('hidden', loggedIn);
   logoutBtn.classList.toggle('hidden', !loggedIn);
-  if (loggedIn) authPass.value = '';   // 비밀번호만 비움 (이메일/체크박스는 유지)
+  if (loggedIn) {
+    authPass.value = '';                 // 비밀번호만 비움 (이메일/체크박스는 유지)
+    if (!_dashShown) { _dashShown = true; showDashboard(); }  // 로그인 직후 프로젝트 대시보드
+  } else {
+    _dashShown = false;
+  }
 }
 
 // Supabase 인증 오류 → 사용자 친화 메시지

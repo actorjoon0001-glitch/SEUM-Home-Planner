@@ -24,6 +24,7 @@
       <span class="brand-sub">홈플래너 · 영업 상담용 3D 설계</span>
     </div>
     <div class="tb-group">
+      <button id="tb-home" class="tb-btn">🏠 프로젝트</button>
       <button id="tb-new" class="tb-btn">새 도면</button>
       <button id="tb-templates" class="tb-btn">📐 기본 도면</button>
       <button id="tb-underlay" class="tb-btn">🖼️ 밑그림</button>
@@ -57,6 +58,26 @@
       <button id="auth-submit" type="submit" class="auth-btn">로그인</button>
       <p id="auth-err" class="auth-err"></p>
     </form>
+  </div>
+
+  <!-- 프로젝트 대시보드 (로그인 후 첫 화면) -->
+  <div id="dashboard" class="dashboard hidden">
+    <aside class="dash-side">
+      <div class="dash-brand"><span class="logo">SEUM</span><span class="dash-brand-t">홈플래너</span></div>
+      <nav class="dash-nav">
+        <button class="dash-navb active" data-view="mine"><span>🏠</span> 내 프로젝트</button>
+        <button class="dash-navb" data-view="templates"><span>📐</span> 전시장 도면</button>
+        <button class="dash-navb" data-view="shared"><span>🔗</span> 공유 프로젝트</button>
+      </nav>
+      <div class="dash-side-foot"><span id="dash-user"></span><button id="dash-logout" class="dash-logout">로그아웃</button></div>
+    </aside>
+    <main class="dash-main">
+      <div class="dash-hero">
+        <h1 id="dash-title">내 프로젝트</h1>
+        <p id="dash-sub" class="dash-sub">도면을 골라 이어서 작업하거나, 새 도면을 시작하세요.</p>
+      </div>
+      <div class="dash-grid" id="dash-grid"></div>
+    </main>
   </div>
 
   <div class="layout">

@@ -37,6 +37,7 @@ body {
   background: linear-gradient(135deg, #c8102e 0%, #7a0a1c 100%);
 }
 .auth-gate.hidden { display: none; }
+#admin-gate { z-index: 2500; }   /* 로그인 게이트(2000)보다 위 */
 .tb-btn.hidden { display: none; }
 .auth-card {
   width: 340px; max-width: 90vw; background: #fff; border-radius: 14px;

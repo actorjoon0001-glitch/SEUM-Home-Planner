@@ -16,6 +16,7 @@ let _viewer = null; // 외장/지붕 자동 표시용
 export function buildUI({ editor, viewer, onModeChange }) {
   _editor = editor;
   _viewer = viewer;
+  buildDashboard({ editor, onModeChange });
   buildLeftRail();
   buildWindows();
   buildLibrary();
@@ -43,6 +44,139 @@ function showSection(sec) {
     const el = document.getElementById(id); if (el) el.classList.toggle('hidden', k !== sec);
   }
 }
+// ---------------------------------------------------------------------------
+// 프로젝트 대시보드 (로그인 후 첫 화면 · Archisketch 스타일)
+// ---------------------------------------------------------------------------
+let _dash = null;                 // { editor, onModeChange }
+let _dashView = 'mine';
+export function showDashboard() {
+  const el = document.getElementById('dashboard'); if (!el) return;
+  el.classList.remove('hidden');
+  renderDash();
+}
+function hideDashboard() {
+  const el = document.getElementById('dashboard'); if (el) el.classList.add('hidden');
+}
+function buildDashboard(deps) {
+  _dash = deps;
+  const el = document.getElementById('dashboard'); if (!el) return;
+  el.querySelectorAll('.dash-navb').forEach((b) => b.onclick = () => {
+    _dashView = b.dataset.view;
+    el.querySelectorAll('.dash-navb').forEach((x) => x.classList.toggle('active', x === b));
+    renderDash();
+  });
+  const lo = el.querySelector('#dash-logout');
+  if (lo) lo.onclick = async () => { try { await cloud.signOut(); } catch (e) { /* noop */ } };
+}
+// 도면 미니 미리보기 (방 + 외곽)
+function drawPlanThumb(cv, d) {
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#f3f5f8'; ctx.fillRect(0, 0, W, H);
+  if (!d) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const acc = (x, y) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); };
+  for (const r of d.rooms || []) { acc(r.x, r.y); acc(r.x + r.w, r.y + r.d); }
+  for (const p of (d.outline && d.outline.paths) || []) for (const pt of p.points || []) acc(ptX(pt), ptY(pt));
+  if (!isFinite(minX)) return;
+  const pad = 12, bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+  const s = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh);
+  const ox = (W - bw * s) / 2 - minX * s, oy = (H - bh * s) / 2 - minY * s;
+  const X = (x) => x * s + ox, Y = (y) => y * s + oy;
+  for (const p of (d.outline && d.outline.paths) || []) {
+    const pts = p.points || []; if (!pts.length) continue;
+    ctx.beginPath(); ctx.moveTo(X(ptX(pts[0])), Y(ptY(pts[0])));
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(X(ptX(pts[i])), Y(ptY(pts[i])));
+    if (p.closed) { ctx.closePath(); ctx.fillStyle = 'rgba(217,180,137,0.7)'; ctx.fill(); }
+    ctx.strokeStyle = '#5b5f66'; ctx.lineWidth = 1.4; ctx.stroke();
+  }
+  for (const r of d.rooms || []) {
+    const t = ROOM_TYPES[r.type] || {};
+    ctx.globalAlpha = 0.85; ctx.fillStyle = t.color || '#cbd5e1';
+    ctx.fillRect(X(r.x), Y(r.y), r.w * s, r.d * s);
+    ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+    ctx.strokeRect(X(r.x), Y(r.y), r.w * s, r.d * s);
+  }
+}
+function fmtDate(ts) { try { return ts ? new Date(ts).toLocaleDateString('ko-KR') : ''; } catch (e) { return ''; } }
+// 편집기로 진입 (도면 로드 후 대시보드 닫고 2D 편집)
+function enterEditor(loadFn) {
+  try { if (loadFn) loadFn(); } catch (e) { alert('불러오기 실패: ' + e.message); return; }
+  hideDashboard();
+  if (_dash && _dash.onModeChange) _dash.onModeChange('2d');
+  if (_dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.fit(); }, 0);
+}
+function projectCard(name, design, meta, onOpen, onDelete) {
+  const card = document.createElement('div');
+  card.className = 'dash-card';
+  const cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.className = 'dc-thumb';
+  card.appendChild(cv);
+  try { drawPlanThumb(cv, design); } catch (e) { /* noop */ }
+  const body = document.createElement('div'); body.className = 'dc-body';
+  body.innerHTML = `<div class="dc-name">${esc(name)}</div><div class="dc-meta">${esc(meta || '')}</div>`;
+  card.appendChild(body);
+  card.onclick = () => onOpen();
+  if (onDelete) {
+    const del = document.createElement('button'); del.className = 'dc-del'; del.textContent = '✕'; del.title = '삭제';
+    del.onclick = (e) => { e.stopPropagation(); if (confirm(`'${name}'을(를) 삭제할까요?`)) { onDelete(); } };
+    card.appendChild(del);
+  }
+  return card;
+}
+function newCard() {
+  const card = document.createElement('div');
+  card.className = 'dash-card dc-new';
+  card.innerHTML = `<span class="dc-plus">＋</span><span>새 도면 시작</span>`;
+  card.onclick = () => enterEditor(() => store.newDesign());
+  return card;
+}
+async function renderDash() {
+  const grid = document.getElementById('dash-grid');
+  const title = document.getElementById('dash-title');
+  const sub = document.getElementById('dash-sub');
+  const userEl = document.getElementById('dash-user');
+  if (userEl) userEl.textContent = (cloud.user && cloud.user.email) || '';
+  if (!grid) return;
+  grid.innerHTML = '';
+  if (_dashView === 'mine') {
+    title.textContent = '내 프로젝트';
+    sub.textContent = '작업하던 도면을 이어서 열거나, 새 도면을 시작하세요.';
+    grid.appendChild(newCard());
+    const saves = store.savedList().slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+    for (const s of saves) {
+      grid.appendChild(projectCard(s.name, s.data, fmtDate(s.savedAt),
+        () => enterEditor(() => store.loadSaved(s.name)),
+        () => { store.removeSaved(s.name); renderDash(); }));
+    }
+  } else if (_dashView === 'templates') {
+    title.textContent = '전시장 도면';
+    sub.textContent = '전시장별 기본 도면을 골라 바로 상담을 시작하세요.';
+    for (const t of listTemplates()) {
+      let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
+      grid.appendChild(projectCard(t.title, d, t.showroom ? `🏢 ${t.showroom}` : (t.category || '주택'),
+        () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); })));
+    }
+    for (const t of store.localTemplates()) {
+      grid.appendChild(projectCard(t.title, t.data, t.showroom ? `🏢 ${t.showroom}` : '내 도면',
+        () => enterEditor(() => store.loadInto(t.data)),
+        () => { store.removeLocalTemplate(t.id); renderDash(); }));
+    }
+  } else if (_dashView === 'shared') {
+    title.textContent = '공유 프로젝트';
+    sub.textContent = '영업팀이 공유한 도면입니다.';
+    if (!cloud.configured()) { grid.innerHTML = '<p class="dash-empty">클라우드가 설정되지 않았습니다.</p>'; return; }
+    grid.innerHTML = '<p class="dash-empty">불러오는 중…</p>';
+    try {
+      await cloud.init();
+      const rows = await cloud.listShared();
+      grid.innerHTML = '';
+      if (!rows.length) { grid.innerHTML = '<p class="dash-empty">공유된 도면이 없습니다.</p>'; return; }
+      for (const r of rows) {
+        grid.appendChild(projectCard(r.name, r.data, '🔗 공유', () => enterEditor(() => store.loadInto(r.data, { cloudId: null }))));
+      }
+    } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
+  }
+}
+
 function buildLeftRail() {
   const rail = document.getElementById('left-rail');
   rail.querySelectorAll('.rail-btn').forEach((btn) => {
@@ -823,6 +957,9 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   // 치수 표시 토글 (고객용 기본 OFF ↔ 시공용 ON)
   const dimBtn = $('tb-dims');
   if (dimBtn) dimBtn.onclick = () => { const on = !editor.showDims; editor.setShowDims(on); dimBtn.classList.toggle('on', on); };
+
+  const homeBtn = $('tb-home');
+  if (homeBtn) homeBtn.onclick = () => showDashboard();
 
   $('tb-fit').onclick = () => { editor.fit(); viewer._needCam = true; viewer.dirty = true; };
   $('tb-undo').onclick = () => store.undo();

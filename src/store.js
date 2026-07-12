@@ -101,6 +101,9 @@ class Store {
   savedList() {
     try { return JSON.parse(localStorage.getItem(LS_LIST) || '[]'); } catch (e) { return []; }
   }
+  removeSaved(name) {
+    localStorage.setItem(LS_LIST, JSON.stringify(this.savedList().filter((e) => e.name !== name)));
+  }
   loadSaved(name) {
     const entry = this.savedList().find((e) => e.name === name);
     if (!entry) return;

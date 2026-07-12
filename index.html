@@ -45,6 +45,18 @@
     </div>
   </header>
 
+  <!-- 관리자 게이트 (우선 관리자만 접근) -->
+  <div id="admin-gate" class="auth-gate">
+    <form id="admin-form" class="auth-card" autocomplete="off">
+      <div class="auth-brand"><span class="logo">SEUM</span><span>홈플래너</span></div>
+      <p class="auth-sub">관리자 비밀번호를 입력하세요</p>
+      <label class="auth-fld"><span>비밀번호</span>
+        <input id="admin-pass" type="password" autocomplete="off" required></label>
+      <button id="admin-submit" type="submit" class="auth-btn">확인</button>
+      <p id="admin-err" class="auth-err"></p>
+    </form>
+  </div>
+
   <!-- 로그인 게이트 (세움 직원 전용) -->
   <div id="auth-gate" class="auth-gate">
     <form id="auth-form" class="auth-card" autocomplete="on">
@@ -179,6 +191,29 @@
   </dialog>
 
   <script src="./config.js"></script>
+  <!-- 관리자 게이트 (우선 관리자만 접근) — 모듈/CDN과 무관하게 즉시 동작 -->
+  <script>
+  (function () {
+    var ADMIN_PW = '931122';
+    var g = document.getElementById('admin-gate'); if (!g) return;
+    var ok = false; try { ok = localStorage.getItem('seum_admin_ok') === '1'; } catch (e) {}
+    if (ok) { g.classList.add('hidden'); return; }
+    var form = document.getElementById('admin-form');
+    var pass = document.getElementById('admin-pass');
+    var err = document.getElementById('admin-err');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (pass.value === ADMIN_PW) {
+        try { localStorage.setItem('seum_admin_ok', '1'); } catch (e) {}
+        g.classList.add('hidden'); err.textContent = '';
+      } else {
+        err.textContent = '비밀번호가 올바르지 않습니다.';
+        pass.value = ''; pass.focus();
+      }
+    });
+    setTimeout(function () { pass.focus(); }, 50);
+  })();
+  </script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

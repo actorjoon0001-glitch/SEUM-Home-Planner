@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
 import * as TEX from './textures.js';
+TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 (2D UI 는 three 의존 제거됨)
 
 const WALL_T = 100; // 벽 두께 mm
 

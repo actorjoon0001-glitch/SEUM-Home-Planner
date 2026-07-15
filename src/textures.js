@@ -5,7 +5,10 @@
 // 모든 패턴은 "밝은 회색 + 명암 변화"의 무채색으로 그립니다.
 // 실제 색은 메쉬 재질의 color 로 곱(multiply)해 입히므로,
 // 사용자가 외장 색상을 바꿔도 같은 텍스처가 자연스럽게 따라옵니다.
-import * as THREE from 'three';
+// three.js 는 3D(재질) 함수에서만 필요하다. 로그인·2D UI 가 three CDN 로딩에
+// 묶이지 않도록 '정적 import' 대신 viewer3d.js 가 주입한다. (swatchDataURL/EXT_KIND 는 2D-only)
+let THREE = null;
+export function _useThree(mod) { THREE = mod; }
 
 // 텍스처 1장이 실제 공간에서 덮는 크기(mm) — repeat 계산 기준
 const TILE = {

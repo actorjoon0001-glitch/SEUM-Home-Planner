@@ -1,13 +1,14 @@
 // 세움 홈플래너 - 진입점
+// 중요: 로그인/회원가입 게이트는 3D(three.js)·앱 UI 로딩과 '분리'해 항상 먼저 동작하게 한다.
+//       (three.js CDN이 늦거나 실패해도 로그인/회원가입 버튼은 정상 반응해야 함)
 import { store } from './store.js';
 import { Editor2D } from './editor2d.js';
-import { Viewer3D } from './viewer3d.js';
 import { buildUI, showDashboard } from './ui.js';
 import { cloud } from './cloud.js';
 
 const editor = new Editor2D(document.getElementById('canvas2d'));
-const viewer = new Viewer3D(document.getElementById('view3d'));
 
+let viewer = null;   // 3D 뷰어는 three.js 로드 후 지연 생성
 let mode = '2d';
 function setMode(m) {
   mode = m;
@@ -16,17 +17,25 @@ function setMode(m) {
   document.getElementById('tb-2d').classList.toggle('active', m === '2d');
   document.getElementById('tb-3d').classList.toggle('active', m === '3d');
   document.getElementById('view-presets').classList.toggle('hidden', m !== '3d');
-  viewer.setActive(m === '3d');
+  if (viewer) viewer.setActive(m === '3d');
   if (m === '2d') { editor._resize(); editor.draw(); }
 }
 
-buildUI({ editor, viewer, onModeChange: setMode });
-setMode('2d');
+// three.js 로드 실패 시 2D는 계속 쓸 수 있게 하는 최소 스텁 뷰어
+function makeStubViewer() {
+  const noop = () => {};
+  return {
+    active: false, dirty: false, _needCam: false, wallOpacity: 1, floorOpacity: 1,
+    controls: { maxPolarAngle: Math.PI },
+    setActive: noop, zoom: noop, resetCamera: noop, toImage: () => null,
+  };
+}
 
-// ---------------------------------------------------------------------------
-// 로그인 게이트 (세움 직원 전용) — 로그인해야 홈플래너 사용 가능
+// ===========================================================================
+// 로그인 게이트 (세움 홈플래너 전용 계정) — 아래 리스너는 '동기'로 즉시 연결되어
+// three.js/앱 초기화 성공 여부와 무관하게 항상 동작한다.
 // (관리자 게이트는 index.html 인라인 스크립트에서 먼저 처리)
-// ---------------------------------------------------------------------------
+// ===========================================================================
 const gate = document.getElementById('auth-gate');
 const authForm = document.getElementById('auth-form');
 const authErr = document.getElementById('auth-err');
@@ -53,7 +62,7 @@ function setAuthMode(m) {
   authSwitchBtn.textContent = signup ? '로그인' : '회원가입';
   authErr.textContent = '';
 }
-authSwitchBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
+if (authSwitchBtn) authSwitchBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
 
 const KEEP_KEY = 'seum_keep_login';   // '0' 이면 자동 로그인 끔
 const EMAIL_KEY = 'seum_last_email';  // 마지막 로그인 이메일 (자동 채움)
@@ -83,21 +92,6 @@ function authErrorText(e) {
   if (/Email not confirmed/i.test(m)) return '이메일 인증이 완료되지 않았습니다. 받은 편지함의 인증 메일을 확인하세요.';
   if (/Failed to fetch|NetworkError|network/i.test(m)) return '네트워크 오류로 처리할 수 없습니다. 인터넷 연결을 확인하세요.';
   return '오류: ' + m;
-}
-
-async function initAuth() {
-  // 클라우드(Supabase) 미설정이면 게이트 없이 사용 (로그인 불가 상태로 잠기지 않도록)
-  if (!cloud.configured()) { gate.classList.add('hidden'); logoutBtn.classList.add('hidden'); return; }
-  // 지난 로그인 이메일 자동 채움 + '자동 로그인 유지' 상태 복원
-  if (lastEmail()) authEmail.value = lastEmail();
-  if (authKeep) authKeep.checked = keepLogin();
-  authErr.textContent = '로그인 확인 중…';
-  try { await cloud.init(); } catch { /* init 실패해도 로그인 폼은 표시 */ }
-  authErr.textContent = '';
-  // 자동 로그인 꺼짐 → 저장된 세션이 있어도 로그아웃해 매번 로그인하도록
-  if (cloud.user && !keepLogin()) { try { await cloud.signOut(); } catch { /* noop */ } }
-  reflectAuth();
-  cloud.onChange(reflectAuth);   // 로그인/로그아웃 시 게이트 자동 표시·숨김
 }
 
 authForm.addEventListener('submit', async (e) => {
@@ -134,7 +128,39 @@ logoutBtn.onclick = async () => {
   try { await cloud.signOut(); } finally { reflectAuth(); }   // onChange 로도 반영됨
 };
 
-initAuth();
+async function initAuth() {
+  // 클라우드(Supabase) 미설정이면 게이트 없이 사용 (로그인 불가 상태로 잠기지 않도록)
+  if (!cloud.configured()) { gate.classList.add('hidden'); logoutBtn.classList.add('hidden'); return; }
+  // 지난 로그인 이메일 자동 채움 + '자동 로그인 유지' 상태 복원
+  if (lastEmail()) authEmail.value = lastEmail();
+  if (authKeep) authKeep.checked = keepLogin();
+  authErr.textContent = '로그인 확인 중…';
+  try { await cloud.init(); } catch { /* init 실패해도 로그인 폼은 표시 */ }
+  authErr.textContent = '';
+  // 자동 로그인 꺼짐 → 저장된 세션이 있어도 로그아웃해 매번 로그인하도록
+  if (cloud.user && !keepLogin()) { try { await cloud.signOut(); } catch { /* noop */ } }
+  reflectAuth();
+  cloud.onChange(reflectAuth);   // 로그인/로그아웃 시 게이트 자동 표시·숨김
+}
 
-// 전역 디버그용
-window.SEUM = { store, editor, viewer, cloud };
+// ===========================================================================
+// 앱 UI + 3D 뷰어 — three.js 지연 로드. 실패해도 로그인/2D 사용엔 지장 없음.
+// (뷰어·UI 준비가 끝난 뒤 세션 복원 initAuth() 를 호출해 대시보드가 안전히 뜨게 함)
+// ===========================================================================
+(async () => {
+  try {
+    const { Viewer3D } = await import('./viewer3d.js');
+    viewer = new Viewer3D(document.getElementById('view3d'));
+  } catch (e) {
+    console.error('[app] 3D 뷰어 로드 실패 (2D는 정상 사용 가능):', e);
+    viewer = makeStubViewer();
+  }
+  try {
+    buildUI({ editor, viewer, onModeChange: setMode });
+    setMode('2d');
+  } catch (e) {
+    console.error('[app] UI 초기화 실패:', e);
+  }
+  window.SEUM = { store, editor, viewer, cloud };   // 전역 디버그용
+  initAuth();
+})();

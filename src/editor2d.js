@@ -21,7 +21,7 @@ export class Editor2D {
 
     // 벽 그리기 옵션 (Archisketch 스타일)
     this.snapMode = true;    // 격자/직각 스냅
-    this.orthoMode = false;  // 직교(90°) 강제
+    this.orthoMode = true;   // 직교(90°) 강제 — 밑그림 따라 반듯한 벽 그리기 기본값
     this.onOutlineChange = null; // 그리는 중 길이 입력 상자 위치/값 콜백
 
     // 텍스트 라벨(방 이름 등)

@@ -1304,6 +1304,8 @@ function openUnderlayDialog(editor) {
   const body = document.createElement('div');
   // 밑그림 변경은 undo 히스토리에 큰 이미지가 쌓이지 않도록 liveUpdate 로 처리
   const apply = (mut) => { store.liveUpdate(mut); store.liveEnd(); };
+  // 여러 쪽 PDF의 쪽 전환용 (모달이 열려있는 동안만 유지 — File 은 저장 불가)
+  let pdfFile = null, pdfPages = 0, pdfPage = 1;
 
   function render() {
     const u = store.design.underlay;
@@ -1321,8 +1323,14 @@ function openUnderlayDialog(editor) {
       body.querySelector('#ul-file').onchange = (e) => loadFile(e.target.files[0]);
       return;
     }
+    const pageSel = pdfFile && pdfPages > 1
+      ? `<label class="fld"><span>PDF 쪽 (전체 ${pdfPages}쪽)</span><select id="ul-page">${
+          Array.from({ length: pdfPages }, (_, i) => `<option value="${i + 1}"${i + 1 === pdfPage ? ' selected' : ''}>${i + 1}쪽</option>`).join('')
+        }</select></label>`
+      : '';
     body.innerHTML = `
       <p class="m-sub">밑그림이 깔려 있습니다. <b>축척 맞추기</b>로 크기를 실제와 맞춘 뒤 방을 그려 따라 그리세요.</p>
+      ${pageSel}
       <label class="fld"><span>투명도</span><input id="ul-op" type="range" min="0.1" max="1" step="0.05" value="${u.opacity != null ? u.opacity : 0.5}"></label>
       <label class="fld"><span>가로 실제 크기(mm)</span><input id="ul-w" type="number" value="${Math.round(u.w)}" step="100"></label>
       <div class="btn-row">
@@ -1347,6 +1355,8 @@ function openUnderlayDialog(editor) {
       flash('밑그림 위에서 길이를 아는 두 점을 차례로 클릭하세요');
     };
     body.querySelector('#ul-focus').onclick = () => editor.focusUnderlay();
+    const pageEl = body.querySelector('#ul-page');
+    if (pageEl) pageEl.onchange = (e) => loadPdfPage(parseInt(e.target.value, 10));
     body.querySelector('#ul-hide').onclick = () => { apply((d) => { d.underlay.hidden = !d.underlay.hidden; }); render(); };
     body.querySelector('#ul-replace').onclick = () => { apply((d) => { d.underlay = null; }); render(); };
     body.querySelector('#ul-del').onclick = () => {
@@ -1367,9 +1377,12 @@ function openUnderlayDialog(editor) {
         if (!r) throw new Error('DXF에서 도형을 찾지 못했습니다 (.dwg는 DXF로 저장 후 시도)');
         dataURL = r.dataURL; w0 = r.w; h0 = r.h;
       } else if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
-        ({ dataURL, iw, ih } = await pdfToImage(file));
+        let pages;
+        ({ dataURL, iw, ih, pages } = await pdfToImage(file, 1));
+        pdfFile = file; pdfPages = pages; pdfPage = 1;
         w0 = 12000; h0 = w0 * (ih / iw); // 기본 12m, '축척 맞추기'로 보정
       } else {
+        pdfFile = null; pdfPages = 0;
         dataURL = await fileToDataURL(file);
         ({ iw, ih } = await imageSize(dataURL));
         w0 = 12000; h0 = w0 * (ih / iw);
@@ -1377,10 +1390,28 @@ function openUnderlayDialog(editor) {
       apply((d) => { d.underlay = { src: dataURL, x: 0, y: 0, w: w0, h: h0, opacity: 0.5, hidden: false }; });
       editor.focusUnderlay();
       render();
-      flash('밑그림 불러옴 — 이제 "축척 맞추기"로 크기를 맞추세요');
+      flash(pdfPages > 1
+        ? `${pdfPages}쪽 PDF입니다 — 위 "PDF 쪽"에서 원하는 도면 쪽을 고르세요`
+        : '밑그림 불러옴 — 이제 "축척 맞추기"로 크기를 맞추세요');
     } catch (e) {
       msg.style.color = '#c8102e';
       msg.textContent = '불러오기 실패: ' + e.message;
+    }
+  }
+
+  // 여러 쪽 PDF에서 다른 쪽으로 교체 (크기는 유지, 이미지·비율만 갱신)
+  async function loadPdfPage(n) {
+    if (!pdfFile) return;
+    const msg = body.querySelector('#ul-msg');
+    try {
+      if (msg) { msg.style.color = ''; msg.textContent = `${n}쪽 불러오는 중...`; }
+      const { dataURL, iw, ih } = await pdfToImage(pdfFile, n);
+      pdfPage = n;
+      apply((d) => { const u = d.underlay; if (u) { u.src = dataURL; u.h = u.w * (ih / iw); } });
+      editor.focusUnderlay();
+      render();
+    } catch (e) {
+      if (msg) { msg.style.color = '#c8102e'; msg.textContent = '쪽 불러오기 실패: ' + e.message; }
     }
   }
 
@@ -1421,18 +1452,20 @@ function downscaleDataURL(dataURL, maxDim, quality) {
     img.src = dataURL;
   });
 }
-// PDF 1페이지를 이미지(dataURL)로 변환 (pdf.js, CDN 동적 로드)
-async function pdfToImage(file) {
+// PDF 한 페이지를 이미지(dataURL)로 변환 (pdf.js, CDN 동적 로드)
+// pageNum: 1부터. 반환값의 pages = 전체 페이지 수 (여러 장이면 쪽 선택용)
+async function pdfToImage(file, pageNum = 1) {
   const pdfjs = await import('https://esm.sh/pdfjs-dist@4.7.76/build/pdf.min.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs';
   const buf = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: buf }).promise;
-  const page = await pdf.getPage(1);
+  const n = Math.min(Math.max(1, pageNum | 0), pdf.numPages);
+  const page = await pdf.getPage(n);
   const viewport = page.getViewport({ scale: 2 });
   const canvas = document.createElement('canvas');
   canvas.width = viewport.width; canvas.height = viewport.height;
   await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-  return { dataURL: canvas.toDataURL('image/jpeg', 0.85), iw: canvas.width, ih: canvas.height };
+  return { dataURL: canvas.toDataURL('image/jpeg', 0.85), iw: canvas.width, ih: canvas.height, pages: pdf.numPages };
 }
 
 // ---------------------------------------------------------------------------

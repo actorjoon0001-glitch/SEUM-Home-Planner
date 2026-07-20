@@ -1497,7 +1497,8 @@ function openUnderlayDialog(editor) {
     body.innerHTML = `
       <p class="m-sub">밑그림이 깔려 있습니다. <b>축척 맞추기</b>로 크기를 실제와 맞춘 뒤 방을 그려 따라 그리세요.</p>
       ${pageSel}
-      <label class="fld"><span>투명도</span><input id="ul-op" type="range" min="0.1" max="1" step="0.05" value="${u.opacity != null ? u.opacity : 0.5}"></label>
+      <label class="fld"><span>도면(밑그림) 투명도</span><input id="ul-op" type="range" min="0.1" max="1" step="0.05" value="${u.opacity != null ? u.opacity : 0.5}"></label>
+      <label class="fld"><span>방·벽 투명도 <small style="color:var(--muted)">· 낮추면 밑그림이 비침</small></span><input id="ul-fo" type="range" min="0" max="1" step="0.05" value="${store.design.floorOpacity != null ? store.design.floorOpacity : 1}"></label>
       <label class="fld"><span>가로 실제 크기(mm)</span><input id="ul-w" type="number" value="${Math.round(u.w)}" step="100"></label>
       <div class="btn-row">
         <button class="mini" id="ul-cal" style="flex:1;background:#c8102e;color:#fff;border-color:#c8102e">📏 축척 맞추기 (두 점)</button>
@@ -1519,6 +1520,8 @@ function openUnderlayDialog(editor) {
       <p id="ul-msg" class="hint"></p>`;
     body.querySelector('#ul-op').oninput = (e) => store.liveUpdate((d) => { d.underlay.opacity = parseFloat(e.target.value); });
     body.querySelector('#ul-op').onchange = () => store.liveEnd();
+    const ulFo = body.querySelector('#ul-fo');
+    if (ulFo) { ulFo.oninput = (e) => store.liveUpdate((d) => { d.floorOpacity = parseFloat(e.target.value); }); ulFo.onchange = () => store.liveEnd(); }
     body.querySelector('#ul-w').onchange = (e) => {
       const neww = parseFloat(e.target.value);
       if (neww > 0) apply((d) => { const f = neww / d.underlay.w; d.underlay.h *= f; d.underlay.w = neww; });

@@ -233,6 +233,10 @@ function buildRoomPalette() {
   // --- 액션들 ---
   const soon = (name) => flash(`'${name}'은(는) 곧 추가됩니다`);
   const openWindows = () => showSection('win');
+  const transformDesign = (kind, name) => {
+    const ok = _editor.transformDesign(kind);
+    flash(ok ? `도면을 ${name}했습니다` : '변환할 도면이 없습니다 (먼저 방/외벽을 그리세요)');
+  };
 
   // Archisketch 사이드바 구조 (그룹별 도구)
   const GROUPS = [
@@ -253,12 +257,12 @@ function buildRoomPalette() {
       { ic: '📐', label: '측정', key: 'M', mode: 'measure' },
     ] },
     { label: '도면 반전', items: [
-      { ic: '◧', label: '좌우 반전', soon: true },
-      { ic: '⬍', label: '상하 반전', soon: true },
+      { ic: '◧', label: '좌우 반전', action: () => transformDesign('flipH', '좌우 반전') },
+      { ic: '⬍', label: '상하 반전', action: () => transformDesign('flipV', '상하 반전') },
     ] },
     { label: '도면 회전', items: [
-      { ic: '↺', label: '반시계 방향 회전', soon: true },
-      { ic: '↻', label: '시계 방향 회전', soon: true },
+      { ic: '↺', label: '반시계 방향 회전', action: () => transformDesign('rotCCW', '반시계 90° 회전') },
+      { ic: '↻', label: '시계 방향 회전', action: () => transformDesign('rotCW', '시계 90° 회전') },
     ] },
     { label: '일반', items: [
       { ic: '🖱️', label: '선택 / 이동', key: 'Esc', mode: 'select' },

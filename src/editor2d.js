@@ -835,6 +835,82 @@ export class Editor2D {
   setSnapMode(on) { this.snapMode = !!on; this.draw(); }
   setOrthoMode(on) { this.orthoMode = !!on; this.draw(); }
   setMonoMode(on) { this.monoMode = !!on; this.draw(); return this.monoMode; }
+
+  // 도면 전체 반전/회전 — 방·가구·라벨·외곽점·개구부를 한꺼번에 변환
+  // kind: 'flipH'(좌우) | 'flipV'(상하) | 'rotCW'(시계90°) | 'rotCCW'(반시계90°)
+  transformDesign(kind) {
+    const d = store.design;
+    // 중심(바운딩 박스) — 방 + 외곽 기준
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const ext = (x, y) => { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; };
+    for (const r of d.rooms) { ext(r.x, r.y); ext(r.x + r.w, r.y + r.d); }
+    for (const s of outlineShapes(d.outline)) for (const p of s.pts) ext(p[0], p[1]);
+    if (!isFinite(minX)) return false;                 // 변환할 도형이 없음
+    const Cx = (minX + maxX) / 2, Cy = (minY + maxY) / 2, R = Math.round;
+
+    // 점 변환 P, 가구 회전 변환 rotF, 가로/세로 스왑 여부 swap
+    let P, rotF; const swap = (kind === 'rotCW' || kind === 'rotCCW');
+    if (kind === 'flipH')      { P = (x, y) => [2 * Cx - x, y];              rotF = (t) => -t; }
+    else if (kind === 'flipV') { P = (x, y) => [x, 2 * Cy - y];              rotF = (t) => 180 - t; }
+    else if (kind === 'rotCW') { P = (x, y) => [Cx - (y - Cy), Cy + (x - Cx)]; rotF = (t) => t + 90; }
+    else                       { P = (x, y) => [Cx + (y - Cy), Cy - (x - Cx)]; rotF = (t) => t - 90; }
+
+    // 방 개구부 중심은 '원본 방' 기준이라 방을 바꾸기 전에 미리 계산
+    const oldCenter = (r, o) => {
+      if (o.side === 'n') return [r.x + o.pos, r.y];
+      if (o.side === 's') return [r.x + o.pos, r.y + r.d];
+      if (o.side === 'w') return [r.x, r.y + o.pos];
+      return [r.x + r.w, r.y + o.pos];                  // 'e'
+    };
+
+    store.commit((dd) => {
+      const roomById = new Map(dd.rooms.map((r) => [r.id, r]));
+      const openCtr = new Map();
+      for (const o of (dd.openings || [])) {
+        if (o.onOutline) continue;                       // 외곽 개구부는 외곽점 변환으로 자동 반영
+        const r = roomById.get(o.roomId); if (r) openCtr.set(o, oldCenter(r, o));
+      }
+      // 방
+      for (const r of dd.rooms) {
+        const [ncx, ncy] = P(r.x + r.w / 2, r.y + r.d / 2);
+        const nw = swap ? r.d : r.w, nd = swap ? r.w : r.d;
+        r.w = nw; r.d = nd; r.x = R(ncx - nw / 2); r.y = R(ncy - nd / 2);
+      }
+      // 가구 (중심점 + 회전)
+      for (const f of dd.furniture) {
+        const [nx, ny] = P(f.x, f.y);
+        f.x = R(nx); f.y = R(ny);
+        f.rotation = ((R(rotF(f.rotation || 0)) % 360) + 360) % 360;
+      }
+      // 텍스트 라벨
+      for (const l of (dd.labels || [])) { const [nx, ny] = P(l.x, l.y); l.x = R(nx); l.y = R(ny); }
+      // 외곽(점들) — 외곽 개구부는 여기에 따라옴(거리 보존)
+      const shapes = outlineShapes(dd.outline);
+      if (shapes.length) {
+        dd.outline = { paths: shapes.map((s) => ({
+          points: s.pts.map((p) => { const [nx, ny] = P(p[0], p[1]); return [R(nx), R(ny)]; }),
+          closed: s.closed,
+        })) };
+      }
+      // 방 개구부 — 변환된 중심을 새 방의 가장 가까운 벽에 다시 부착
+      for (const o of (dd.openings || [])) {
+        const c = openCtr.get(o); if (!c) continue;
+        const r = roomById.get(o.roomId); if (!r) continue;
+        const [ncx, ncy] = P(c[0], c[1]);
+        const dN = Math.abs(ncy - r.y), dS = Math.abs(ncy - (r.y + r.d));
+        const dW = Math.abs(ncx - r.x), dE = Math.abs(ncx - (r.x + r.w));
+        const m = Math.min(dN, dS, dW, dE);
+        let side, pos, span;
+        if (m === dN)      { side = 'n'; pos = ncx - r.x; span = r.w; }
+        else if (m === dS) { side = 's'; pos = ncx - r.x; span = r.w; }
+        else if (m === dW) { side = 'w'; pos = ncy - r.y; span = r.d; }
+        else               { side = 'e'; pos = ncy - r.y; span = r.d; }
+        o.side = side; o.pos = R(Math.max(0, Math.min(span, pos)));
+      }
+    });
+    this.fit(); this.draw();
+    return true;
+  }
   setShowDims(on) { this.showDims = !!on; this.draw(); }
 
   // 외곽 점 스냅: (스냅 모드) 격자 100mm + 직전 점과 거의 수평/수직이면 직각 정렬

@@ -1341,15 +1341,17 @@ export class Editor2D {
     ctx.restore();
   }
 
-  // 집 외곽(외벽) 2D 표시 — 닫힌 공간은 강화마루 바닥 + 면적, 벽 + 치수
+  // 집 외곽(외벽) 2D 표시 — 닫힌 공간은 흰 바닥 + 면적, 벽 + 치수
+  // (강화마루 질감 바닥은 2D엔 넣지 않고 3D에서만 표현)
   _drawOutline() {
     const ctx = this.ctx;
     const t = Math.max(3, this.wallThickness() * this.scale); // 외벽 두께(도면 설정)
     for (const { pts, closed } of outlineShapes(store.design.outline)) {
       const px = pts.map((p) => this.toPx(p[0], p[1]));
-      if (closed && pts.length >= 3) {
-        if (this.monoMode) { ctx.save(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); px.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.fill(); ctx.restore(); }
-        else this._fillLaminate(px);                            // 강화마루 바닥(기본)
+      if (closed && pts.length >= 3) {                          // 집 안쪽을 깔끔한 흰 바닥으로
+        ctx.save(); ctx.fillStyle = '#ffffff'; ctx.beginPath();
+        px.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+        ctx.closePath(); ctx.fill(); ctx.restore();
       }
       ctx.save();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
@@ -1392,26 +1394,6 @@ export class Editor2D {
     }
   }
 
-  // 닫힌 공간 내부를 강화마루(오크) 질감으로 채움 — px: 화면좌표 꼭짓점 배열
-  _fillLaminate(px) {
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.beginPath();
-    px.forEach((p, i) => { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
-    ctx.closePath();
-    ctx.clip();
-    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-    for (const [x, y] of px) { if (x < minx) minx = x; if (y < miny) miny = y; if (x > maxx) maxx = x; if (y > maxy) maxy = y; }
-    ctx.fillStyle = '#d9b489';                              // 강화마루 베이스(라이트 오크)
-    ctx.fillRect(minx, miny, maxx - minx, maxy - miny);
-    const plank = Math.max(9, 190 * this.scale);            // 판재 폭 ≈190mm
-    ctx.strokeStyle = 'rgba(140,100,60,0.22)'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let y = miny; y <= maxy; y += plank) { ctx.moveTo(minx, y); ctx.lineTo(maxx, y); }
-    ctx.stroke();
-    ctx.restore();
-  }
-
   // 닫힌 공간 중앙에 면적 라벨
   _outlineAreaLabel(pts) {
     const a = Math.abs(this._polyAreaMm(pts)) / 1e6;
@@ -1423,7 +1405,7 @@ export class Editor2D {
     ctx.font = '600 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const txt = this.showDims ? `${(a / 3.305).toFixed(1)}평 · ${a.toFixed(1)}m²` : `${(a / 3.305).toFixed(1)}평`;
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeText(txt, cx, cy);
-    ctx.fillStyle = '#5b4a36'; ctx.fillText(txt, cx, cy);
+    ctx.fillStyle = '#33373d'; ctx.fillText(txt, cx, cy);
     ctx.restore();
   }
 

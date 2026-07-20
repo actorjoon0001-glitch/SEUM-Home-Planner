@@ -383,6 +383,15 @@ export class Editor2D {
   // 개구부의 평면 기하 계산 (mm 단위 끝점 + 외향 방향)
   _openingGeom(o) {
     const half = o.w / 2;
+    // 벽 없이 자유 배치된 개구부 (먼저 올리고 나중에 위치/크기 조정)
+    if (o.free) {
+      const ang = o.angle || 0;
+      return {
+        cx: o.x, cy: o.y, half, angle: ang, free: true,
+        horizontal: Math.abs(Math.cos(ang)) >= Math.abs(Math.sin(ang)),
+        nx: -Math.sin(ang), ny: Math.cos(ang),
+      };
+    }
     // 외벽(외곽)에 부착된 개구부
     if (o.onOutline) {
       const shapes = outlineShapes(store.design.outline);
@@ -813,11 +822,12 @@ export class Editor2D {
       return;
     }
 
-    // 창호 클릭 (벽 가장자리)
+    // 창호 클릭 (벽 가장자리 또는 자유 배치)
     const op = this._hitOpening(px, py);
     if (op) {
       store.select(null, null, op.id);
-      this.drag = { mode: 'moveo', o: op };
+      const [mx, my] = this.toMm(px, py);
+      this.drag = { mode: 'moveo', o: op, dx: op.free ? mx - op.x : 0, dy: op.free ? my - op.y : 0 };
       return;
     }
 
@@ -911,7 +921,9 @@ export class Editor2D {
         drag.f.y = this.snap(my - drag.dy);
       });
     } else if (drag.mode === 'moveo') {
-      if (drag.o.onOutline) {
+      if (drag.o.free) {
+        store.liveUpdate(() => { drag.o.x = this.snap(mx - (drag.dx || 0)); drag.o.y = this.snap(my - (drag.dy || 0)); });
+      } else if (drag.o.onOutline) {
         const g = this._openingGeom(drag.o);
         if (g) {
           const along = (mx - g.ax) * g.ux + (my - g.ay) * g.uy;
@@ -1766,7 +1778,9 @@ export class Editor2D {
     // 3) 더 가까운 쪽에 부착 — 방 벽과 외벽이 겹칠 땐 방 벽을 우선(50mm 편향),
     //    바깥 외벽 쪽에 떨어뜨리면 외벽에 직접 부착
     const useOutline = outBest && (!roomBest || outBest.dist + 50 < roomBest.dist);
-    if (!useOutline && !roomBest) return;
+    const bestDist = useOutline ? outBest.dist : (roomBest ? roomBest.dist : Infinity);
+    // 벽이 없거나 멀면(800mm 초과) 벽 없이 '자유 배치' — 먼저 올리고 나중에 위치/크기 조정
+    if (bestDist > 800) { this._addFreeOpening(winType, mx, my); return; }
     store.commit((dd) => {
       const o = useOutline
         ? openingOutline(outBest.pathIndex, outBest.edgeIndex, this.snap(outBest.pos), winType)
@@ -1775,5 +1789,22 @@ export class Editor2D {
       store.selectedOpening = o.id;
       store.selectedRoom = store.selectedFurniture = null;
     });
+  }
+
+  // 벽 없이 개구부를 화면에 바로 올림 (없으면 화면 중앙). winType, mx/my(mm) 선택
+  _addFreeOpening(winType, mx, my) {
+    const t = WINDOW_TYPES[winType] || WINDOW_TYPES.door || {};
+    if (mx == null || my == null) { [mx, my] = this.toMm(this.cssW / 2, this.cssH / 2); }
+    store.commit((dd) => {
+      const o = {
+        id: 'o' + Date.now().toString(36), free: true,
+        x: this.snap(mx), y: this.snap(my), angle: 0,
+        winType, w: t.w || 900, h: t.h || 2100, sill: t.sill || 0, color: '#4a5560',
+      };
+      dd.openings.push(o);
+      store.selectedOpening = o.id;
+      store.selectedRoom = store.selectedFurniture = null;
+    });
+    return true;
   }
 }

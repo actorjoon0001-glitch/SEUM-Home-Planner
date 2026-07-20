@@ -537,7 +537,7 @@ function windowCard(item) {
   const card = document.createElement('div');
   card.className = 'lib-card';
   card.draggable = true;
-  card.title = `${item.label} (${item.w}×${item.h}mm) — 방 벽이나 외벽으로 끌어다 놓으세요`;
+  card.title = `${item.label} (${item.w}×${item.h}mm) — 벽으로 끌어다 놓거나, 더블클릭으로 벽 없이 바로 올리기`;
   card.innerHTML = `
     <div class="lib-thumb">${winThumb(item, isDoor)}</div>
     <div class="lib-name">${item.label}</div>
@@ -547,19 +547,8 @@ function windowCard(item) {
     e.dataTransfer.effectAllowed = 'copy';
   });
   card.addEventListener('dblclick', () => {
-    // 더블클릭 → 첫 방의 북측 벽 중앙에 추가
-    const d = store.design;
-    if (!d.rooms.length) return;
-    const r = d.rooms[0];
-    store.commit((dd) => {
-      dd.openings.push({
-        id: 'o' + Date.now().toString(36),
-        roomId: r.id, side: 'n', pos: Math.round(r.w / 2),
-        winType: item.id, w: item.w, h: item.h, sill: item.sill, color: '#4a5560',
-      });
-      store.selectedOpening = dd.openings[dd.openings.length - 1].id;
-      store.selectedRoom = store.selectedFurniture = null;
-    });
+    // 더블클릭 → 벽 없이 화면에 바로 올림(자유 배치). 이후 드래그로 이동, W로 크기조절
+    if (_editor && _editor._addFreeOpening) _editor._addFreeOpening(item.id);
   });
   return card;
 }
@@ -810,13 +799,18 @@ function openingForm(o) {
   const typeOpts = Object.entries(WINDOW_TYPES)
     .map(([k, t]) => `<option value="${k}" ${k === o.winType ? 'selected' : ''}>${t.label}</option>`).join('');
   const onOutline = !!o.onOutline;
+  const free = !!o.free;
   const sideOpts = [['n', '북(상)'], ['s', '남(하)'], ['e', '동(우)'], ['w', '서(좌)']]
     .map(([k, l]) => `<option value="${k}" ${k === o.side ? 'selected' : ''}>${l}</option>`).join('');
-  const room = onOutline ? null : (store.design.rooms || []).find((r) => r.id === o.roomId);
-  const where = onOutline ? '외벽' : (room ? esc(room.name) : '');
-  const sideField = onOutline
-    ? `<div class="info-row"><span>부착 위치</span><b>외벽(외곽)</b></div>`
-    : `<label class="fld"><span>부착 벽면</span><select id="o-side">${sideOpts}</select></label>`;
+  const room = (onOutline || free) ? null : (store.design.rooms || []).find((r) => r.id === o.roomId);
+  const where = free ? '자유 배치' : (onOutline ? '외벽' : (room ? esc(room.name) : ''));
+  const sideField = free
+    ? `<div class="fld"><span>배치 <small style="color:var(--muted)">· 도면에서 드래그로 이동</small></span>
+        <div class="btn-row"><button class="mini" id="o-rot" title="90° 회전">⟳ 90° 회전</button></div></div>`
+    : onOutline
+      ? `<div class="info-row"><span>부착 위치</span><b>외벽(외곽)</b></div>`
+      : `<label class="fld"><span>부착 벽면</span><select id="o-side">${sideOpts}</select></label>`;
+  const posField = free ? '' : `<label class="fld"><span>벽 위치 (mm)</span><input id="o-pos" type="number" step="100" value="${Math.round(o.pos)}"></label>`;
   return `
     <button class="mini" id="o-back">← 창호 목록</button>
     <p class="ph">창호 속성${where ? ` · ${where}` : ''}</p>
@@ -828,7 +822,7 @@ function openingForm(o) {
     </div>
     <div class="grid2">
       <label class="fld"><span>하단 높이 (mm)</span><input id="o-sill" type="number" step="50" value="${o.sill}"></label>
-      <label class="fld"><span>벽 위치 (mm)</span><input id="o-pos" type="number" step="100" value="${Math.round(o.pos)}"></label>
+      ${posField}
     </div>
     <label class="fld"><span>창틀 색상</span><input id="o-color" type="color" value="${o.color || '#4a5560'}"></label>
     <div class="fld"><span>여는 방향 (문)</span>
@@ -855,15 +849,20 @@ function bindOpeningForm(o) {
   });
   const sideEl = document.getElementById('o-side');
   if (sideEl) sideEl.onchange = (e) => upd(() => o.side = e.target.value);
+  const rotEl = document.getElementById('o-rot');
+  if (rotEl) rotEl.onclick = () => upd(() => o.angle = ((o.angle || 0) + Math.PI / 2) % (Math.PI * 2));
   document.getElementById('o-w').onchange = (e) => upd(() => o.w = Math.max(300, +e.target.value || 300));
   document.getElementById('o-h').onchange = (e) => upd(() => o.h = Math.max(300, +e.target.value || 300));
   document.getElementById('o-sill').onchange = (e) => upd(() => o.sill = Math.max(0, +e.target.value || 0));
-  document.getElementById('o-pos').onchange = (e) => upd(() => o.pos = +e.target.value || 0);
+  const posEl = document.getElementById('o-pos');
+  if (posEl) posEl.onchange = (e) => upd(() => o.pos = +e.target.value || 0);
   document.getElementById('o-color').oninput = (e) => upd(() => o.color = e.target.value);
   document.getElementById('o-fliph').onclick = () => upd(() => o.flipH = !o.flipH);
   document.getElementById('o-flipv').onclick = () => upd(() => o.flipV = !o.flipV);
   document.getElementById('o-dup').onclick = () => store.commit((d) => {
-    const copy = { ...o, id: 'o' + Date.now().toString(36), pos: o.pos + 1200 };
+    const copy = o.free
+      ? { ...o, id: 'o' + Date.now().toString(36), x: (o.x || 0) + 400, y: (o.y || 0) + 400 }
+      : { ...o, id: 'o' + Date.now().toString(36), pos: (o.pos || 0) + 1200 };
     d.openings.push(copy); store.selectedOpening = copy.id;
   });
   document.getElementById('o-del').onclick = () => store.commit((d) => {

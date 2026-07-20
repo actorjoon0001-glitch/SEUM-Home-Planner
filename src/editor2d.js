@@ -317,12 +317,11 @@ export class Editor2D {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((f.rotation || 0) * Math.PI / 180);
-    ctx.fillStyle = this.monoMode ? '#eeeeee' : c.color;
-    ctx.globalAlpha = this.monoMode ? 1 : 0.9;
+    // 가구·가전·소품은 항상 모노톤(회색)으로 통일 — 깔끔한 2D
+    ctx.fillStyle = '#ececec';
     ctx.fillRect(-w / 2, -d / 2, w, d);
-    ctx.globalAlpha = 1;
     ctx.lineWidth = selected ? 2.5 : 1.2;
-    ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#8b9098' : '#6b6b6b');
+    ctx.strokeStyle = selected ? '#c8102e' : '#8b9098';
     ctx.strokeRect(-w / 2, -d / 2, w, d);
     // 방향 표시 (앞쪽)
     ctx.fillStyle = 'rgba(0,0,0,0.18)';

@@ -386,7 +386,7 @@ export class Viewer3D {
 
   // 집 외곽(외벽) — 각 경로의 변에 벽 (+ 닫힌 경로면 바닥). 여러 외벽 누적 지원
   _buildOutline(d, b, ceilH) {
-    const H = ceilH, T = d.wallThickness || 160;
+    const H = ceilH, T = d.wallThickness || 150;
     const wallMat = this._wallMat();
     for (const { pts, closed } of outlineShapes(d.outline)) {
       const P = pts.map((p) => this._p(p[0], p[1], b));

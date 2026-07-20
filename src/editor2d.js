@@ -825,7 +825,7 @@ export class Editor2D {
   }
 
   // 벽 두께 (mm) — 도면에 저장, 없으면 기본 200
-  wallThickness() { return (store.design && store.design.wallThickness) || 200; }
+  wallThickness() { return (store.design && store.design.wallThickness) || 150; }
   setWallThickness(mm) {
     const v = Math.max(50, Math.min(600, Math.round((+mm || 200) / 10) * 10));
     store.commit((d) => { d.wallThickness = v; });

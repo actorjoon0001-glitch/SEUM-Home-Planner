@@ -984,6 +984,14 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('tb-underlay').onclick = () => openUnderlayDialog(editor);
   $('tb-cloud').onclick = () => openCloudDialog();
 
+  // 모노톤(흑백) 도면 토글 — 종이 카달로그 인쇄용. 화면·내보내기·인쇄에 모두 반영
+  const monoBtn = $('tb-mono');
+  if (monoBtn) monoBtn.onclick = () => {
+    const on = editor.setMonoMode(!editor.monoMode);
+    monoBtn.classList.toggle('active', on);
+    flash(on ? '모노톤(흑백) 도면 — 카달로그 인쇄용으로 표시합니다' : '색상 도면으로 되돌렸습니다');
+  };
+
   $('tb-export').onclick = () => {
     const blob = new Blob([store.exportJSON()], { type: 'application/json' });
     const a = document.createElement('a');

@@ -556,6 +556,30 @@ export class Editor2D {
     return null;
   }
 
+  // 외벽(벽체) 선 위 클릭 판정 — 선분에 가까우면 그 경로 index 반환
+  _hitOutline(px, py) {
+    const shapes = outlineShapes(store.design.outline);
+    const tol = Math.max(8, this.wallThickness() * this.scale / 2 + 5);
+    for (let pi = 0; pi < shapes.length; pi++) {
+      const { pts, closed } = shapes[pi];
+      const n = pts.length; if (n < 2) continue;
+      const edges = closed ? n : n - 1;
+      for (let i = 0; i < edges; i++) {
+        const a = this.toPx(pts[i][0], pts[i][1]);
+        const b = this.toPx(pts[(i + 1) % n][0], pts[(i + 1) % n][1]);
+        if (this._distToSeg(px, py, a[0], a[1], b[0], b[1]).dist <= tol) return pi;
+      }
+    }
+    return null;
+  }
+  // 외곽을 항상 {paths:[{points,closed}]} 형태로 (구버전/사각형 호환 → 이동 가능하게)
+  _toOutlinePaths(d) {
+    const o = d.outline; if (!o || Array.isArray(o.paths)) return;
+    const shapes = outlineShapes(o);
+    d.outline = { paths: shapes.map((s) => ({ points: s.pts.map((p) => [p[0], p[1]]), closed: s.closed })) };
+    if (typeof o.z === 'number') d.outline.z = o.z;
+  }
+
   // ---- 입력 ----
   _bind() {
     const cv = this.canvas;
@@ -719,6 +743,17 @@ export class Editor2D {
       return;
     }
 
+    // 외벽(벽체) 선 클릭 → 선택 + 통째로 이동 (방처럼)
+    const oi = this._hitOutline(px, py);
+    if (oi != null) {
+      store.selectOutline(oi);
+      const [mx, my] = this.toMm(px, py);
+      let orig = null;
+      store.liveUpdate((d) => { this._toOutlinePaths(d); const p = d.outline.paths[oi]; if (p) orig = p.points.map((pt) => [pt[0], pt[1]]); });
+      this.drag = { mode: 'moveoutline', pathIndex: oi, sx: mx, sy: my, orig };
+      return;
+    }
+
     // 빈 곳 → 선택 해제 + 팬
     store.select(null, null);
     this.drag = { mode: 'pan', sx: px, sy: py, ox: this.ox, oy: this.oy };
@@ -793,6 +828,13 @@ export class Editor2D {
           store.liveUpdate(() => { drag.o.pos = this.snap(along); });
         }
       }
+    } else if (drag.mode === 'moveoutline') {
+      const dx = this.snap(mx - drag.sx), dy = this.snap(my - drag.sy);
+      store.liveUpdate((d) => {
+        const p = d.outline && d.outline.paths && d.outline.paths[drag.pathIndex];
+        if (!p || !drag.orig) return;
+        p.points = drag.orig.map(([x, y]) => [Math.round(x + dx), Math.round(y + dy)]);
+      });
     } else if (drag.mode === 'resize') {
       this._resizeRoom(drag.room, drag.handle, mx, my);
     } else if (drag.mode === 'rotate') {
@@ -817,7 +859,7 @@ export class Editor2D {
 
   _up() {
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
-    if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo'].includes(this.drag.mode)) {
+    if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline'].includes(this.drag.mode)) {
       store.liveEnd();
     }
     this.drag = null;
@@ -1358,7 +1400,10 @@ export class Editor2D {
     const ctx = this.ctx;
     // 외벽 선도 방 벽 선과 같은 얇은 두께로 (2D에선 두께 차이 없이 통일 — 실제 두께는 3D에서)
     const lw = this.monoMode ? 3.5 : 3;
-    for (const { pts, closed } of outlineShapes(store.design.outline)) {
+    const shapes = outlineShapes(store.design.outline);
+    for (let si = 0; si < shapes.length; si++) {
+      const { pts, closed } = shapes[si];
+      const selected = store.selectedOutline === si;
       const px = pts.map((p) => this.toPx(p[0], p[1]));
       if (closed && pts.length >= 3) {                          // 집 안쪽을 깔끔한 흰 바닥으로
         ctx.save(); ctx.fillStyle = '#ffffff'; ctx.beginPath();
@@ -1367,7 +1412,7 @@ export class Editor2D {
       }
       ctx.save();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
-      ctx.strokeStyle = this.monoMode ? '#111418' : '#5b5f66'; ctx.lineWidth = lw;
+      ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#5b5f66'); ctx.lineWidth = selected ? lw + 1.5 : lw;
       ctx.beginPath();
       px.forEach((p, i) => { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
       if (closed) ctx.closePath();
@@ -1499,6 +1544,7 @@ export class Editor2D {
     if (cur === 'default') {
       if (this._hitOpening(px, py)) cur = 'move';
       else if (this._hitFurniture(px, py) || this._hitRoom(px, py)) cur = 'move';
+      else if (this._hitOutline(px, py) != null) cur = 'move';   // 벽체 선 위 → 이동 커서
     }
     this.canvas.style.cursor = cur;
   }

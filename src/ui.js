@@ -1156,7 +1156,15 @@ function buildToolbar({ editor, viewer, onModeChange }) {
       if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
       else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });
       else if (store.selectedOpening) store.commit((d) => { d.openings = d.openings.filter((o) => o.id !== store.selectedOpening); store.selectedOpening = null; });
+      else if (store.selectedOutline != null) store.commit((d) => {
+        if (d.outline && Array.isArray(d.outline.paths)) {
+          d.outline.paths.splice(store.selectedOutline, 1);
+          if (!d.outline.paths.length) d.outline = null;
+        } else { d.outline = null; }
+        store.selectedOutline = null;
+      });
     }
+    else if (e.key === 'Escape' && store.selectedOutline != null) { store.selectedOutline = null; store.emit(); }
     // 레이어 순서: ] = 앞으로(위), [ = 뒤로(아래) — 선택된 요소에 적용
     else if (e.key === ']' || e.key === '[') {
       const move = e.key === ']' ? 'up' : 'down';

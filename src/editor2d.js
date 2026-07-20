@@ -128,11 +128,15 @@ export class Editor2D {
     // 밑그림(참조 도면 PDF/이미지) - 방보다 아래에 깔기
     this._drawUnderlay();
 
-    // 집 외곽(외벽) - 방보다 아래(틀)
-    this._drawOutline();
-
-    // 방
-    for (const room of d.rooms) this._drawRoom(room);
+    // 외벽(벽체) + 방을 하나의 레이어 스택(z)으로 정렬해 그림 — 방↔벽체 위아래 조절 가능
+    // z 없으면 기본값: 벽체 -1(가장 아래), 방은 배열 순서 → 기존 도면 모양 유지
+    const layers = [];
+    if (d.outline) layers.push({ z: (typeof d.outline.z === 'number' ? d.outline.z : -1), wall: true });
+    d.rooms.forEach((room, i) => layers.push({ z: (typeof room.z === 'number' ? room.z : i), room }));
+    layers.sort((a, b) => a.z - b.z);
+    for (const L of layers) { if (L.wall) this._drawOutlineShapes(); else this._drawRoom(L.room); }
+    // 외벽 그리는 중(draft)은 항상 위에
+    this._drawOutlineDraft();
     // 선택 방 핸들
     const sel = d.rooms.find((r) => r.id === store.selectedRoom);
     if (sel) this._drawHandles(sel);
@@ -541,8 +545,10 @@ export class Editor2D {
 
   _hitRoom(px, py) {
     const d = store.design;
-    for (let i = d.rooms.length - 1; i >= 0; i--) {
-      const r = d.rooms[i];
+    // 위(높은 z)에 그려진 방부터 검사 — 겹칠 때 눈에 보이는 방이 먼저 선택됨
+    const rooms = d.rooms.map((r, i) => ({ r, z: (typeof r.z === 'number' ? r.z : i) }))
+      .sort((a, b) => b.z - a.z);
+    for (const { r } of rooms) {
       const [x, y] = this.toPx(r.x, r.y);
       const w = r.w * this.scale, h = r.d * this.scale;
       if (px >= x && px <= x + w && py >= y && py <= y + h) return r;
@@ -995,7 +1001,8 @@ export class Editor2D {
         else if (cur && 'w' in cur) paths = [{ points: [[cur.x, cur.y], [cur.x + cur.w, cur.y], [cur.x + cur.w, cur.y + cur.d], [cur.x, cur.y + cur.d]], closed: true }];
         else paths = [];
         paths.push(path);
-        dd.outline = { paths };
+        const keepZ = cur && typeof cur.z === 'number' ? cur.z : undefined;   // 레이어 z 유지
+        dd.outline = keepZ === undefined ? { paths } : { paths, z: keepZ };
       });
     }
     this.outlineDraft = null; this._outlineCursor = null;
@@ -1344,11 +1351,13 @@ export class Editor2D {
     ctx.restore();
   }
 
-  // 집 외곽(외벽) 2D 표시 — 닫힌 공간은 흰 바닥 + 면적, 벽 + 치수
+  // 집 외곽(외벽) 완성분 2D 표시 — 닫힌 공간은 흰 바닥 + 면적, 벽 + 치수
   // (강화마루 질감 바닥은 2D엔 넣지 않고 3D에서만 표현)
-  _drawOutline() {
+  // draw()의 레이어 스택에서 '벽체' 위치에 호출된다 (방과 위아래 순서 조절 가능)
+  _drawOutlineShapes() {
     const ctx = this.ctx;
-    const t = Math.max(3, this.wallThickness() * this.scale); // 외벽 두께(도면 설정)
+    // 외벽 선도 방 벽 선과 같은 얇은 두께로 (2D에선 두께 차이 없이 통일 — 실제 두께는 3D에서)
+    const lw = this.monoMode ? 3.5 : 3;
     for (const { pts, closed } of outlineShapes(store.design.outline)) {
       const px = pts.map((p) => this.toPx(p[0], p[1]));
       if (closed && pts.length >= 3) {                          // 집 안쪽을 깔끔한 흰 바닥으로
@@ -1358,7 +1367,7 @@ export class Editor2D {
       }
       ctx.save();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
-      ctx.strokeStyle = this.monoMode ? '#111418' : '#3a3f44'; ctx.lineWidth = t;
+      ctx.strokeStyle = this.monoMode ? '#111418' : '#5b5f66'; ctx.lineWidth = lw;
       ctx.beginPath();
       px.forEach((p, i) => { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
       if (closed) ctx.closePath();
@@ -1368,7 +1377,11 @@ export class Editor2D {
       if (this.showDims) for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) this._segLabel(pts[i], pts[(i + 1) % pts.length], '#3a3f44');
       if (closed && pts.length >= 3) this._outlineAreaLabel(pts);
     }
-    // 그리는 중(draft) — 형광펜 스타일(두껍고 반투명한 퍼플) + 치수 + 점
+  }
+
+  // 외벽 그리는 중(draft) 표시 — 항상 맨 위에 (형광펜 스타일)
+  _drawOutlineDraft() {
+    const ctx = this.ctx;
     const draft = this.outlineDraft;
     if (draft && draft.length) {
       const HL = '#6c5ce7';                                    // 형광 퍼플

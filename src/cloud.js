@@ -110,6 +110,16 @@ export const cloud = {
     return out;
   },
 
+  // 이미 저장된 도면을 빠르게 갱신 (이름/데이터/썸네일만) — 공유·템플릿 설정은 그대로 유지
+  async quickSave({ id, name, data }) {
+    await this.init();
+    if (!this.user) throw new Error('로그인이 필요합니다.');
+    const row = { name, data, updated_at: new Date().toISOString() };
+    const { data: out, error } = await client.from('designs').update(row).eq('id', id).select().single();
+    if (error) throw error;
+    return out;
+  },
+
   async listMine() {
     await this.init();
     if (!this.user) return [];

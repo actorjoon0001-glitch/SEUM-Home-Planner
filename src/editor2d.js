@@ -22,6 +22,7 @@ export class Editor2D {
     // 벽 그리기 옵션 (Archisketch 스타일)
     this.snapMode = true;    // 격자/직각 스냅
     this.orthoMode = true;   // 직교(90°) 강제 — 밑그림 따라 반듯한 벽 그리기 기본값
+    this.monoMode = false;   // 모노톤(흑백) — 종이 카달로그 인쇄용: 방·가구·바닥 색 제거
     this.onOutlineChange = null; // 그리는 중 길이 입력 상자 위치/값 콜백
 
     // 텍스트 라벨(방 이름 등)
@@ -236,8 +237,8 @@ export class Editor2D {
     const w = room.w * this.scale, h = room.d * this.scale;
     const selected = room.id === store.selectedRoom;
 
-    // 바닥
-    ctx.fillStyle = t.color;
+    // 바닥 (모노톤: 색 없이 흰 바닥)
+    ctx.fillStyle = this.monoMode ? '#ffffff' : t.color;
     ctx.fillRect(x, y, w, h);
     // 벽 (면별로 그림 — 트인(open) 면은 점선 통로로 표시)
     const open = Array.isArray(room.open) ? room.open : [];
@@ -247,7 +248,7 @@ export class Editor2D {
       ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
       if (side === hov) { ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 6; ctx.setLineDash([]); }
       else if (open.includes(side)) { ctx.strokeStyle = '#c2c7ce'; ctx.lineWidth = 2; ctx.setLineDash([4, 5]); }
-      else { ctx.strokeStyle = selected ? '#c8102e' : '#5b5f66'; ctx.lineWidth = selected ? 4 : 3; ctx.setLineDash([]); }
+      else { ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#5b5f66'); ctx.lineWidth = selected ? 4 : (this.monoMode ? 3.5 : 3); ctx.setLineDash([]); }
       ctx.stroke(); ctx.setLineDash([]);
     };
     drawWall(x, y, x + w, y, 'n');
@@ -316,12 +317,12 @@ export class Editor2D {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((f.rotation || 0) * Math.PI / 180);
-    ctx.fillStyle = c.color;
-    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = this.monoMode ? '#eeeeee' : c.color;
+    ctx.globalAlpha = this.monoMode ? 1 : 0.9;
     ctx.fillRect(-w / 2, -d / 2, w, d);
     ctx.globalAlpha = 1;
     ctx.lineWidth = selected ? 2.5 : 1.2;
-    ctx.strokeStyle = selected ? '#c8102e' : '#6b6b6b';
+    ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#8b9098' : '#6b6b6b');
     ctx.strokeRect(-w / 2, -d / 2, w, d);
     // 방향 표시 (앞쪽)
     ctx.fillStyle = 'rgba(0,0,0,0.18)';
@@ -412,11 +413,11 @@ export class Editor2D {
     ctx.rotate(g.angle || 0);
 
     // 벽 끊기 (흰 배경)
-    ctx.fillStyle = '#f4f5f7';
+    ctx.fillStyle = this.monoMode ? '#ffffff' : '#f4f5f7';
     ctx.fillRect(-len / 2, -thick / 2 - 1, len, thick + 2);
 
     if (isDoor) {
-      ctx.strokeStyle = selected ? '#c8102e' : '#4a5560';
+      ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#4a5560');
       ctx.lineWidth = selected ? 2.5 : 1.6;
       if (t.slide) {
         // 슬라이딩/포켓 도어 — 트랙 + 문짝(절반)
@@ -450,7 +451,7 @@ export class Editor2D {
       }
     } else {
       // 창: 평행 이중선(유리) + 분할
-      ctx.strokeStyle = selected ? '#c8102e' : (o.color || '#4a5560');
+      ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : (o.color || '#4a5560'));
       ctx.lineWidth = selected ? 2.5 : 1.8;
       ctx.beginPath();
       ctx.moveTo(-len / 2, -thick / 2); ctx.lineTo(len / 2, -thick / 2);
@@ -833,6 +834,7 @@ export class Editor2D {
   }
   setSnapMode(on) { this.snapMode = !!on; this.draw(); }
   setOrthoMode(on) { this.orthoMode = !!on; this.draw(); }
+  setMonoMode(on) { this.monoMode = !!on; this.draw(); return this.monoMode; }
   setShowDims(on) { this.showDims = !!on; this.draw(); }
 
   // 외곽 점 스냅: (스냅 모드) 격자 100mm + 직전 점과 거의 수평/수직이면 직각 정렬
@@ -1269,10 +1271,13 @@ export class Editor2D {
     const t = Math.max(3, this.wallThickness() * this.scale); // 외벽 두께(도면 설정)
     for (const { pts, closed } of outlineShapes(store.design.outline)) {
       const px = pts.map((p) => this.toPx(p[0], p[1]));
-      if (closed && pts.length >= 3) this._fillLaminate(px);   // 강화마루 바닥(기본)
+      if (closed && pts.length >= 3) {
+        if (this.monoMode) { ctx.save(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); px.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.fill(); ctx.restore(); }
+        else this._fillLaminate(px);                            // 강화마루 바닥(기본)
+      }
       ctx.save();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
-      ctx.strokeStyle = '#3a3f44'; ctx.lineWidth = t;
+      ctx.strokeStyle = this.monoMode ? '#111418' : '#3a3f44'; ctx.lineWidth = t;
       ctx.beginPath();
       px.forEach((p, i) => { i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
       if (closed) ctx.closePath();

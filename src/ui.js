@@ -822,11 +822,17 @@ function openingForm(o) {
       <label class="fld"><span>벽 위치 (mm)</span><input id="o-pos" type="number" step="100" value="${Math.round(o.pos)}"></label>
     </div>
     <label class="fld"><span>창틀 색상</span><input id="o-color" type="color" value="${o.color || '#4a5560'}"></label>
+    <div class="fld"><span>여는 방향 (문)</span>
+      <div class="btn-row">
+        <button class="mini${o.flipH ? ' active' : ''}" id="o-fliph" title="경첩(문 다는 쪽)을 좌우로 바꿈">↔ 경첩 좌우</button>
+        <button class="mini${o.flipV ? ' active' : ''}" id="o-flipv" title="문이 열리는 쪽을 안/밖으로 바꿈">↕ 안/밖</button>
+      </div>
+    </div>
     <div class="btn-row">
       <button class="mini" id="o-dup">복제</button>
       <button class="mini danger" id="o-del">삭제</button>
     </div>
-    <p class="hint">창은 도면에서 벽을 따라 드래그해 위치를 옮길 수 있습니다.</p>`;
+    <p class="hint">창·문은 도면에서 벽을 따라 드래그해 위치를 옮기고, 위 버튼으로 여는 방향을 바꿀 수 있습니다.</p>`;
 }
 
 function bindOpeningForm(o) {
@@ -844,6 +850,8 @@ function bindOpeningForm(o) {
   document.getElementById('o-sill').onchange = (e) => upd(() => o.sill = Math.max(0, +e.target.value || 0));
   document.getElementById('o-pos').onchange = (e) => upd(() => o.pos = +e.target.value || 0);
   document.getElementById('o-color').oninput = (e) => upd(() => o.color = e.target.value);
+  document.getElementById('o-fliph').onclick = () => upd(() => o.flipH = !o.flipH);
+  document.getElementById('o-flipv').onclick = () => upd(() => o.flipV = !o.flipV);
   document.getElementById('o-dup').onclick = () => store.commit((d) => {
     const copy = { ...o, id: 'o' + Date.now().toString(36), pos: o.pos + 1200 };
     d.openings.push(copy); store.selectedOpening = copy.id;

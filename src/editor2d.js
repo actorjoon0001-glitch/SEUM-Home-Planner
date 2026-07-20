@@ -405,12 +405,14 @@ export class Editor2D {
     const selected = o.id === store.selectedOpening;
     const [pcx, pcy] = this.toPx(g.cx, g.cy);
     const len = o.w * this.scale;
-    // 화면상 벽 두께 표현 — 외벽(200mm)은 더 두꺼우므로 그 폭을 덮도록 맞춤
-    const thick = o.onOutline ? Math.max(9, 200 * this.scale + 4) : 9;
+    // 화면상 벽 두께 표현 — 외벽은 실제 두께만큼 덮어 그림
+    const thick = o.onOutline ? Math.max(9, this.wallThickness() * this.scale + 4) : 9;
 
     ctx.save();
     ctx.translate(pcx, pcy);
     ctx.rotate(g.angle || 0);
+    // 문 여는 방향: flipH=경첩 좌우, flipV=여는 쪽 안/밖 (문짝·호를 거울 반전)
+    ctx.scale(o.flipH ? -1 : 1, o.flipV ? -1 : 1);
 
     // 벽 끊기 (흰 배경)
     ctx.fillStyle = this.monoMode ? '#ffffff' : '#f4f5f7';
@@ -492,7 +494,9 @@ export class Editor2D {
       const ca = Math.cos(g.angle || 0), sa = Math.sin(g.angle || 0);
       const along = Math.abs(dx * ca + dy * sa);
       const across = Math.abs(-dx * sa + dy * ca);
-      if (along <= len / 2 + 4 && across <= 8) return o;
+      // 클릭 여유: 벽 두께 절반 + 여유(최소 12px)라 문·창을 쉽게 집을 수 있음
+      const wallHalf = (o.onOutline ? this.wallThickness() * this.scale : 9) / 2;
+      if (along <= len / 2 + 6 && across <= Math.max(12, wallHalf + 8)) return o;
     }
     return null;
   }

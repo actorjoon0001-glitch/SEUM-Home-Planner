@@ -1563,8 +1563,7 @@ export class Editor2D {
         ctx.beginPath(); ctx.arc(p[0], p[1], i === 0 ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       });
       ctx.restore();
-      // 놓인 구간 치수 + 현재(고무줄) 구간 길이 실시간 표시
-      for (let i = 0; i < draft.length - 1; i++) this._segLabel(draft[i], draft[i + 1], HL);
+      // 지금 그리는 구간(고무줄) 길이만 표시 — 놓인 구간 치수는 겹쳐서 안 보이게(짧은 벽도 그리기 쉽게)
       if (this._outlineCursor) this._segLabel(draft[draft.length - 1], this._outlineCursor, HL);
     }
   }

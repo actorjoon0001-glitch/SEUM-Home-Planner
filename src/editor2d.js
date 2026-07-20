@@ -125,21 +125,27 @@ export class Editor2D {
     ctx.clearRect(0, 0, this.cssW, this.cssH);
     this._drawGrid();
 
-    // 밑그림(참조 도면 PDF/이미지) - 방보다 아래에 깔기
-    this._drawUnderlay();
-
-    // 외벽(벽체) + 방을 하나의 레이어 스택(z)으로 정렬해 그림 — 방↔벽체 위아래 조절 가능
-    // z 없으면 기본값: 벽체 -1(가장 아래), 방은 배열 순서 → 기존 도면 모양 유지
+    // 밑그림(참조 도면) + 외벽(벽체) + 방을 하나의 레이어 스택(z)으로 정렬해 그림
+    // → 밑그림·벽·방을 서로 위/아래로 조절 가능
+    // z 없으면 기본값: 밑그림 -2, 벽체 -1(아래), 방은 배열 순서 → 기존 모양 유지
     const layers = [];
+    const u = d.underlay;
+    if (u && !u.hidden && !this._export) layers.push({ z: (typeof u.z === 'number' ? u.z : -2), underlay: true });
     if (d.outline) layers.push({ z: (typeof d.outline.z === 'number' ? d.outline.z : -1), wall: true });
     d.rooms.forEach((room, i) => layers.push({ z: (typeof room.z === 'number' ? room.z : i), room }));
     layers.sort((a, b) => a.z - b.z);
-    for (const L of layers) { if (L.wall) this._drawOutlineShapes(); else this._drawRoom(L.room); }
+    for (const L of layers) {
+      if (L.underlay) this._drawUnderlay();
+      else if (L.wall) this._drawOutlineShapes();
+      else this._drawRoom(L.room);
+    }
     // 외벽 그리는 중(draft)은 항상 위에
     this._drawOutlineDraft();
     // 선택 방 핸들
     const sel = d.rooms.find((r) => r.id === store.selectedRoom);
     if (sel) this._drawHandles(sel);
+    // 선택 벽체(외벽) 크기조절 핸들
+    if (store.selectedOutline != null) this._drawOutlineHandles(store.selectedOutline);
 
     // 창호(개구부)
     for (const o of (d.openings || [])) this._drawOpening(o);
@@ -241,19 +247,26 @@ export class Editor2D {
     const w = room.w * this.scale, h = room.d * this.scale;
     const selected = room.id === store.selectedRoom;
 
-    // 바닥 — 색 채움 없이 흰 바닥으로 (깔끔한 2D·모노톤 인쇄용)
+    // 바닥 — 흰 바닥. 바닥 투명도 적용 → 밑그림(도면) 위에서 비쳐 보이게
+    ctx.save();
+    ctx.globalAlpha = this._floorAlpha();
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y, w, h);
-    // 벽 (면별로 그림 — 트인(open) 면은 점선 통로로 표시)
+    ctx.restore();
+    // 벽 (면별로 그림 — 트인(open) 면은 점선 통로로 표시). 벽 투명도 적용.
     const open = Array.isArray(room.open) ? room.open : [];
     const hov = this.wallEdit && this._hoverWall && this._hoverWall.roomId === room.id ? this._hoverWall.side : null;
+    const wa = this._wallAlpha();
     const drawWall = (x1, y1, x2, y2, side) => {
+      ctx.save();
+      ctx.globalAlpha = (side === hov || selected) ? 1 : wa;   // 강조/선택은 또렷하게
       ctx.beginPath();
       ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
       if (side === hov) { ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 6; ctx.setLineDash([]); }
       else if (open.includes(side)) { ctx.strokeStyle = '#c2c7ce'; ctx.lineWidth = 2; ctx.setLineDash([4, 5]); }
       else { ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#5b5f66'); ctx.lineWidth = selected ? 4 : (this.monoMode ? 3.5 : 3); ctx.setLineDash([]); }
       ctx.stroke(); ctx.setLineDash([]);
+      ctx.restore();
     };
     drawWall(x, y, x + w, y, 'n');
     drawWall(x, y + h, x + w, y + h, 's');
@@ -567,21 +580,31 @@ export class Editor2D {
     return null;
   }
 
-  // 외벽(벽체) 선 위 클릭 판정 — 선분에 가까우면 그 경로 index 반환
+  // 외벽(벽체) 클릭 판정 — 선분에 가깝거나(선), 닫힌 면 '안쪽'을 눌러도(면) 그 경로 index 반환
   _hitOutline(px, py) {
     const shapes = outlineShapes(store.design.outline);
     const tol = Math.max(8, this.wallThickness() * this.scale / 2 + 5);
-    for (let pi = 0; pi < shapes.length; pi++) {
+    // 위(뒤 index=위)부터 검사 — 여러 벽 겹칠 때 눈에 보이는 것 우선
+    for (let pi = shapes.length - 1; pi >= 0; pi--) {
       const { pts, closed } = shapes[pi];
       const n = pts.length; if (n < 2) continue;
+      const poly = pts.map((p) => this.toPx(p[0], p[1]));
       const edges = closed ? n : n - 1;
       for (let i = 0; i < edges; i++) {
-        const a = this.toPx(pts[i][0], pts[i][1]);
-        const b = this.toPx(pts[(i + 1) % n][0], pts[(i + 1) % n][1]);
+        const a = poly[i], b = poly[(i + 1) % n];
         if (this._distToSeg(px, py, a[0], a[1], b[0], b[1]).dist <= tol) return pi;
       }
+      if (closed && n >= 3 && this._pointInPoly(px, py, poly)) return pi;   // 면 안쪽 클릭
     }
     return null;
+  }
+  _pointInPoly(px, py, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+      if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
   }
   // 외곽을 항상 {paths:[{points,closed}]} 형태로 (구버전/사각형 호환 → 이동 가능하게)
   _toOutlinePaths(d) {
@@ -589,6 +612,57 @@ export class Editor2D {
     const shapes = outlineShapes(o);
     d.outline = { paths: shapes.map((s) => ({ points: s.pts.map((p) => [p[0], p[1]]), closed: s.closed })) };
     if (typeof o.z === 'number') d.outline.z = o.z;
+  }
+  // 선택된 외벽 경로의 바운딩박스(mm)
+  _outlineBboxMm(pathIndex) {
+    const shapes = outlineShapes(store.design.outline);
+    const s = shapes[pathIndex]; if (!s) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of s.pts) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; }
+    if (!isFinite(minX)) return null;
+    return { x: minX, y: minY, w: maxX - minX, d: maxY - minY };
+  }
+  _outlineHandlePoints(pathIndex) {
+    const bb = this._outlineBboxMm(pathIndex); if (!bb) return null;
+    const [x, y] = this.toPx(bb.x, bb.y);
+    return this._handlePoints(x, y, bb.w * this.scale, bb.d * this.scale);
+  }
+  _hitOutlineHandle(pathIndex, px, py) {
+    const pts = this._outlineHandlePoints(pathIndex); if (!pts) return null;
+    for (const [k, p] of Object.entries(pts)) {
+      if (Math.abs(px - p[0]) <= HANDLE && Math.abs(py - p[1]) <= HANDLE) return k;
+    }
+    return null;
+  }
+  _drawOutlineHandles(pathIndex) {
+    const pts = this._outlineHandlePoints(pathIndex); if (!pts) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2;
+    for (const p of Object.values(pts)) {
+      ctx.fillRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE);
+      ctx.strokeRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE);
+    }
+    ctx.restore();
+  }
+  // 바운딩박스 핸들 드래그 → 외벽 폴리곤 전체를 비율대로 확대/축소
+  _resizeOutline(drag, mx, my) {
+    const bb = drag.bb, orig = drag.orig; if (!bb || !orig) return;
+    const MIN = 500;
+    let x0 = bb.x, y0 = bb.y, x1 = bb.x + bb.w, y1 = bb.y + bb.d;
+    mx = this.snap(mx); my = this.snap(my);
+    const h = drag.handle;
+    if (h.includes('w')) x0 = Math.min(mx, x1 - MIN);
+    if (h.includes('e')) x1 = Math.max(mx, x0 + MIN);
+    if (h.includes('n')) y0 = Math.min(my, y1 - MIN);
+    if (h.includes('s')) y1 = Math.max(my, y0 + MIN);
+    const nw = x1 - x0, nd = y1 - y0;
+    const sx = bb.w > 0 ? nw / bb.w : 1, sy = bb.d > 0 ? nd / bb.d : 1;
+    store.liveUpdate((d) => {
+      const p = d.outline && d.outline.paths && d.outline.paths[drag.pathIndex];
+      if (!p) return;
+      p.points = orig.map(([ox, oy]) => [Math.round(x0 + (ox - bb.x) * sx), Math.round(y0 + (oy - bb.y) * sy)]);
+    });
   }
 
   // ---- 입력 ----
@@ -721,6 +795,17 @@ export class Editor2D {
         return;
       }
     }
+    // 선택된 벽체(외벽) 크기조절 핸들 우선 — 방처럼 8핸들로 확대/축소
+    if (store.selectedOutline != null) {
+      const hk = this._hitOutlineHandle(store.selectedOutline, px, py);
+      if (hk) {
+        const bb = this._outlineBboxMm(store.selectedOutline);
+        let orig = null;
+        store.liveUpdate((dd) => { this._toOutlinePaths(dd); const p = dd.outline.paths[store.selectedOutline]; if (p) orig = p.points.map((pt) => [pt[0], pt[1]]); });
+        this.drag = { mode: 'resizeoutline', pathIndex: store.selectedOutline, handle: hk, bb, orig };
+        return;
+      }
+    }
     // 선택된 가구 회전 핸들
     const selF = d.furniture.find((f) => f.id === store.selectedFurniture);
     if (selF && this._hitFurnitureRotate(selF, px, py)) {
@@ -848,6 +933,8 @@ export class Editor2D {
       });
     } else if (drag.mode === 'resize') {
       this._resizeRoom(drag.room, drag.handle, mx, my);
+    } else if (drag.mode === 'resizeoutline') {
+      this._resizeOutline(drag, mx, my);
     } else if (drag.mode === 'rotate') {
       const [cx, cy] = this.toPx(drag.f.x, drag.f.y);
       let ang = Math.atan2(py - cy, px - cx) * 180 / Math.PI + 90;
@@ -870,7 +957,7 @@ export class Editor2D {
 
   _up() {
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
-    if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline'].includes(this.drag.mode)) {
+    if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline', 'resizeoutline'].includes(this.drag.mode)) {
       store.liveEnd();
     }
     this.drag = null;
@@ -897,6 +984,9 @@ export class Editor2D {
   setSnapMode(on) { this.snapMode = !!on; this.draw(); }
   setOrthoMode(on) { this.orthoMode = !!on; this.draw(); }
   setMonoMode(on) { this.monoMode = !!on; this.draw(); return this.monoMode; }
+  // 2D 바닥/벽 투명도 (도면 위에서 작업 시 밑그림 비침용). 내보내기/인쇄는 항상 불투명.
+  _floorAlpha() { if (this._export) return 1; const v = store.design.floorOpacity; return v == null ? 1 : v; }
+  _wallAlpha() { if (this._export) return 1; const v = store.design.wallOpacity2d; return v == null ? 1 : v; }
 
   // 도면 전체 반전/회전 — 방·가구·라벨·외곽점·개구부를 한꺼번에 변환
   // kind: 'flipH'(좌우) | 'flipV'(상하) | 'rotCW'(시계90°) | 'rotCCW'(반시계90°)
@@ -1416,12 +1506,13 @@ export class Editor2D {
       const { pts, closed } = shapes[si];
       const selected = store.selectedOutline === si;
       const px = pts.map((p) => this.toPx(p[0], p[1]));
-      if (closed && pts.length >= 3) {                          // 집 안쪽을 깔끔한 흰 바닥으로
-        ctx.save(); ctx.fillStyle = '#ffffff'; ctx.beginPath();
+      if (closed && pts.length >= 3) {                          // 집 안쪽을 흰 바닥으로 (투명도 적용 → 밑그림 비침)
+        ctx.save(); ctx.globalAlpha = this._floorAlpha(); ctx.fillStyle = '#ffffff'; ctx.beginPath();
         px.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
         ctx.closePath(); ctx.fill(); ctx.restore();
       }
       ctx.save();
+      ctx.globalAlpha = selected ? 1 : this._wallAlpha();
       ctx.lineJoin = 'miter'; ctx.lineCap = 'round';
       ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#5b5f66'); ctx.lineWidth = selected ? lw + 1.5 : lw;
       ctx.beginPath();
@@ -1547,10 +1638,15 @@ export class Editor2D {
       return;
     }
     const selRoom = d.rooms.find((r) => r.id === store.selectedRoom);
+    const RC = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
     let cur = 'default';
     if (selRoom) {
       const hk = this._hitHandle(selRoom, px, py);
-      if (hk) cur = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }[hk];
+      if (hk) cur = RC[hk];
+    }
+    if (cur === 'default' && store.selectedOutline != null) {
+      const hk = this._hitOutlineHandle(store.selectedOutline, px, py);
+      if (hk) cur = RC[hk];
     }
     if (cur === 'default') {
       if (this._hitOpening(px, py)) cur = 'move';

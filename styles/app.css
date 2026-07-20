@@ -346,6 +346,8 @@ body {
 .wall-toggle .wt.off { background: #fff; color: var(--muted); border-style: dashed; opacity: .7; }
 .wall-toggle .wt.off::before { content: '↔ '; }
 .btn-row { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.layer-row { gap: 4px; margin-top: 6px; flex-wrap: nowrap; }
+.layer-row .mini { flex: 1 1 0; padding: 6px 2px; font-size: 11px; white-space: nowrap; }
 .mini {
   flex: 1 1 auto; border: 1px solid var(--line); background: #f6f7f9; color: var(--ink);
   border-radius: 6px; padding: 8px 6px; font-size: 12px; cursor: pointer; font-family: inherit;

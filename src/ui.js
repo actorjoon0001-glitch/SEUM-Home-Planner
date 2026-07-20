@@ -836,6 +836,7 @@ function openingForm(o) {
       <button class="mini" id="o-dup">복제</button>
       <button class="mini danger" id="o-del">삭제</button>
     </div>
+    ${layerControlsHTML()}
     <p class="hint">창·문은 도면에서 벽을 따라 드래그해 위치를 옮기고, 위 버튼으로 여는 방향을 바꿀 수 있습니다.</p>`;
 }
 
@@ -862,6 +863,39 @@ function bindOpeningForm(o) {
   });
   document.getElementById('o-del').onclick = () => store.commit((d) => {
     d.openings = d.openings.filter((x) => x.id !== o.id); store.selectedOpening = null;
+  });
+  bindLayerControls('op', o.id);
+}
+
+// 레이어 순서(겹칠 때 위/아래) — 같은 종류(방/가구/창호) 안에서 그리기 순서를 바꿈
+// 배열에서 뒤쪽일수록 위에 그려짐. up=앞으로(위), down=뒤로(아래), top/bottom=맨앞/맨뒤
+function layerReorder(kind, id, move) {
+  store.commit((d) => {
+    const arr = kind === 'room' ? d.rooms : kind === 'furn' ? d.furniture : d.openings;
+    if (!Array.isArray(arr)) return;
+    const i = arr.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    if (move === 'top') { arr.push(arr.splice(i, 1)[0]); }
+    else if (move === 'bottom') { arr.unshift(arr.splice(i, 1)[0]); }
+    else {
+      const j = move === 'up' ? i + 1 : i - 1;
+      if (j >= 0 && j < arr.length) { const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+    }
+  });
+}
+function layerControlsHTML() {
+  return `
+    <p class="ph">레이어 순서 <small>겹칠 때 위/아래</small></p>
+    <div class="btn-row layer-row">
+      <button class="mini" data-lz="top" title="맨 앞으로">⤒ 맨앞</button>
+      <button class="mini" data-lz="up" title="한 칸 앞으로(위)">▲ 앞으로</button>
+      <button class="mini" data-lz="down" title="한 칸 뒤로(아래)">▼ 뒤로</button>
+      <button class="mini" data-lz="bottom" title="맨 뒤로">⤓ 맨뒤</button>
+    </div>`;
+}
+function bindLayerControls(kind, id) {
+  document.querySelectorAll('.layer-row [data-lz]').forEach((b) => {
+    b.onclick = () => layerReorder(kind, id, b.dataset.lz);
   });
 }
 
@@ -890,6 +924,7 @@ function roomForm(room) {
       </div>
     </div>
     <p class="hint small">거실·주방처럼 트인 공간은 맞닿은 두 방의 해당 면을 모두 '트기'로 (3D에서 벽 사라짐)</p>
+    ${layerControlsHTML()}
     <div class="btn-row">
       <button class="mini" id="r-dup">복제</button>
       <button class="mini danger" id="r-del">삭제</button>
@@ -918,6 +953,7 @@ function bindRoomForm(room) {
   document.getElementById('r-del').onclick = () => store.commit((d) => {
     d.rooms = d.rooms.filter((r) => r.id !== room.id); store.selectedRoom = null;
   });
+  bindLayerControls('room', room.id);
 }
 
 function furnForm(f) {
@@ -936,7 +972,8 @@ function furnForm(f) {
       <button class="mini" id="f-rotr">⟳ 90°</button>
       <button class="mini" id="f-dup">복제</button>
       <button class="mini danger" id="f-del">삭제</button>
-    </div>`;
+    </div>
+    ${layerControlsHTML()}`;
 }
 
 function bindFurnForm(f) {
@@ -953,6 +990,7 @@ function bindFurnForm(f) {
   document.getElementById('f-del').onclick = () => store.commit((d) => {
     d.furniture = d.furniture.filter((x) => x.id !== f.id); store.selectedFurniture = null;
   });
+  bindLayerControls('furn', f.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -1060,6 +1098,13 @@ function buildToolbar({ editor, viewer, onModeChange }) {
       if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
       else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });
       else if (store.selectedOpening) store.commit((d) => { d.openings = d.openings.filter((o) => o.id !== store.selectedOpening); store.selectedOpening = null; });
+    }
+    // 레이어 순서: ] = 앞으로(위), [ = 뒤로(아래) — 선택된 요소에 적용
+    else if (e.key === ']' || e.key === '[') {
+      const move = e.key === ']' ? 'up' : 'down';
+      if (store.selectedRoom) layerReorder('room', store.selectedRoom, move);
+      else if (store.selectedFurniture) layerReorder('furn', store.selectedFurniture, move);
+      else if (store.selectedOpening) layerReorder('op', store.selectedOpening, move);
     }
   });
 }

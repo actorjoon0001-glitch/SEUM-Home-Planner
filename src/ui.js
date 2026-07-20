@@ -3,7 +3,7 @@ import { store } from './store.js';
 import {
   ROOM_TYPES, FURNITURE_CATALOG, CATEGORIES, catalogOf, ROOM_PALETTE_TYPES,
   WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
-  ROOF_TYPES, ROOF_PALETTE, PRODUCT_TYPES,
+  ROOF_TYPES, ROOF_PALETTE, PRODUCT_TYPES, outlineShapes,
 } from './data.js';
 import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
@@ -934,19 +934,58 @@ function bindLayerControls(kind, id) {
   });
 }
 
-// 벽체(외벽) 선택 시 속성 패널 — 레이어 순서(방과 위아래) + 삭제
+// 바닥 투명도 슬라이더 (방·벽 공통) — 밑그림 위 작업용. 패널 재렌더 없이 즉시 반영.
+function floorOpacityHTML() {
+  const v = store.design.floorOpacity != null ? store.design.floorOpacity : 1;
+  return `<label class="fld"><span>바닥 투명도 <small id="fo2-val" style="color:var(--muted)">${Math.round(v * 100)}% · 낮추면 밑그림 비침</small></span>
+    <input id="fo2-range" type="range" min="0" max="1" step="0.05" value="${v}"></label>`;
+}
+function bindFloorOpacity() {
+  const el = document.getElementById('fo2-range'); if (!el) return;
+  el.oninput = (e) => {
+    const v = parseFloat(e.target.value);
+    const lbl = document.getElementById('fo2-val'); if (lbl) lbl.textContent = Math.round(v * 100) + '% · 낮추면 밑그림 비침';
+    store.design.floorOpacity = v; if (_editor) _editor.draw();   // 재렌더 없이 캔버스만 갱신(드래그 안 끊김)
+  };
+  el.onchange = () => { try { store.persist(); } catch (_) { /* noop */ } };
+}
+
+// 벽체(외벽) 선택 시 속성 패널 — 방 패널처럼 크기·위치·면적·투명도·레이어·삭제
 function outlineForm() {
+  const bb = (_editor && _editor._outlineBboxMm(store.selectedOutline)) || { x: 0, y: 0, w: 0, d: 0 };
+  const shape = outlineShapes(store.design.outline)[store.selectedOutline];
+  const pts = shape ? shape.pts : [];
+  const area = pts.length >= 3 ? Math.abs(polyArea(pts)) / 1e6 : 0;
   return `
     <p class="ph">벽체(외벽) 속성</p>
-    <p class="hint">벽 선을 드래그해 옮기거나, 아래 버튼으로 방과 위아래 순서를 바꿀 수 있습니다.</p>
+    <div class="grid2">
+      <label class="fld"><span>가로 W (mm)</span><input id="ol-w" type="number" step="100" value="${Math.round(bb.w)}"></label>
+      <label class="fld"><span>세로 D (mm)</span><input id="ol-d" type="number" step="100" value="${Math.round(bb.d)}"></label>
+    </div>
+    <div class="grid2">
+      <label class="fld"><span>X 위치</span><input id="ol-x" type="number" step="100" value="${Math.round(bb.x)}"></label>
+      <label class="fld"><span>Y 위치</span><input id="ol-y" type="number" step="100" value="${Math.round(bb.y)}"></label>
+    </div>
+    <div class="info-row"><span>면적</span><b>${area.toFixed(2)} m² (${(area / 3.305).toFixed(1)}평)</b></div>
+    ${floorOpacityHTML()}
     ${layerControlsHTML()}
     <div class="btn-row">
       <button class="mini danger" id="ol-del">벽체 삭제</button>
-    </div>`;
+    </div>
+    <p class="hint">도면에서 벽 선을 드래그해 옮기거나, 모서리·변 핸들·위 값으로 크기를 바꿀 수 있습니다.</p>`;
 }
 function bindOutlineForm() {
+  const idx = store.selectedOutline;
+  const box = () => _editor._outlineBboxMm(idx) || { x: 0, y: 0, w: 0, d: 0 };
+  const setBox = (patch) => { const b = { ...box(), ...patch }; _editor.setOutlineBox(idx, b.x, b.y, b.w, b.d); };
+  const g = (id) => document.getElementById(id);
+  if (g('ol-w')) g('ol-w').onchange = (e) => setBox({ w: Math.max(500, +e.target.value || 500) });
+  if (g('ol-d')) g('ol-d').onchange = (e) => setBox({ d: Math.max(500, +e.target.value || 500) });
+  if (g('ol-x')) g('ol-x').onchange = (e) => setBox({ x: +e.target.value || 0 });
+  if (g('ol-y')) g('ol-y').onchange = (e) => setBox({ y: +e.target.value || 0 });
+  bindFloorOpacity();
   bindLayerControls('wall', null);
-  const del = document.getElementById('ol-del');
+  const del = g('ol-del');
   if (del) del.onclick = () => store.commit((d) => {
     if (d.outline && Array.isArray(d.outline.paths)) {
       d.outline.paths.splice(store.selectedOutline, 1);
@@ -981,6 +1020,7 @@ function roomForm(room) {
       </div>
     </div>
     <p class="hint small">거실·주방처럼 트인 공간은 맞닿은 두 방의 해당 면을 모두 '트기'로 (3D에서 벽 사라짐)</p>
+    ${floorOpacityHTML()}
     ${layerControlsHTML()}
     <div class="btn-row">
       <button class="mini" id="r-dup">복제</button>
@@ -1010,6 +1050,7 @@ function bindRoomForm(room) {
   document.getElementById('r-del').onclick = () => store.commit((d) => {
     d.rooms = d.rooms.filter((r) => r.id !== room.id); store.selectedRoom = null;
   });
+  bindFloorOpacity();
   bindLayerControls('room', room.id);
 }
 

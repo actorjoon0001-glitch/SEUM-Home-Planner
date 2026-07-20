@@ -631,6 +631,20 @@ export class Editor2D {
     if (!isFinite(minX)) return null;
     return { x: minX, y: minY, w: maxX - minX, d: maxY - minY };
   }
+  // 숫자 입력으로 벽체 폴리곤의 바운딩박스를 지정 크기/위치로 (핸들 드래그의 입력창 버전)
+  setOutlineBox(pathIndex, nx, ny, nw, nd) {
+    store.commit((d) => {
+      this._toOutlinePaths(d);
+      const p = d.outline && d.outline.paths && d.outline.paths[pathIndex]; if (!p) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const [x, y] of p.points) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; }
+      const ow = maxX - minX, od = maxY - minY;
+      const w = Math.max(500, nw), dd = Math.max(500, nd);
+      const sx = ow > 0 ? w / ow : 1, sy = od > 0 ? dd / od : 1;
+      p.points = p.points.map(([x, y]) => [Math.round(nx + (x - minX) * sx), Math.round(ny + (y - minY) * sy)]);
+    });
+    this.draw();
+  }
   _outlineHandlePoints(pathIndex) {
     const bb = this._outlineBboxMm(pathIndex); if (!bb) return null;
     const [x, y] = this.toPx(bb.x, bb.y);

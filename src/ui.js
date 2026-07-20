@@ -934,20 +934,27 @@ function bindLayerControls(kind, id) {
   });
 }
 
-// 바닥 투명도 슬라이더 (방·벽 공통) — 밑그림 위 작업용. 패널 재렌더 없이 즉시 반영.
+// 바닥·벽 투명도 슬라이더 (방·벽 공통) — 밑그림 위 작업용. 패널 재렌더 없이 즉시 반영.
 function floorOpacityHTML() {
-  const v = store.design.floorOpacity != null ? store.design.floorOpacity : 1;
-  return `<label class="fld"><span>바닥 투명도 <small id="fo2-val" style="color:var(--muted)">${Math.round(v * 100)}% · 낮추면 밑그림 비침</small></span>
-    <input id="fo2-range" type="range" min="0" max="1" step="0.05" value="${v}"></label>`;
+  const fo = store.design.floorOpacity != null ? store.design.floorOpacity : 1;
+  const wo = store.design.wallOpacity2d != null ? store.design.wallOpacity2d : 1;
+  return `<label class="fld"><span>바닥 투명도 <small id="fo2-val" style="color:var(--muted)">${Math.round(fo * 100)}%</small></span>
+    <input id="fo2-range" type="range" min="0" max="1" step="0.05" value="${fo}"></label>
+    <label class="fld"><span>벽 투명도 <small id="wo2-val" style="color:var(--muted)">${Math.round(wo * 100)}%</small></span>
+    <input id="wo2-range" type="range" min="0" max="1" step="0.05" value="${wo}"></label>`;
 }
 function bindFloorOpacity() {
-  const el = document.getElementById('fo2-range'); if (!el) return;
-  el.oninput = (e) => {
-    const v = parseFloat(e.target.value);
-    const lbl = document.getElementById('fo2-val'); if (lbl) lbl.textContent = Math.round(v * 100) + '% · 낮추면 밑그림 비침';
-    store.design.floorOpacity = v; if (_editor) _editor.draw();   // 재렌더 없이 캔버스만 갱신(드래그 안 끊김)
+  const wire = (rangeId, valId, key) => {
+    const el = document.getElementById(rangeId); if (!el) return;
+    el.oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      const lbl = document.getElementById(valId); if (lbl) lbl.textContent = Math.round(v * 100) + '%';
+      store.design[key] = v; if (_editor) _editor.draw();          // 재렌더 없이 캔버스만 갱신(드래그 안 끊김)
+    };
+    el.onchange = () => { try { store.persist(); } catch (_) { /* noop */ } };
   };
-  el.onchange = () => { try { store.persist(); } catch (_) { /* noop */ } };
+  wire('fo2-range', 'fo2-val', 'floorOpacity');
+  wire('wo2-range', 'wo2-val', 'wallOpacity2d');
 }
 
 // 벽체(외벽) 선택 시 속성 패널 — 방 패널처럼 크기·위치·면적·투명도·레이어·삭제

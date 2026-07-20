@@ -85,10 +85,11 @@ export const cloud = {
     const { error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
   },
-  async signUp(email, password) {
+  async signUp(email, password, name) {
     await this.init();
     this._requireClient();
-    const { error } = await client.auth.signUp({ email, password });
+    const opts = name ? { data: { full_name: name, name } } : undefined;
+    const { error } = await client.auth.signUp({ email, password, options: opts });
     if (error) throw error;
   },
   async signOut() { if (client) await client.auth.signOut(); },

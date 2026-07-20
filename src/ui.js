@@ -590,6 +590,7 @@ function renderProperties(editor) {
   if (room) { panel.innerHTML = roomForm(room); bindRoomForm(room); return; }
   if (furn) { panel.innerHTML = furnForm(furn); bindFurnForm(furn); return; }
   if (op)   { panel.innerHTML = openingForm(op); bindOpeningForm(op); return; }
+  if (store.selectedOutline != null && d.outline) { panel.innerHTML = outlineForm(); bindOutlineForm(); return; }
 
   // 선택 없음 → 미니맵 + 층 관리 + 상세 설정 (Archisketch 우측 패널 구조)
   const ops = d.openings || [];
@@ -898,7 +899,9 @@ function layerReorder(kind, id, move) {
     const items = d.rooms.map((r) => ({ kind: 'room', ref: r, get z() { return r.z; }, set z(v) { r.z = v; } }));
     if (d.outline) items.push({ kind: 'wall', get z() { return d.outline.z; }, set z(v) { d.outline.z = v; } });
     items.sort((a, b) => a.z - b.z);
-    const idx = items.findIndex((it) => it.kind === 'room' && it.ref.id === id);
+    const idx = kind === 'wall'
+      ? items.findIndex((it) => it.kind === 'wall')
+      : items.findIndex((it) => it.kind === 'room' && it.ref.id === id);
     if (idx < 0) return;
     if (move === 'top') { items[idx].z = items[items.length - 1].z + 1; }
     else if (move === 'bottom') { items[idx].z = items[0].z - 1; }
@@ -922,6 +925,28 @@ function layerControlsHTML() {
 function bindLayerControls(kind, id) {
   document.querySelectorAll('.layer-row [data-lz]').forEach((b) => {
     b.onclick = () => layerReorder(kind, id, b.dataset.lz);
+  });
+}
+
+// 벽체(외벽) 선택 시 속성 패널 — 레이어 순서(방과 위아래) + 삭제
+function outlineForm() {
+  return `
+    <p class="ph">벽체(외벽) 속성</p>
+    <p class="hint">벽 선을 드래그해 옮기거나, 아래 버튼으로 방과 위아래 순서를 바꿀 수 있습니다.</p>
+    ${layerControlsHTML()}
+    <div class="btn-row">
+      <button class="mini danger" id="ol-del">벽체 삭제</button>
+    </div>`;
+}
+function bindOutlineForm() {
+  bindLayerControls('wall', null);
+  const del = document.getElementById('ol-del');
+  if (del) del.onclick = () => store.commit((d) => {
+    if (d.outline && Array.isArray(d.outline.paths)) {
+      d.outline.paths.splice(store.selectedOutline, 1);
+      if (!d.outline.paths.length) d.outline = null;
+    } else { d.outline = null; }
+    store.selectedOutline = null;
   });
 }
 

@@ -1563,7 +1563,8 @@ export class Editor2D {
         ctx.beginPath(); ctx.arc(p[0], p[1], i === 0 ? 6 : 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       });
       ctx.restore();
-      // 길이는 입력창(wall-len)에만 표시 — 캔버스 라벨과 중복(2번) 제거해 짧은 벽도 그리기 쉽게
+      // 지금 그리는 구간 길이(작은 캔버스 치수) 하나만 표시 — 입력창은 숫자 입력할 때만 뜸
+      if (this._outlineCursor) this._segLabel(draft[draft.length - 1], this._outlineCursor, HL);
     }
   }
 

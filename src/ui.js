@@ -867,19 +867,45 @@ function bindOpeningForm(o) {
   bindLayerControls('op', o.id);
 }
 
-// 레이어 순서(겹칠 때 위/아래) — 같은 종류(방/가구/창호) 안에서 그리기 순서를 바꿈
-// 배열에서 뒤쪽일수록 위에 그려짐. up=앞으로(위), down=뒤로(아래), top/bottom=맨앞/맨뒤
+// 방·외벽에 레이어용 z 값을 채워 넣음(없는 것만). 기본: 벽체는 방들 아래.
+function ensureLayerZ(d) {
+  const zs = [];
+  if (d.outline && typeof d.outline.z === 'number') zs.push(d.outline.z);
+  d.rooms.forEach((r) => { if (typeof r.z === 'number') zs.push(r.z); });
+  let next = (zs.length ? Math.max(...zs) : 0) + 1;
+  if (d.outline && typeof d.outline.z !== 'number') d.outline.z = 0;   // 벽체 기본 맨 아래
+  d.rooms.forEach((r) => { if (typeof r.z !== 'number') r.z = next++; });
+}
+
+// 레이어 순서(겹칠 때 위/아래). up=앞으로(위), down=뒤로(아래), top/bottom=맨앞/맨뒤
+// 방·창호·가구는 방↔벽체까지 한 스택으로 다룬다:
+//   - 방(room): 방들 + 외벽(벽체) 을 통합 z 스택으로 한 칸씩 이동 (방을 벽체 위/아래로)
+//   - 가구(furn)·창호(op): 각자 배열 순서로 이동 (항상 방/벽 위에 그려짐)
 function layerReorder(kind, id, move) {
   store.commit((d) => {
-    const arr = kind === 'room' ? d.rooms : kind === 'furn' ? d.furniture : d.openings;
-    if (!Array.isArray(arr)) return;
-    const i = arr.findIndex((x) => x.id === id);
-    if (i < 0) return;
-    if (move === 'top') { arr.push(arr.splice(i, 1)[0]); }
-    else if (move === 'bottom') { arr.unshift(arr.splice(i, 1)[0]); }
+    if (kind === 'furn' || kind === 'op') {
+      const arr = kind === 'furn' ? d.furniture : d.openings;
+      if (!Array.isArray(arr)) return;
+      const i = arr.findIndex((x) => x.id === id);
+      if (i < 0) return;
+      if (move === 'top') { arr.push(arr.splice(i, 1)[0]); }
+      else if (move === 'bottom') { arr.unshift(arr.splice(i, 1)[0]); }
+      else { const j = move === 'up' ? i + 1 : i - 1; if (j >= 0 && j < arr.length) { const t = arr[i]; arr[i] = arr[j]; arr[j] = t; } }
+      return;
+    }
+    // kind === 'room': 방 + 외벽(벽체) 통합 z 스택
+    ensureLayerZ(d);
+    const items = d.rooms.map((r) => ({ kind: 'room', ref: r, get z() { return r.z; }, set z(v) { r.z = v; } }));
+    if (d.outline) items.push({ kind: 'wall', get z() { return d.outline.z; }, set z(v) { d.outline.z = v; } });
+    items.sort((a, b) => a.z - b.z);
+    const idx = items.findIndex((it) => it.kind === 'room' && it.ref.id === id);
+    if (idx < 0) return;
+    if (move === 'top') { items[idx].z = items[items.length - 1].z + 1; }
+    else if (move === 'bottom') { items[idx].z = items[0].z - 1; }
     else {
-      const j = move === 'up' ? i + 1 : i - 1;
-      if (j >= 0 && j < arr.length) { const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+      const j = move === 'up' ? idx + 1 : idx - 1;
+      if (j < 0 || j >= items.length) return;
+      const a = items[idx].z, b = items[j].z; items[idx].z = b; items[j].z = a;   // 이웃과 z 교환 = 한 칸 이동
     }
   });
 }

@@ -42,6 +42,8 @@ const authErr = document.getElementById('auth-err');
 const authSubmit = document.getElementById('auth-submit');
 const authEmail = document.getElementById('auth-email');
 const authPass = document.getElementById('auth-pass');
+const authName = document.getElementById('auth-name');
+const authNameFld = document.getElementById('auth-name-fld');
 const authKeep = document.getElementById('auth-keep');
 const authSub = document.getElementById('auth-sub');
 const authKeepFld = document.getElementById('auth-keep-fld');
@@ -57,6 +59,7 @@ function setAuthMode(m) {
   authSub.textContent = signup ? '세움 홈플래너 계정을 만드세요' : '세움 직원 계정으로 로그인하세요';
   authSubmit.textContent = signup ? '회원가입' : '로그인';
   authPass.setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+  if (authNameFld) authNameFld.classList.toggle('hidden', !signup);   // 이름 칸은 회원가입에서만
   authKeepFld.classList.toggle('hidden', signup);
   authSwitchQ.textContent = signup ? '이미 계정이 있으신가요?' : '계정이 없으신가요?';
   authSwitchBtn.textContent = signup ? '로그인' : '회원가입';
@@ -98,7 +101,9 @@ authForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = authEmail.value.trim();
   const pass = authPass.value;
+  const name = authName ? authName.value.trim() : '';
   if (!email || !pass) { authErr.textContent = '이메일과 비밀번호를 모두 입력하세요.'; return; }
+  if (authMode === 'signup' && !name) { authErr.textContent = '이름을 입력하세요.'; return; }
   // 자동 로그인 유지 여부 + 이메일 저장
   const keep = authKeep ? authKeep.checked : true;
   try { localStorage.setItem(KEEP_KEY, keep ? '1' : '0'); localStorage.setItem(EMAIL_KEY, email); } catch { /* noop */ }
@@ -107,7 +112,7 @@ authForm.addEventListener('submit', async (e) => {
   authSubmit.disabled = true; authSubmit.textContent = signup ? '가입 중…' : '로그인 중…';
   try {
     if (signup) {
-      await cloud.signUp(email, pass);
+      await cloud.signUp(email, pass, name);
       if (!cloud.user) {
         // 이메일 인증이 필요한 프로젝트: 세션이 바로 생기지 않음
         authErr.textContent = '가입 완료! 이메일 인증 메일을 확인한 뒤 로그인하세요.';
@@ -148,13 +153,21 @@ async function initAuth() {
 // (뷰어·UI 준비가 끝난 뒤 세션 복원 initAuth() 를 호출해 대시보드가 안전히 뜨게 함)
 // ===========================================================================
 (async () => {
-  try {
-    const { Viewer3D } = await import('./viewer3d.js');
-    viewer = new Viewer3D(document.getElementById('view3d'));
-  } catch (e) {
-    console.error('[app] 3D 뷰어 로드 실패 (2D는 정상 사용 가능):', e);
-    viewer = makeStubViewer();
-  }
+  // 3D 뷰어는 three.js(CDN)에 의존한다. CDN이 느리거나 응답이 없더라도
+  // 로그인·2D 앱이 절대 막히지 않도록, 최대 대기시간(8초)을 두고 진행한다.
+  // (그 안에 로드되면 실제 3D 사용, 늦으면 스텁으로 시작 — 로그인/2D는 항상 동작)
+  const loadViewer = (async () => {
+    try {
+      const { Viewer3D } = await import('./viewer3d.js');
+      return new Viewer3D(document.getElementById('view3d'));
+    } catch (e) {
+      console.error('[app] 3D 뷰어 로드 실패 (2D는 정상 사용 가능):', e);
+      return makeStubViewer();
+    }
+  })();
+  const timeout = new Promise((res) => setTimeout(() => res(null), 8000));
+  viewer = (await Promise.race([loadViewer, timeout])) || makeStubViewer();
+
   try {
     buildUI({ editor, viewer, onModeChange: setMode });
     setMode('2d');
@@ -162,5 +175,5 @@ async function initAuth() {
     console.error('[app] UI 초기화 실패:', e);
   }
   window.SEUM = { store, editor, viewer, cloud };   // 전역 디버그용
-  initAuth();
+  initAuth();   // 로그인/세션 복원 — 3D 로드와 무관하게 항상 실행
 })();

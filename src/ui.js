@@ -134,7 +134,11 @@ async function renderDash() {
   const title = document.getElementById('dash-title');
   const sub = document.getElementById('dash-sub');
   const userEl = document.getElementById('dash-user');
-  if (userEl) userEl.textContent = (cloud.user && cloud.user.email) || '';
+  if (userEl) {
+    const u = cloud.user;
+    const nm = u && u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name);
+    userEl.textContent = u ? (nm ? `${nm} (${u.email})` : u.email) : '';
+  }
   if (!grid) return;
   grid.innerHTML = '';
   if (_dashView === 'mine') {

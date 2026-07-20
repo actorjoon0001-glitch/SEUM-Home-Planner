@@ -358,7 +358,7 @@ function buildWallTools(editor) {
 
   let typing = false;
   lenBox.addEventListener('focus', () => { typing = true; });
-  lenBox.addEventListener('blur', () => { typing = false; });
+  lenBox.addEventListener('blur', () => { typing = false; lenBox.classList.add('hidden'); });
   lenBox.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); if (editor.commitOutlineLength(parseFloat(lenBox.value))) lenBox.blur(); }
     else if (e.key === 'Escape') { e.preventDefault(); lenBox.blur(); }
@@ -373,9 +373,9 @@ function buildWallTools(editor) {
   });
 
   // 편집기가 알려주는 현재 구간 길이/위치를 상자에 반영
+  // 상자는 '숫자를 직접 입력할 때만' 보이게(캔버스 치수와 중복 방지). 위치·값만 갱신.
   editor.onOutlineChange = (st) => {
     if (!st || !st.active) { lenBox.classList.add('hidden'); return; }
-    lenBox.classList.remove('hidden');
     lenBox.style.left = Math.round(st.x + 12) + 'px';
     lenBox.style.top = Math.round(st.y - 12) + 'px';
     if (!typing && document.activeElement !== lenBox) lenBox.value = st.lengthMm;

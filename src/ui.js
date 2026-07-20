@@ -129,6 +129,30 @@ function newCard() {
   card.onclick = () => enterEditor(() => store.newDesign());
   return card;
 }
+function actionCard(label, onClick) {
+  const card = document.createElement('div');
+  card.className = 'dash-card dc-new';
+  card.innerHTML = `<span class="dc-plus">＋</span><span>${esc(label)}</span>`;
+  card.onclick = onClick;
+  return card;
+}
+// 현재 도면을 '전시장 도면'(공용 템플릿)으로 클라우드에 추가 — 전시장 이름별 분류
+async function addCurrentAsShowroom() {
+  if (!(cloud.configured() && cloud.user)) { alert('전시장 도면은 로그인 후 클라우드에 저장됩니다.'); return; }
+  if (!(store.design.rooms || []).length && !store.design.outline) { alert('먼저 방이나 벽을 그린 뒤 추가하세요.'); return; }
+  const room = prompt('전시장 이름을 입력하세요 (예: 킨텍스, 송도 전시장)', store.design.showroom || '');
+  if (room == null) return;
+  store.design.showroom = room.trim();
+  const name = prompt('도면 이름', store.design.name || '무제 도면');
+  if (name == null) return;
+  store.design.name = name || '무제 도면';
+  try {
+    try { store.design.thumb = _editor.toImage(360, 240, 'image/jpeg', 0.6); } catch (e) { /* noop */ }
+    await cloud.saveDesign({ name: store.design.name, data: store.design, isShared: true, isTemplate: true });
+    flash(`전시장 도면으로 추가됨${store.design.showroom ? ` · 🏢 ${store.design.showroom}` : ''}`);
+    renderDash();
+  } catch (e) { alert('추가 실패: ' + (e.message || e)); }
+}
 async function renderDash() {
   const grid = document.getElementById('dash-grid');
   const title = document.getElementById('dash-title');
@@ -143,26 +167,55 @@ async function renderDash() {
   grid.innerHTML = '';
   if (_dashView === 'mine') {
     title.textContent = '내 프로젝트';
-    sub.textContent = '작업하던 도면을 이어서 열거나, 새 도면을 시작하세요.';
+    sub.textContent = '저장한 도면이 여기 모입니다. 이어서 열거나 새 도면을 시작하세요.';
     grid.appendChild(newCard());
-    const saves = store.savedList().slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
-    for (const s of saves) {
-      grid.appendChild(projectCard(s.name, s.data, fmtDate(s.savedAt),
-        () => enterEditor(() => store.loadSaved(s.name)),
-        () => { store.removeSaved(s.name); renderDash(); }));
+    if (cloud.configured() && cloud.user) {
+      grid.insertAdjacentHTML('beforeend', '<p class="dash-empty" id="dash-loading">불러오는 중…</p>');
+      try {
+        const rows = (await cloud.listMine()).filter((r) => !r.is_template);
+        const l = document.getElementById('dash-loading'); if (l) l.remove();
+        for (const r of rows) {
+          const cust = (r.data && r.data.customer || '').trim();
+          grid.appendChild(projectCard(r.name, r.data, fmtDate(r.updated_at) + (cust ? ` · 📁 ${cust}` : ''),
+            () => enterEditor(() => store.loadInto(r.data, { cloudId: r.id })),
+            async () => { try { await cloud.removeDesign(r.id); } catch (e) { /* noop */ } renderDash(); }));
+        }
+      } catch (e) { const l = document.getElementById('dash-loading'); if (l) l.textContent = '불러오기 실패: ' + (e.message || e); }
+    } else {
+      // 로그인 전 — 이 기기(로컬) 저장 표시
+      const saves = store.savedList().slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+      for (const s of saves) {
+        grid.appendChild(projectCard(s.name, s.data, fmtDate(s.savedAt) + ' · 이 기기',
+          () => enterEditor(() => store.loadSaved(s.name)),
+          () => { store.removeSaved(s.name); renderDash(); }));
+      }
     }
   } else if (_dashView === 'templates') {
     title.textContent = '전시장 도면';
-    sub.textContent = '전시장별 기본 도면을 골라 바로 상담을 시작하세요.';
+    sub.textContent = '전시장별 기본 도면입니다. 현재 도면을 전시장에 추가할 수 있어요.';
+    grid.appendChild(actionCard('현재 도면을 전시장에 추가', addCurrentAsShowroom));
+    // 항목 수집: 내장 템플릿 + 클라우드 전시장 도면(공용) → 전시장(showroom)별 그룹
+    const items = [];
     for (const t of listTemplates()) {
       let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
-      grid.appendChild(projectCard(t.title, d, t.showroom ? `🏢 ${t.showroom}` : (t.category || '주택'),
-        () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); })));
+      items.push({ title: t.title, showroom: (t.showroom || '').trim(), data: d, open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }) });
     }
-    for (const t of store.localTemplates()) {
-      grid.appendChild(projectCard(t.title, t.data, t.showroom ? `🏢 ${t.showroom}` : '내 도면',
-        () => enterEditor(() => store.loadInto(t.data)),
-        () => { store.removeLocalTemplate(t.id); renderDash(); }));
+    if (cloud.configured() && cloud.user) {
+      try {
+        const rows = await cloud.listTemplates();
+        for (const r of rows) items.push({
+          title: r.name, showroom: (r.data && r.data.showroom || '').trim(), data: r.data,
+          open: () => enterEditor(() => store.loadInto(r.data)),
+          del: async () => { try { await cloud.removeDesign(r.id); } catch (e) { /* noop */ } renderDash(); },
+        });
+      } catch (e) { /* 클라우드 미가용 → 내장만 */ }
+    }
+    // 전시장별 그룹핑 (이름 없으면 '기타')
+    const groups = {};
+    for (const it of items) { const k = it.showroom || '기타'; (groups[k] = groups[k] || []).push(it); }
+    for (const room of Object.keys(groups).sort()) {
+      grid.insertAdjacentHTML('beforeend', `<h3 class="dash-group">🏢 ${esc(room)}</h3>`);
+      for (const it of groups[room]) grid.appendChild(projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del));
     }
   } else if (_dashView === 'shared') {
     title.textContent = '공유 프로젝트';

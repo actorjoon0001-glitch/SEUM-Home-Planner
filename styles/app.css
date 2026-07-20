@@ -90,6 +90,7 @@ body {
 .dash-card.dc-new:hover { border-color: var(--seum-red); background: #fff7f6; }
 .dash-card.dc-new .dc-plus { font-size: 30px; line-height: 1; }
 .dash-empty { grid-column: 1 / -1; color: var(--muted); font-size: 14px; padding: 30px 4px; }
+.dash-group { grid-column: 1 / -1; margin: 8px 0 -4px; font-size: 14px; font-weight: 800; color: var(--ink); }
 /* 작은 화면: 줄바꿈 대신 가로 스크롤 → 버튼 글씨가 잘리지 않음 */
 .tb-group {
   display: flex; align-items: center; gap: 4px; margin-left: 8px;

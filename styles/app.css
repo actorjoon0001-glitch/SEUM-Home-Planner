@@ -351,6 +351,8 @@ body {
   border-radius: 6px; padding: 8px 6px; font-size: 12px; cursor: pointer; font-family: inherit;
 }
 .mini:hover { background: #ececf0; }
+.mini.active { background: var(--seum-red); color: #fff; border-color: var(--seum-red); }
+.mini.active:hover { background: #c62f3b; }
 .mini.danger { color: var(--seum-red); border-color: #f3c6cd; }
 .mini.danger:hover { background: #fdecee; }
 .hint { font-size: 11px; color: var(--muted); line-height: 1.6; margin-top: 14px; }

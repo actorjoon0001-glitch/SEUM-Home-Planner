@@ -601,8 +601,8 @@ function renderProperties(editor) {
     const pts = p.points || [];
     if (pts.length >= 3) grossArea = Math.max(grossArea, Math.abs(polyArea(pts)) / 1e6);
   }
-  const woVal = _viewer ? _viewer.wallOpacity : 1;
-  const foVal = _viewer ? _viewer.floorOpacity : 1;
+  const woVal = d.wallOpacity2d != null ? d.wallOpacity2d : (_viewer ? _viewer.wallOpacity : 1);
+  const foVal = d.floorOpacity != null ? d.floorOpacity : (_viewer ? _viewer.floorOpacity : 1);
   panel.innerHTML = `
     <div class="prop-empty">
       <div class="mini-wrap">
@@ -625,9 +625,9 @@ function renderProperties(editor) {
       <div class="area-box"><b id="area-num">${netArea.toFixed(1)}</b> m² <small id="area-py">(${(netArea/3.305).toFixed(1)}평)</small></div>
       <label class="fld"><span>슬래브 두께 (mm)</span><input id="p-slab" type="number" step="10" value="${d.slabThickness || 0}"></label>
       <label class="fld"><span>벽 투명도 <small id="wo-val">${Math.round(woVal*100)}%</small></span>
-        <input id="wo-range" type="range" min="0.2" max="1" step="0.05" value="${woVal}"></label>
-      <label class="fld"><span>바닥 투명도 <small id="fo-val">${Math.round(foVal*100)}%</small></span>
-        <input id="fo-range" type="range" min="0.2" max="1" step="0.05" value="${foVal}"></label>
+        <input id="wo-range" type="range" min="0.1" max="1" step="0.05" value="${woVal}"></label>
+      <label class="fld"><span>바닥 투명도 <small id="fo-val">${Math.round(foVal*100)}%</small> <small style="color:var(--muted)">· 낮추면 밑그림 비침</small></span>
+        <input id="fo-range" type="range" min="0" max="1" step="0.05" value="${foVal}"></label>
 
       <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${ops.length}</b></div>
       <p class="hint">· 외장재·지붕 마감은 좌측 <b>마감재</b> 패널에서 고르세요.<br>· 슬래브 두께는 구조 정보용으로 저장됩니다.</p>
@@ -640,14 +640,18 @@ function renderProperties(editor) {
   if (woRange) woRange.oninput = (e) => {
     const v = parseFloat(e.target.value);
     document.getElementById('wo-val').textContent = Math.round(v * 100) + '%';
-    if (_viewer) { _viewer.wallOpacity = v; _viewer.dirty = true; }
+    if (_viewer) { _viewer.wallOpacity = v; _viewer.dirty = true; }        // 3D 벽
+    store.liveUpdate((dd) => { dd.wallOpacity2d = v; });                    // 2D 벽 선
   };
+  if (woRange) woRange.onchange = () => store.liveEnd();
   const foRange = document.getElementById('fo-range');
   if (foRange) foRange.oninput = (e) => {
     const v = parseFloat(e.target.value);
     document.getElementById('fo-val').textContent = Math.round(v * 100) + '%';
-    if (_viewer) { _viewer.floorOpacity = v; _viewer.dirty = true; }
+    if (_viewer) { _viewer.floorOpacity = v; _viewer.dirty = true; }        // 3D 바닥
+    store.liveUpdate((dd) => { dd.floorOpacity = v; });                     // 2D 바닥(밑그림 비침)
   };
+  if (foRange) foRange.onchange = () => store.liveEnd();
   // 실면적 / 실면적+내외벽 전환
   document.querySelectorAll('#area-seg .seg-btn').forEach((b) => b.onclick = () => {
     document.querySelectorAll('#area-seg .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
@@ -871,10 +875,12 @@ function bindOpeningForm(o) {
 // 방·외벽에 레이어용 z 값을 채워 넣음(없는 것만). 기본: 벽체는 방들 아래.
 function ensureLayerZ(d) {
   const zs = [];
+  if (d.underlay && typeof d.underlay.z === 'number') zs.push(d.underlay.z);
   if (d.outline && typeof d.outline.z === 'number') zs.push(d.outline.z);
   d.rooms.forEach((r) => { if (typeof r.z === 'number') zs.push(r.z); });
   let next = (zs.length ? Math.max(...zs) : 0) + 1;
-  if (d.outline && typeof d.outline.z !== 'number') d.outline.z = 0;   // 벽체 기본 맨 아래
+  if (d.underlay && typeof d.underlay.z !== 'number') d.underlay.z = -2;  // 밑그림(도면) 기본 맨 아래
+  if (d.outline && typeof d.outline.z !== 'number') d.outline.z = -1;      // 벽체 기본 아래(방들 밑)
   d.rooms.forEach((r) => { if (typeof r.z !== 'number') r.z = next++; });
 }
 
@@ -894,13 +900,14 @@ function layerReorder(kind, id, move) {
       else { const j = move === 'up' ? i + 1 : i - 1; if (j >= 0 && j < arr.length) { const t = arr[i]; arr[i] = arr[j]; arr[j] = t; } }
       return;
     }
-    // kind === 'room': 방 + 외벽(벽체) 통합 z 스택
+    // kind === 'room'/'wall'/'underlay': 밑그림 + 외벽 + 방 통합 z 스택
     ensureLayerZ(d);
     const items = d.rooms.map((r) => ({ kind: 'room', ref: r, get z() { return r.z; }, set z(v) { r.z = v; } }));
     if (d.outline) items.push({ kind: 'wall', get z() { return d.outline.z; }, set z(v) { d.outline.z = v; } });
+    if (d.underlay) items.push({ kind: 'underlay', get z() { return d.underlay.z; }, set z(v) { d.underlay.z = v; } });
     items.sort((a, b) => a.z - b.z);
-    const idx = kind === 'wall'
-      ? items.findIndex((it) => it.kind === 'wall')
+    const idx = (kind === 'wall' || kind === 'underlay')
+      ? items.findIndex((it) => it.kind === kind)
       : items.findIndex((it) => it.kind === 'room' && it.ref.id === id);
     if (idx < 0) return;
     if (move === 'top') { items[idx].z = items[items.length - 1].z + 1; }
@@ -1502,6 +1509,14 @@ function openUnderlayDialog(editor) {
         <button class="mini" id="ul-replace" style="flex:1">다른 파일</button>
         <button class="mini danger" id="ul-del" style="flex:1">밑그림 제거</button>
       </div>
+      <div class="fld"><span>도면 레이어 <small style="color:var(--muted)">· 방·벽 대비 위/아래</small></span>
+        <div class="btn-row layer-row">
+          <button class="mini" data-ulz="top" title="맨 위로">⤒ 맨위</button>
+          <button class="mini" data-ulz="up" title="한 칸 위로">▲ 위로</button>
+          <button class="mini" data-ulz="down" title="한 칸 아래로">▼ 아래로</button>
+          <button class="mini" data-ulz="bottom" title="맨 아래로">⤓ 맨아래</button>
+        </div>
+      </div>
       <p id="ul-msg" class="hint"></p>`;
     body.querySelector('#ul-op').oninput = (e) => store.liveUpdate((d) => { d.underlay.opacity = parseFloat(e.target.value); });
     body.querySelector('#ul-op').onchange = () => store.liveEnd();
@@ -1515,6 +1530,7 @@ function openUnderlayDialog(editor) {
       flash('밑그림 위에서 길이를 아는 두 점을 차례로 클릭하세요');
     };
     body.querySelector('#ul-focus').onclick = () => editor.focusUnderlay();
+    body.querySelectorAll('.layer-row [data-ulz]').forEach((b) => b.onclick = () => { layerReorder('underlay', null, b.dataset.ulz); flash('도면 레이어 순서를 바꿨습니다'); });
     const pageEl = body.querySelector('#ul-page');
     if (pageEl) pageEl.onchange = (e) => loadPdfPage(parseInt(e.target.value, 10));
     body.querySelector('#ul-hide').onclick = () => { apply((d) => { d.underlay.hidden = !d.underlay.hidden; }); render(); };

@@ -496,10 +496,21 @@ export class Editor2D {
       const dx = px - pcx, dy = py - pcy;
       const ca = Math.cos(g.angle || 0), sa = Math.sin(g.angle || 0);
       const along = Math.abs(dx * ca + dy * sa);
-      const across = Math.abs(-dx * sa + dy * ca);
-      // 클릭 여유: 벽 두께 절반 + 여유(최소 12px)라 문·창을 쉽게 집을 수 있음
+      const acrossS = -dx * sa + dy * ca;               // 부호 있는 수직거리(+ = 여는 방향 쪽)
       const wallHalf = (o.onOutline ? this.wallThickness() * this.scale : 9) / 2;
-      if (along <= len / 2 + 6 && across <= Math.max(12, wallHalf + 8)) return o;
+      const t = WINDOW_TYPES[o.winType] || {};
+      const hingedDoor = t.glass === false && !t.slide && !t.fold;  // 열림 호(부채꼴)가 있는 문
+      if (hingedDoor) {
+        // 벽 근처 띠 + 스윙(부채꼴·문짝) 영역까지 넉넉히 잡음 → 문 선택 쉽게
+        const swingR = (t.double ? len / 2 : len) + 8;
+        const sw = o.flipV ? -1 : 1;                     // 여는 쪽(안/밖)
+        const lo = sw > 0 ? -(wallHalf + 8) : -swingR;
+        const hi = sw > 0 ? swingR : (wallHalf + 8);
+        if (along <= len / 2 + 8 && acrossS >= lo && acrossS <= hi) return o;
+      } else {
+        // 창·미닫이·폴딩: 벽 선 근처 얇은 띠
+        if (along <= len / 2 + 6 && Math.abs(acrossS) <= Math.max(12, wallHalf + 8)) return o;
+      }
     }
     return null;
   }

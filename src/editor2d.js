@@ -237,8 +237,8 @@ export class Editor2D {
     const w = room.w * this.scale, h = room.d * this.scale;
     const selected = room.id === store.selectedRoom;
 
-    // 바닥 (모노톤: 색 없이 흰 바닥)
-    ctx.fillStyle = this.monoMode ? '#ffffff' : t.color;
+    // 바닥 — 색 채움 없이 흰 바닥으로 (깔끔한 2D·모노톤 인쇄용)
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y, w, h);
     // 벽 (면별로 그림 — 트인(open) 면은 점선 통로로 표시)
     const open = Array.isArray(room.open) ? room.open : [];

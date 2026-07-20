@@ -11,6 +11,7 @@ class Store {
     this.selectedRoom = null;     // room id
     this.selectedFurniture = null; // furniture id
     this.selectedOpening = null;  // opening id
+    this.selectedOutline = null;  // 외벽(벽체) 경로 index
     this.cloudId = null;          // 현재 도면의 클라우드 저장 id (있으면)
     this._subs = new Set();
     this._history = [];
@@ -48,6 +49,8 @@ class Store {
     if (!this.design.rooms.some((r) => r.id === this.selectedRoom)) this.selectedRoom = null;
     if (!this.design.furniture.some((f) => f.id === this.selectedFurniture)) this.selectedFurniture = null;
     if (!(this.design.openings || []).some((o) => o.id === this.selectedOpening)) this.selectedOpening = null;
+    const paths = (this.design.outline && this.design.outline.paths) || [];
+    if (this.selectedOutline != null && !paths[this.selectedOutline] && !(this.design.outline && this.selectedOutline === 0)) this.selectedOutline = null;
   }
 
   // --- 변경 (스냅샷 후 emit) ---
@@ -69,6 +72,13 @@ class Store {
     this.selectedRoom = roomId ?? null;
     this.selectedFurniture = furnitureId ?? null;
     this.selectedOpening = openingId ?? null;
+    this.selectedOutline = null;
+    this.emit();
+  }
+  // 외벽(벽체) 경로 선택 — 다른 선택은 해제
+  selectOutline(idx) {
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null;
+    this.selectedOutline = idx;
     this.emit();
   }
 

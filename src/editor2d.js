@@ -232,7 +232,7 @@ export class Editor2D {
     ctx.fillStyle = this._export ? '#ffffff' : '#f4f5f7';
     ctx.fillRect(0, 0, this.cssW, this.cssH);
     const step = 1000 * this.scale; // 1m 격자
-    if (step > 6) {
+    if (step > 6 && !this._export) {   // 내보내기/인쇄에는 배경 격자 제외 — 도면만 깔끔하게
       ctx.strokeStyle = this._export ? '#eceef1' : '#e3e5e9';
       ctx.lineWidth = 1;
       const startX = this.ox % step, startY = this.oy % step;

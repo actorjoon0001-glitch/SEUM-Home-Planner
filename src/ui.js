@@ -1322,13 +1322,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
     flash(on ? '모노톤(흑백) 도면 — 카달로그 인쇄용으로 표시합니다' : '색상 도면으로 되돌렸습니다');
   };
 
-  $('tb-export').onclick = () => {
-    const blob = new Blob([store.exportJSON()], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = (store.design.name || 'seum-design') + '.json';
-    a.click();
-  };
+  $('tb-export').onclick = () => openExportDialog(editor);
 
   $('tb-import').onclick = () => {
     const inp = document.createElement('input');
@@ -1427,6 +1421,83 @@ function modal(title, contentEl) {
   dlg.querySelector('#m-close').onclick = () => dlg.close();
   if (!dlg.open) dlg.showModal();
   return dlg;
+}
+
+// ---------------------------------------------------------------------------
+// 도면 내보내기 — PNG / PDF / 도면파일(.json) 선택
+// ---------------------------------------------------------------------------
+function safeFileName() { return (store.design.name || 'seum-도면').replace(/[\\/:*?"<>|]/g, '_'); }
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+// data URL(base64) → 바이트 배열
+function dataURLToBytes(dataURL) {
+  const bin = atob(dataURL.split(',')[1] || '');
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+// 단일 이미지(JPEG)로 최소 구성의 PDF 한 페이지 생성 — 외부 라이브러리 없이 자체 구현
+function buildImagePDF(jpegBytes, iw, ih) {
+  const enc = new TextEncoder();
+  const chunks = []; let length = 0;
+  const push = (data) => { const a = (data instanceof Uint8Array) ? data : enc.encode(data); chunks.push(a); length += a.length; };
+  const objOff = [];
+  const startObj = () => { objOff.push(length); };
+  const W = iw, H = ih;
+  push('%PDF-1.3\n');
+  startObj(); push('1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n');
+  startObj(); push('2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n');
+  startObj(); push(`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${W} ${H}]/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>\nendobj\n`);
+  startObj(); push(`4 0 obj\n<</Type/XObject/Subtype/Image/Width ${iw}/Height ${ih}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpegBytes.length}>>\nstream\n`);
+  push(jpegBytes); push('\nendstream\nendobj\n');
+  const content = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+  startObj(); push(`5 0 obj\n<</Length ${content.length}>>\nstream\n${content}\nendstream\nendobj\n`);
+  const xrefStart = length;
+  let xref = 'xref\n0 6\n0000000000 65535 f \n';
+  for (let i = 0; i < 5; i++) xref += String(objOff[i]).padStart(10, '0') + ' 00000 n \n';
+  push(xref);
+  push(`trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF`);
+  const out = new Uint8Array(length); let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return new Blob([out], { type: 'application/pdf' });
+}
+function openExportDialog(editor) {
+  const body = document.createElement('div');
+  body.innerHTML = `
+    <p class="m-sub">현재 도면을 어떤 형식으로 내보낼까요? <small class="muted">(배경 격자 없이 도면만 저장됩니다)</small></p>
+    <div class="export-opts">
+      <button class="m-opt" id="exp-png"><b>🖼️ PNG 이미지</b><span>화면·문서에 붙여넣기 좋음</span></button>
+      <button class="m-opt" id="exp-pdf"><b>📄 PDF</b><span>인쇄·이메일 첨부용 (가로 한 장)</span></button>
+      <button class="m-opt" id="exp-json"><b>🗂️ 도면 파일 (.json)</b><span>다시 불러와 편집 (백업/공유)</span></button>
+    </div>`;
+  modal('내보내기', body);
+  const W = 2480, H = 1754; // ≈ A4 가로(300dpi)
+  body.querySelector('#exp-png').onclick = () => {
+    try { downloadBlob(dataURLBlob(editor.toImage(W, H, 'image/png')), safeFileName() + '.png'); flash('PNG로 내보냈습니다'); }
+    catch (e) { alert('내보내기 실패: ' + (e.message || e)); }
+    closeModal();
+  };
+  body.querySelector('#exp-pdf').onclick = () => {
+    try {
+      const bytes = dataURLToBytes(editor.toImage(W, H, 'image/jpeg', 0.92));
+      downloadBlob(buildImagePDF(bytes, W, H), safeFileName() + '.pdf');
+      flash('PDF로 내보냈습니다');
+    } catch (e) { alert('PDF 내보내기 실패: ' + (e.message || e)); }
+    closeModal();
+  };
+  body.querySelector('#exp-json').onclick = () => {
+    downloadBlob(new Blob([store.exportJSON()], { type: 'application/json' }), safeFileName() + '.json');
+    closeModal();
+  };
+}
+// data URL → Blob (PNG 다운로드용)
+function dataURLBlob(dataURL) {
+  const mime = (dataURL.match(/^data:([^;]+)/) || [])[1] || 'image/png';
+  return new Blob([dataURLToBytes(dataURL)], { type: mime });
 }
 
 // ---------------------------------------------------------------------------

@@ -334,7 +334,7 @@ export class Editor2D {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((f.rotation || 0) * Math.PI / 180);
-    this._drawFurnitureSymbol(c, w, d, selected);   // 항목별 2D 도면 기호
+    this._drawFurnitureSymbol(c, w, d, selected, f.cross);   // 항목별 2D 도면 기호(+X 옵션)
     ctx.restore();
     // 회전 핸들
     if (selected) {
@@ -352,7 +352,7 @@ export class Editor2D {
   }
 
   // 가구·가전·소품을 2D 도면 기호로 그림 (로컬 좌표: 중심 원점, 앞쪽 = +y).
-  _drawFurnitureSymbol(c, w, d, selected) {
+  _drawFurnitureSymbol(c, w, d, selected, cross) {
     const ctx = this.ctx;
     const hw = w / 2, hd = d / 2;
     const stroke = selected ? '#c8102e' : '#7c828b';
@@ -361,6 +361,16 @@ export class Editor2D {
     ctx.lineWidth = selected ? 2 : 1.2;
     // 너무 작으면 단순 사각형
     if (w < 14 || d < 14) { ctx.fillStyle = light; ctx.fillRect(-hw, -hd, w, d); ctx.strokeStyle = stroke; ctx.strokeRect(-hw, -hd, w, d); return; }
+    // 'X 표시' 옵션: 박스 + 대각선 X (냉장고·세탁기 등 도면 관례)
+    if (cross) {
+      ctx.fillStyle = light; ctx.fillRect(-hw, -hd, w, d);
+      ctx.strokeStyle = stroke; ctx.strokeRect(-hw, -hd, w, d);
+      ctx.beginPath();
+      ctx.moveTo(-hw, -hd); ctx.lineTo(hw, hd);
+      ctx.moveTo(hw, -hd); ctx.lineTo(-hw, hd);
+      ctx.stroke();
+      return;
+    }
     const rrect = (x, y, ww, hh, r) => {
       r = Math.min(r, ww / 2, hh / 2);
       ctx.beginPath();

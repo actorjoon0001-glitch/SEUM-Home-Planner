@@ -1027,6 +1027,8 @@ function outlineForm() {
       <label class="fld"><span>Y 위치</span><input id="ol-y" type="number" step="100" value="${Math.round(bb.y)}"></label>
     </div>
     <div class="info-row"><span>면적</span><b>${area.toFixed(2)} m² (${(area / 3.305).toFixed(1)}평)</b></div>
+    <label class="fld"><span>외벽 선 두께 <b id="ol-lw-val">${_editor ? _editor.outlineLineW() : 3}</b> px</span>
+      <input id="ol-lw" type="range" min="1" max="14" step="1" value="${_editor ? _editor.outlineLineW() : 3}"></label>
     ${floorOpacityHTML()}
     ${layerControlsHTML()}
     <div class="btn-row">
@@ -1043,6 +1045,7 @@ function bindOutlineForm() {
   if (g('ol-d')) g('ol-d').onchange = (e) => setBox({ d: Math.max(500, +e.target.value || 500) });
   if (g('ol-x')) g('ol-x').onchange = (e) => setBox({ x: +e.target.value || 0 });
   if (g('ol-y')) g('ol-y').onchange = (e) => setBox({ y: +e.target.value || 0 });
+  if (g('ol-lw')) g('ol-lw').oninput = (e) => { const v = _editor.setOutlineLineW(+e.target.value); const lbl = g('ol-lw-val'); if (lbl) lbl.textContent = v; };
   bindFloorOpacity();
   bindLayerControls('wall', null);
   const del = g('ol-del');
@@ -1178,6 +1181,10 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   // 치수 표시 토글 (고객용 기본 OFF ↔ 시공용 ON)
   const dimBtn = $('tb-dims');
   if (dimBtn) dimBtn.onclick = () => { const on = !editor.showDims; editor.setShowDims(on); dimBtn.classList.toggle('on', on); };
+
+  // 평수·면적 표시 토글 (기본 ON)
+  const areaBtn = $('tb-area');
+  if (areaBtn) { areaBtn.classList.toggle('on', editor.showArea); areaBtn.onclick = () => { const on = !editor.showArea; editor.setShowArea(on); areaBtn.classList.toggle('on', on); }; }
 
   const homeBtn = $('tb-home');
   if (homeBtn) homeBtn.onclick = () => showDashboard();

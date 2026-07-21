@@ -30,7 +30,8 @@ export class Editor2D {
     this.editingLabel = null;
     this.onLabelEdit = null; // (label, [px,py]) → UI가 입력창 표시
 
-    this.showDims = false;   // 벽 치수 표시(고객용 기본=OFF, 시공용=ON)
+    this.showDims = false;   // 벽 치수(mm) 표시(고객용 기본=OFF, 시공용=ON)
+    this.showArea = true;    // 평수 표시(방·외곽 면적)
 
     this._bind();
     this._resize();
@@ -293,12 +294,14 @@ export class Editor2D {
     const big = Math.min(16, Math.max(10, w / 8));
     ctx.font = `600 ${big}px "Noto Sans KR", sans-serif`;
     if (w > 40 && h > 30) {
-      ctx.fillText(room.name || t.label, x + w / 2, y + h / 2 - big * 0.5);
-      ctx.font = `${big * 0.8}px "Noto Sans KR", sans-serif`;
-      ctx.fillStyle = '#6b7079';
-      // 고객 친숙 단위(평) 우선 + 시공 치수 토글 시 m² 병기
-      const txt = this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`;
-      ctx.fillText(txt, x + w / 2, y + h / 2 + big * 0.6);
+      // 평수 표시 옵션이 켜져 있으면 이름을 위로 올리고 평수 병기, 아니면 이름만 중앙
+      ctx.fillText(room.name || t.label, x + w / 2, y + h / 2 - (this.showArea ? big * 0.5 : 0));
+      if (this.showArea) {
+        ctx.font = `${big * 0.8}px "Noto Sans KR", sans-serif`;
+        ctx.fillStyle = '#6b7079';
+        const txt = this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`;
+        ctx.fillText(txt, x + w / 2, y + h / 2 + big * 0.6);
+      }
     }
 
     // 치수선 (선택 시)
@@ -1277,6 +1280,10 @@ export class Editor2D {
     return true;
   }
   setShowDims(on) { this.showDims = !!on; this.draw(); }
+  setShowArea(on) { this.showArea = !!on; this.draw(); }
+  // 외벽 2D 선 두께(px) — design 에 저장, 기본 3
+  outlineLineW() { return (store.design && store.design.outlineLineW) || 3; }
+  setOutlineLineW(px) { const v = Math.max(1, Math.min(14, +px || 3)); store.commit((d) => { d.outlineLineW = v; }); this.draw(); return v; }
 
   // 외곽 점 스냅: (스냅 모드) 격자 100mm + 직전 점과 거의 수평/수직이면 직각 정렬
   //             (직교 모드) 직전 점 기준 무조건 수평/수직으로 강제
@@ -1712,8 +1719,8 @@ export class Editor2D {
   // draw()의 레이어 스택에서 '벽체' 위치에 호출된다 (방과 위아래 순서 조절 가능)
   _drawOutlineShapes() {
     const ctx = this.ctx;
-    // 외벽 선도 방 벽 선과 같은 얇은 두께로 (2D에선 두께 차이 없이 통일 — 실제 두께는 3D에서)
-    const lw = this.monoMode ? 3.5 : 3;
+    // 외벽 2D 선 두께 — 설정값(외벽만 개별 조정). 실제 벽 두께(mm)는 3D에서.
+    const lw = this.outlineLineW();
     const shapes = outlineShapes(store.design.outline);
     for (let si = 0; si < shapes.length; si++) {
       const { pts, closed } = shapes[si];
@@ -1735,7 +1742,7 @@ export class Editor2D {
       ctx.restore();
       // 각 변 치수 (고객용은 숨김, '치수' 토글 시 표시)
       if (this.showDims) for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) this._segLabel(pts[i], pts[(i + 1) % pts.length], '#3a3f44');
-      if (closed && pts.length >= 3) this._outlineAreaLabel(pts);
+      if (closed && pts.length >= 3 && this.showArea) this._outlineAreaLabel(pts);
     }
   }
 

@@ -290,6 +290,17 @@ body {
 }
 .dim-toggle:hover { color: var(--ink); border-color: var(--seum-red); }
 .dim-toggle.on { background: var(--seum-red); color: #fff; border-color: var(--seum-red); font-weight: 600; }
+/* 내보내기 형식 선택 */
+.export-opts { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.m-opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  width: 100%; text-align: left; padding: 12px 14px; cursor: pointer;
+  background: #fff; border: 1px solid var(--line); border-radius: 10px; font-family: inherit;
+  transition: border-color .12s, background .12s;
+}
+.m-opt:hover { border-color: var(--seum-red); background: #fff7f8; }
+.m-opt b { font-size: 14px; color: var(--ink); }
+.m-opt span { font-size: 12px; color: var(--muted); }
 /* 우측 패널 상단 2D/3D 전환 (미니맵 위) */
 .right-modebar { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .right-modebar .mode-toggle { margin: 0; width: 100%; }

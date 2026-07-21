@@ -145,6 +145,8 @@ export const FURNITURE_CATALOG = [
   { id: 'speaker', cat: '가전', name: '스피커',       kind: 'box',      w: 340,  d: 340,  h: 1150, color: '#232323' },
   { id: 'karaoke', cat: '가전', name: '노래방 기계',  kind: 'box',      w: 600,  d: 520,  h: 1080, color: '#1f2937' },
   { id: 'golfsim', cat: '가전', name: '스크린골프 기계', kind: 'rug',   w: 1800, d: 2600, h: 40,   color: '#3f6b3f' },
+  { id: 'induction', cat: '가전', name: '인덕션',     kind: 'box',      w: 600,  d: 520,  h: 60,   color: '#2b2f33' },
+  { id: 'sinkwf',  cat: '가전', name: '폭포수전 싱크대', kind: 'box',   w: 1200, d: 600,  h: 850,  color: '#d7d2c8' },
 
   // 욕실
   { id: 'toilet',  cat: '욕실', name: '양변기',       kind: 'box',      w: 400,  d: 700,  h: 800,  color: '#eef0f1' },
@@ -155,6 +157,8 @@ export const FURNITURE_CATALOG = [
   { id: 'rug',     cat: '소품', name: '러그',         kind: 'rug',      w: 2000, d: 1400, h: 20,   color: '#cdbfae' },
   { id: 'plant',   cat: '소품', name: '화분',         kind: 'plant',    w: 450,  d: 450,  h: 1200, color: '#5b8c5a' },
   { id: 'lamp',    cat: '소품', name: '스탠드 조명',  kind: 'plant',    w: 350,  d: 350,  h: 1600, color: '#d8cbb0' },
+  { id: 'railing', cat: '소품', name: '난간',         kind: 'box',      w: 2000, d: 80,   h: 900,  color: '#9aa0a8' },
+  { id: 'ceilfan', cat: '소품', name: '실링팬',       kind: 'box',      w: 1100, d: 1100, h: 300,  color: '#cbb89a' },
 ];
 
 export const CATEGORIES = ['가구', '가전', '욕실', '소품'];

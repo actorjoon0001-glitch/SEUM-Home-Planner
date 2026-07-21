@@ -1137,6 +1137,13 @@ function roomForm(room) {
       </div>
     </div>
     <p class="hint small">거실·주방처럼 트인 공간은 맞닿은 두 방의 해당 면을 모두 '트기'로 (3D에서 벽 사라짐)</p>
+    ${(room.type === 'deck' || room.type === 'porch') ? `
+    <div class="fld"><span>널판 방향 (데크·포치)</span>
+      <div class="seg" id="r-deckdir">
+        <button class="mini${(room.deckDir || 'h') === 'h' ? ' active' : ''}" data-dir="h">▬ 가로</button>
+        <button class="mini${room.deckDir === 'v' ? ' active' : ''}" data-dir="v">▮ 세로</button>
+      </div>
+    </div>` : ''}
     ${floorOpacityHTML()}
     ${layerControlsHTML()}
     <div class="btn-row">
@@ -1167,6 +1174,7 @@ function bindRoomForm(room) {
   document.getElementById('r-del').onclick = () => store.commit((d) => {
     d.rooms = d.rooms.filter((r) => r.id !== room.id); store.selectedRoom = null;
   });
+  document.querySelectorAll('#r-deckdir button').forEach((b) => b.onclick = () => upd('deckDir', b.dataset.dir));
   bindFloorOpacity();
   bindLayerControls('room', room.id);
 }

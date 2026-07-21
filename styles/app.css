@@ -283,6 +283,8 @@ body {
 }
 .stage-bottombar > * { pointer-events: auto; }
 .toggle-group { display: flex; align-items: center; gap: 6px; }
+.seg { display: flex; gap: 6px; }
+.seg .mini { flex: 1; }
 .dim-toggle {
   background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px;
   font-family: inherit; font-size: 12.5px; color: var(--muted); cursor: pointer;

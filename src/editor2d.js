@@ -32,6 +32,7 @@ export class Editor2D {
 
     this.showDims = false;   // 벽 치수(mm) 표시(고객용 기본=OFF, 시공용=ON)
     this.showArea = true;    // 평수 표시(방·외곽 면적)
+    this.showRoomNames = true; // 공간 이름 표시(이름을 넣은 방만 표시)
 
     this._bind();
     this._resize();
@@ -45,6 +46,8 @@ export class Editor2D {
   toPx(mx, my) { return [mx * this.scale + this.ox, my * this.scale + this.oy]; }
   toMm(px, py) { return [(px - this.ox) / this.scale, (py - this.oy) / this.scale]; }
   snap(v) { return Math.round(v / GRID) * GRID; }
+  // 이동/크기 조정용 스냅 — 격자 스냅이 켜져 있으면 100mm 단위, 꺼져 있으면 10mm 단위(미세 조정)
+  _mv(v) { return this.snapMode ? this.snap(v) : Math.round(v / 10) * 10; }
 
   _resize() {
     const r = this.canvas.getBoundingClientRect();
@@ -294,13 +297,15 @@ export class Editor2D {
     const big = Math.min(16, Math.max(10, w / 8));
     ctx.font = `600 ${big}px "Noto Sans KR", sans-serif`;
     if (w > 40 && h > 30) {
-      // 평수 표시 옵션이 켜져 있으면 이름을 위로 올리고 평수 병기, 아니면 이름만 중앙
-      ctx.fillText(room.name || t.label, x + w / 2, y + h / 2 - (this.showArea ? big * 0.5 : 0));
+      // 이름은 사용자가 직접 넣은 방만 표시(자동 라벨 없음). 이름 표시 옵션이 꺼져 있으면 모두 숨김.
+      const hasName = this.showRoomNames && !!(room.name && room.name.trim());
+      if (hasName) ctx.fillText(room.name, x + w / 2, y + h / 2 - (this.showArea ? big * 0.5 : 0));
       if (this.showArea) {
         ctx.font = `${big * 0.8}px "Noto Sans KR", sans-serif`;
         ctx.fillStyle = '#6b7079';
         const txt = this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`;
-        ctx.fillText(txt, x + w / 2, y + h / 2 + big * 0.6);
+        // 이름이 없으면 평수를 중앙에, 있으면 이름 아래에
+        ctx.fillText(txt, x + w / 2, y + h / 2 + (hasName ? big * 0.6 : 0));
       }
     }
 
@@ -1107,33 +1112,33 @@ export class Editor2D {
     if (!drag.snapped) { store.snapshot(); drag.snapped = true; }
 
     if (drag.mode === 'movelabel') {
-      store.liveUpdate(() => { drag.label.x = this.snap(mx - drag.dx); drag.label.y = this.snap(my - drag.dy); });
+      store.liveUpdate(() => { drag.label.x = this._mv(mx - drag.dx); drag.label.y = this._mv(my - drag.dy); });
     } else if (drag.mode === 'mover') {
-      const sn = this._snapRoomMove(drag.room, this.snap(mx - drag.dx), this.snap(my - drag.dy));
+      const sn = this._snapRoomMove(drag.room, this._mv(mx - drag.dx), this._mv(my - drag.dy));
       store.liveUpdate(() => { drag.room.x = sn.x; drag.room.y = sn.y; });
     } else if (drag.mode === 'movef') {
       store.liveUpdate(() => {
-        drag.f.x = this.snap(mx - drag.dx);
-        drag.f.y = this.snap(my - drag.dy);
+        drag.f.x = this._mv(mx - drag.dx);
+        drag.f.y = this._mv(my - drag.dy);
       });
     } else if (drag.mode === 'moveo') {
       if (drag.o.free) {
-        store.liveUpdate(() => { drag.o.x = this.snap(mx - (drag.dx || 0)); drag.o.y = this.snap(my - (drag.dy || 0)); });
+        store.liveUpdate(() => { drag.o.x = this._mv(mx - (drag.dx || 0)); drag.o.y = this._mv(my - (drag.dy || 0)); });
       } else if (drag.o.onOutline) {
         const g = this._openingGeom(drag.o);
         if (g) {
           const along = (mx - g.ax) * g.ux + (my - g.ay) * g.uy;
-          store.liveUpdate(() => { drag.o.pos = this.snap(along); });
+          store.liveUpdate(() => { drag.o.pos = this._mv(along); });
         }
       } else {
         const room = store.design.rooms.find((r) => r.id === drag.o.roomId);
         if (room) {
           const along = (drag.o.side === 'n' || drag.o.side === 's') ? (mx - room.x) : (my - room.y);
-          store.liveUpdate(() => { drag.o.pos = this.snap(along); });
+          store.liveUpdate(() => { drag.o.pos = this._mv(along); });
         }
       }
     } else if (drag.mode === 'moveoutline') {
-      const dx = this.snap(mx - drag.sx), dy = this.snap(my - drag.sy);
+      const dx = this._mv(mx - drag.sx), dy = this._mv(my - drag.sy);
       store.liveUpdate((d) => {
         const p = d.outline && d.outline.paths && d.outline.paths[drag.pathIndex];
         if (!p || !drag.orig) return;
@@ -1163,7 +1168,7 @@ export class Editor2D {
     const MIN = 800;
     let { x, y, w, d } = room;
     const right = x + w, bottom = y + d;
-    mx = this.snap(mx); my = this.snap(my);
+    mx = this._mv(mx); my = this._mv(my);
     if (handle.includes('w')) { x = Math.min(mx, right - MIN); w = right - x; }
     if (handle.includes('e')) { w = Math.max(MIN, mx - x); }
     if (handle.includes('n')) { y = Math.min(my, bottom - MIN); d = bottom - y; }
@@ -1281,6 +1286,7 @@ export class Editor2D {
   }
   setShowDims(on) { this.showDims = !!on; this.draw(); }
   setShowArea(on) { this.showArea = !!on; this.draw(); }
+  setShowRoomNames(on) { this.showRoomNames = !!on; this.draw(); }
   // 외벽 2D 선 두께(px) — design 에 저장, 기본 3
   outlineLineW() { return (store.design && store.design.outlineLineW) || 3; }
   setOutlineLineW(px) { const v = Math.max(1, Math.min(14, +px || 3)); store.commit((d) => { d.outlineLineW = v; }); this.draw(); return v; }
@@ -1375,7 +1381,8 @@ export class Editor2D {
 
   // 방을 옮길 때 외곽/다른 방 모서리에 자동 정렬(스냅)
   _snapRoomMove(room, x, y) {
-    const SNAP = 250; // mm 이내면 달라붙음
+    // 격자 스냅이 켜져 있으면 넉넉히(250mm) 달라붙고, 미세 조정(꺼짐) 때는 약하게(80mm)만
+    const SNAP = this.snapMode ? 250 : 80;
     const d = store.design;
     const xs = [], ys = [];
     for (const { pts } of outlineShapes(d.outline)) for (const p of pts) { xs.push(p[0]); ys.push(p[1]); }
@@ -1688,7 +1695,7 @@ export class Editor2D {
     const type = this.drawRoom;
     const t = ROOM_TYPES[type] || ROOM_TYPES.living;
     store.commit((d) => {
-      const room = { id: rid(), type, name: t.label, x: x0, y: y0, w, d: dd };
+      const room = { id: rid(), type, name: '', x: x0, y: y0, w, d: dd };
       d.rooms.push(room);
       store.selectedRoom = room.id; store.selectedFurniture = store.selectedOpening = null;
     });
@@ -1920,7 +1927,7 @@ export class Editor2D {
     x = this.snap(x); y = this.snap(y); w = this.snap(w); d = this.snap(d);
     const sn = this._snapRoomMove({ id: '', w, d }, x, y);
     store.commit((dd) => {
-      const room = { id: rid(), type, name: t.label, x: sn.x, y: sn.y, w, d };
+      const room = { id: rid(), type, name: '', x: sn.x, y: sn.y, w, d };
       dd.rooms.push(room);
       store.selectedRoom = room.id; store.selectedFurniture = store.selectedOpening = null;
     });

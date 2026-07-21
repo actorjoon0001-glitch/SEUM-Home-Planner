@@ -459,7 +459,7 @@ function buildWallTools(editor) {
   snap.checked = editor.snapMode;
   ortho.checked = editor.orthoMode;
   thick.onchange = () => { thick.value = editor.setWallThickness(thick.value); };
-  snap.onchange = () => editor.setSnapMode(snap.checked);
+  snap.onchange = () => { editor.setSnapMode(snap.checked); const tb = document.getElementById('tb-snap'); if (tb) tb.classList.toggle('on', snap.checked); };
   ortho.onchange = () => editor.setOrthoMode(ortho.checked);
 
   let typing = false;
@@ -1116,9 +1116,10 @@ function roomForm(room) {
   const keys = ROOM_PALETTE_TYPES.includes(room.type) ? ROOM_PALETTE_TYPES : [...ROOM_PALETTE_TYPES, room.type];
   const opts = keys.map((k) => `<option value="${k}" ${k === room.type ? 'selected' : ''}>${(ROOM_TYPES[k] || {}).label || k}</option>`).join('');
   const area = (room.w * room.d / 1e6).toFixed(2);
+  const typeLabel = (ROOM_TYPES[room.type] || {}).label || '';
   return `
     <p class="ph">공간 속성</p>
-    <label class="fld"><span>이름</span><input id="r-name" value="${esc(room.name)}"></label>
+    <label class="fld"><span>이름 <small class="muted">(비우면 표시 안 됨)</small></span><input id="r-name" value="${esc(room.name)}" placeholder="예: ${esc(typeLabel)}"></label>
     <label class="fld"><span>종류</span><select id="r-type">${opts}</select></label>
     <div class="grid2">
       <label class="fld"><span>가로 W (mm)</span><input id="r-w" type="number" step="100" value="${room.w}"></label>
@@ -1238,6 +1239,22 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   // 평수·면적 표시 토글 (기본 ON)
   const areaBtn = $('tb-area');
   if (areaBtn) { areaBtn.classList.toggle('on', editor.showArea); areaBtn.onclick = () => { const on = !editor.showArea; editor.setShowArea(on); areaBtn.classList.toggle('on', on); }; }
+
+  // 공간 이름 표시 토글 (기본 ON) — 이름을 넣은 방만 표시됨
+  const nameBtn = $('tb-names');
+  if (nameBtn) { nameBtn.classList.toggle('on', editor.showRoomNames); nameBtn.onclick = () => { const on = !editor.showRoomNames; editor.setShowRoomNames(on); nameBtn.classList.toggle('on', on); }; }
+
+  // 격자 스냅 토글 (기본 ON) — 끄면 방·가구를 10mm 단위로 미세 이동
+  const snapBtn = $('tb-snap');
+  if (snapBtn) {
+    snapBtn.classList.toggle('on', editor.snapMode);
+    snapBtn.onclick = () => {
+      const on = !editor.snapMode; editor.setSnapMode(on);
+      snapBtn.classList.toggle('on', on);
+      const wt = $('wt-snap'); if (wt) wt.checked = on;               // 벽 도구 체크박스와 동기화
+      flash(on ? '격자 스냅 켜짐 (100mm 단위)' : '미세 이동 — 10mm 단위로 움직입니다');
+    };
+  }
 
   const homeBtn = $('tb-home');
   if (homeBtn) homeBtn.onclick = () => showDashboard();

@@ -145,7 +145,8 @@ export const FURNITURE_CATALOG = [
   { id: 'speaker', cat: '가전', name: '스피커',       kind: 'box',      w: 340,  d: 340,  h: 1150, color: '#232323' },
   { id: 'karaoke', cat: '가전', name: '노래방 기계',  kind: 'box',      w: 600,  d: 520,  h: 1080, color: '#1f2937' },
   { id: 'golfsim', cat: '가전', name: '스크린골프 기계', kind: 'rug',   w: 1800, d: 2600, h: 40,   color: '#3f6b3f' },
-  { id: 'induction', cat: '가전', name: '인덕션',     kind: 'box',      w: 600,  d: 520,  h: 60,   color: '#2b2f33' },
+  { id: 'induction', cat: '가전', name: '인덕션 4구',  kind: 'box',      w: 600,  d: 520,  h: 60,   color: '#2b2f33' },
+  { id: 'induction2', cat: '가전', name: '인덕션 2구', kind: 'box',      w: 530,  d: 300,  h: 60,   color: '#2b2f33' },
   { id: 'sinkwf',  cat: '가전', name: '폭포수전 싱크대', kind: 'box',   w: 1200, d: 600,  h: 850,  color: '#d7d2c8' },
 
   // 욕실

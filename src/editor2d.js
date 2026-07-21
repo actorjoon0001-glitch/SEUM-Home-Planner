@@ -252,6 +252,18 @@ export class Editor2D {
     ctx.globalAlpha = this._floorAlpha();
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y, w, h);
+    // 화장실·현관은 타일 격자(300mm)로 구분 표시
+    if (room.type === 'bath' || room.type === 'entrance') {
+      const tile = 300 * this.scale;
+      if (tile > 4) {
+        ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        ctx.strokeStyle = 'rgba(120,130,140,0.4)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let gx = x; gx <= x + w + 0.5; gx += tile) { ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); }
+        for (let gy = y; gy <= y + h + 0.5; gy += tile) { ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); }
+        ctx.stroke();
+      }
+    }
     ctx.restore();
     // 벽 (면별로 그림 — 트인(open) 면은 점선 통로로 표시). 벽 투명도 적용.
     const open = Array.isArray(room.open) ? room.open : [];
@@ -442,6 +454,27 @@ export class Editor2D {
     } else if (kind === 'plant') {                            // 화분/조명: 원
       oval(0, 0, hw * 0.9, hd * 0.9); ctx.fillStyle = light; ctx.fill(); ctx.stroke();
       oval(0, 0, hw * 0.5, hd * 0.5); ctx.stroke();
+    } else if (id === 'induction') {                          // 인덕션: 상판 + 화구 원
+      rrect(-hw, -hd, w, d, Math.min(6, d * 0.1)); ctx.fillStyle = '#e9e9ec'; ctx.fill(); ctx.stroke();
+      const r = Math.min(w, d) * 0.19;
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * w * 0.22, sy * d * 0.22, r, 0, Math.PI * 2); ctx.stroke(); }
+    } else if (id === 'sinkwf') {                             // 폭포수전 싱크대: 상판 + 볼 + 사각 폭포수전
+      box();
+      rrect(-hw + w * 0.12, -hd + d * 0.2, w * 0.5, d * 0.6, Math.min(6, d * 0.12)); ctx.stroke();  // 개수대 볼
+      ctx.fillStyle = stroke; ctx.fillRect(hw - w * 0.28, -hd + d * 0.1, w * 0.14, d * 0.06);        // 사각 폭포 수전
+    } else if (id === 'railing') {                            // 난간: 위아래 레일 + 세로 살
+      ctx.strokeStyle = stroke;
+      ctx.beginPath(); ctx.moveTo(-hw, -hd * 0.5); ctx.lineTo(hw, -hd * 0.5); ctx.moveTo(-hw, hd * 0.5); ctx.lineTo(hw, hd * 0.5); ctx.stroke();
+      const n = Math.max(2, Math.round(w / Math.max(6, 250 * this.scale)));
+      for (let i = 0; i <= n; i++) { const gx = -hw + w * i / n; ctx.beginPath(); ctx.moveTo(gx, -hd * 0.5); ctx.lineTo(gx, hd * 0.5); ctx.stroke(); }
+    } else if (id === 'ceilfan') {                            // 실링팬: 날개 4장 + 허브
+      ctx.strokeStyle = stroke; ctx.fillStyle = '#f0ede6';
+      for (let k = 0; k < 4; k++) {
+        ctx.save(); ctx.rotate(k * Math.PI / 2);
+        ctx.beginPath(); ctx.ellipse(0, -hd * 0.5, hw * 0.16, hd * 0.42, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.beginPath(); ctx.arc(0, 0, Math.min(hw, hd) * 0.18, 0, Math.PI * 2); ctx.fillStyle = '#d9d4c8'; ctx.fill(); ctx.stroke();
     } else if (kind === 'tv') {                               // TV/스크린: 얇은 막대
       ctx.fillStyle = '#d6d8db'; ctx.fillRect(-hw, -hd, w, d); ctx.strokeRect(-hw, -hd, w, d);
     } else {                                                  // 기타(옷장·수납 등): 사각 + 이름

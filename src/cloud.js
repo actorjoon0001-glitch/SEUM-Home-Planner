@@ -8,6 +8,12 @@ const subs = new Set();
 
 const cfg = (typeof window !== 'undefined' && window.SEUM_CONFIG) || {};
 
+// 관리자 이메일 — 이 계정으로 로그인하면 '전체 도면'(모두의 도면)을 볼 수 있음.
+// config.js 의 adminEmails 로 덮어쓸 수 있음(문자열 배열).
+const ADMIN_EMAILS = (Array.isArray(cfg.adminEmails) && cfg.adminEmails.length
+  ? cfg.adminEmails
+  : ['actorjoon0001@gmail.com']).map((e) => String(e).trim().toLowerCase());
+
 // Supabase 라이브러리를 여러 CDN에서 순차 시도 (한 곳이 막혀도 다음 것으로)
 async function loadSupabase() {
   // jsDelivr /+esm 는 단일 번들(요청 1회)이라 가장 견고 → 우선. 실패 시 esm.sh/skypack 폴백.
@@ -72,6 +78,15 @@ export const cloud = {
   onChange(fn) { subs.add(fn); return () => subs.delete(fn); },
   _emit() { subs.forEach((fn) => fn(this)); },
 
+  // 도면 데이터에 작성자 정보를 남겨 관리자 화면에서 누가 만든지 보이게 함
+  _stampAuthor(data) {
+    if (!data || !this.user) return;
+    const u = this.user;
+    const nm = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || '';
+    data.ownerName = nm || u.email || data.ownerName || '';
+    data.ownerEmail = u.email || data.ownerEmail || '';
+  },
+
   // --- 인증 ---
   _requireClient() {
     if (!client) {
@@ -99,6 +114,7 @@ export const cloud = {
   async saveDesign({ id, name, data, isShared = false, isTemplate = false }) {
     await this.init();
     if (!this.user) throw new Error('로그인이 필요합니다.');
+    this._stampAuthor(data);
     const row = {
       name, data,
       is_shared: isShared, is_template: isTemplate,
@@ -114,6 +130,7 @@ export const cloud = {
   async quickSave({ id, name, data }) {
     await this.init();
     if (!this.user) throw new Error('로그인이 필요합니다.');
+    this._stampAuthor(data);
     const row = { name, data, updated_at: new Date().toISOString() };
     const { data: out, error } = await client.from('designs').update(row).eq('id', id).select().single();
     if (error) throw error;
@@ -126,6 +143,23 @@ export const cloud = {
     const { data, error } = await client.from('designs')
       .select('id,name,data,is_shared,is_template,updated_at,owner')
       .eq('owner', this.user.id).order('updated_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  // 현재 로그인 계정이 관리자인지 (전체 도면 열람 권한)
+  isAdmin() {
+    const email = this.user && this.user.email;
+    return !!(email && ADMIN_EMAILS.includes(String(email).trim().toLowerCase()));
+  },
+
+  // 관리자 전용: 모두가 만든 모든 도면. (Supabase RLS 가 관리자 SELECT 를 허용해야 실제로 반환됨)
+  async listAll() {
+    await this.init();
+    if (!this.user) return [];
+    const { data, error } = await client.from('designs')
+      .select('id,name,data,is_shared,is_template,updated_at,owner')
+      .order('updated_at', { ascending: false });
     if (error) throw error;
     return data || [];
   },

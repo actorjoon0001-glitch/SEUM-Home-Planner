@@ -57,6 +57,10 @@ export function showDashboard() {
 function hideDashboard() {
   const el = document.getElementById('dashboard'); if (el) el.classList.add('hidden');
 }
+function setActiveNav(view) {
+  const el = document.getElementById('dashboard'); if (!el) return;
+  el.querySelectorAll('.dash-navb').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+}
 function buildDashboard(deps) {
   _dash = deps;
   const el = document.getElementById('dashboard'); if (!el) return;
@@ -67,6 +71,8 @@ function buildDashboard(deps) {
   });
   const lo = el.querySelector('#dash-logout');
   if (lo) lo.onclick = async () => { try { await cloud.signOut(); } catch (e) { /* noop */ } };
+  // 로그인/로그아웃 시 대시보드가 열려 있으면 다시 그림(관리자 탭 노출 갱신 포함)
+  cloud.onChange(() => { if (!el.classList.contains('hidden')) renderDash(); });
 }
 // 도면 미니 미리보기 (방 + 외곽)
 function drawPlanThumb(cv, d) {
@@ -163,6 +169,13 @@ async function renderDash() {
     const nm = u && u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name);
     userEl.textContent = u ? (nm ? `${nm} (${u.email})` : u.email) : '';
   }
+  // 관리자 계정일 때만 '전체 도면' 탭 노출
+  const navAll = document.getElementById('dash-nav-all');
+  if (navAll) {
+    const admin = cloud.configured() && cloud.isAdmin();
+    navAll.classList.toggle('hidden', !admin);
+    if (!admin && _dashView === 'all') { _dashView = 'mine'; setActiveNav('mine'); }
+  }
   if (!grid) return;
   grid.innerHTML = '';
   if (_dashView === 'mine') {
@@ -231,7 +244,47 @@ async function renderDash() {
         grid.appendChild(projectCard(r.name, r.data, '🔗 공유', () => enterEditor(() => store.loadInto(r.data, { cloudId: null }))));
       }
     } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
+  } else if (_dashView === 'all') {
+    title.textContent = '전체 도면 (관리자)';
+    sub.textContent = '모든 직원이 만든 도면입니다. 작성자별로 모아 보고, 열어서 확인할 수 있어요.';
+    if (!(cloud.configured() && cloud.isAdmin())) { grid.innerHTML = '<p class="dash-empty">관리자 계정으로 로그인해야 볼 수 있습니다.</p>'; return; }
+    grid.innerHTML = '<p class="dash-empty">불러오는 중…</p>';
+    try {
+      const rows = await cloud.listAll();
+      grid.innerHTML = '';
+      if (!rows.length) {
+        grid.innerHTML = '<p class="dash-empty">아직 도면이 없거나, Supabase에서 관리자 전체 열람 권한(RLS)이 설정되지 않았습니다.</p>';
+        return;
+      }
+      // 작성자(owner)별 그룹 — 내 것은 맨 위
+      const groups = {};
+      for (const r of rows) { const k = r.owner || '알 수 없음'; (groups[k] = groups[k] || []).push(r); }
+      const myId = cloud.user && cloud.user.id;
+      const keys = Object.keys(groups).sort((a, b) => (a === myId ? -1 : b === myId ? 1 : 0));
+      for (const owner of keys) {
+        const list = groups[owner];
+        const who = owner === myId ? '나' : ownerLabel(list[0]);
+        grid.insertAdjacentHTML('beforeend', `<h3 class="dash-group">👤 ${esc(who)} · ${list.length}개</h3>`);
+        for (const r of list) {
+          const cust = (r.data && r.data.customer || '').trim();
+          const tags = [fmtDate(r.updated_at)];
+          if (r.is_template) tags.push('🏢 전시장'); if (r.is_shared) tags.push('🔗 공유');
+          if (cust) tags.push(`📁 ${cust}`);
+          grid.appendChild(projectCard(r.name, r.data, tags.join(' · '),
+            () => enterEditor(() => store.loadInto(r.data, { cloudId: r.owner === myId ? r.id : null })),
+            async () => { try { await cloud.removeDesign(r.id); } catch (e) { alert('삭제 실패(권한): ' + (e.message || e)); } renderDash(); }));
+        }
+      }
+    } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
   }
+}
+// 작성자 표시 라벨 — 도면 데이터에 저장된 작성자명이 있으면 사용, 없으면 owner id 앞부분
+function ownerLabel(row) {
+  const d = row && row.data;
+  const nm = d && (d.ownerName || d.author || d.ownerEmail);
+  if (nm) return String(nm);
+  const id = row && row.owner ? String(row.owner) : '';
+  return id ? id.slice(0, 8) + '…' : '알 수 없음';
 }
 
 function buildLeftRail() {

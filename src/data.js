@@ -148,6 +148,7 @@ export const FURNITURE_CATALOG = [
   { id: 'induction', cat: '가전', name: '인덕션 4구',  kind: 'box',      w: 600,  d: 520,  h: 60,   color: '#2b2f33' },
   { id: 'induction2', cat: '가전', name: '인덕션 2구', kind: 'box',      w: 530,  d: 300,  h: 60,   color: '#2b2f33' },
   { id: 'sinkwf',  cat: '가전', name: '폭포수전 싱크대', kind: 'box',   w: 1200, d: 600,  h: 850,  color: '#d7d2c8' },
+  { id: 'faucet',  cat: '가전', name: '수도꼭지',     kind: 'box',      w: 150,  d: 150,  h: 100,  color: '#c9ced3' },
 
   // 욕실
   { id: 'toilet',  cat: '욕실', name: '양변기',       kind: 'box',      w: 400,  d: 700,  h: 800,  color: '#eef0f1' },

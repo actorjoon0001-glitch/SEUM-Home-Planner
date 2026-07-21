@@ -346,7 +346,7 @@ export class Editor2D {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((f.rotation || 0) * Math.PI / 180);
-    this._drawFurnitureSymbol(c, w, d, selected, f.cross, f.showName !== false);   // 항목별 2D 도면 기호(+X/이름 옵션)
+    this._drawFurnitureSymbol(c, w, d, selected, f.cross, !!f.showName);   // 항목별 2D 도면 기호(+X/이름 옵션)
     ctx.restore();
     // 회전 핸들
     if (selected) {
@@ -382,16 +382,7 @@ export class Editor2D {
       ctx.moveTo(hw, -hd); ctx.lineTo(-hw, hd);
       ctx.stroke();
       // 이름 라벨 — '이름 표시' 옵션이 켜져 있을 때만 (X 위에 흰 배경, 긴 쪽으로 눕힘)
-      if (showName && w > 30 && d > 14) {
-        ctx.save();
-        ctx.font = '10px "Noto Sans KR", sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        if (Math.abs(w) < Math.abs(d)) ctx.rotate(-Math.PI / 2);
-        const tw = ctx.measureText(c.name).width;
-        ctx.fillStyle = 'rgba(255,255,255,0.86)'; ctx.fillRect(-tw / 2 - 3, -7, tw + 6, 14);
-        ctx.fillStyle = '#3a3f44'; ctx.fillText(c.name, 0, 0);
-        ctx.restore();
-      }
+      if (showName) this._furnLabel(c, w, d);
       return;
     }
     const rrect = (x, y, ww, hh, r) => {
@@ -501,18 +492,30 @@ export class Editor2D {
         ctx.restore();
       }
       ctx.beginPath(); ctx.arc(0, 0, R * 0.17, 0, Math.PI * 2); ctx.fillStyle = '#d9d4c8'; ctx.fill(); ctx.stroke();
+    } else if (id === 'faucet') {                             // 수도꼭지: 급수 자리 표시(세탁기 등)
+      ctx.beginPath(); ctx.arc(0, 0, Math.min(hw, hd) * 0.7, 0, Math.PI * 2); ctx.fillStyle = light; ctx.fill(); ctx.stroke();  // 밸브 원
+      const a = Math.min(hw, hd) * 0.42;                                                                                       // 내부 십자(급수)
+      ctx.beginPath(); ctx.moveTo(-a, 0); ctx.lineTo(a, 0); ctx.moveTo(0, -a); ctx.lineTo(0, a); ctx.stroke();
     } else if (kind === 'tv') {                               // TV/스크린: 얇은 막대
       ctx.fillStyle = '#d6d8db'; ctx.fillRect(-hw, -hd, w, d); ctx.strokeRect(-hw, -hd, w, d);
-    } else {                                                  // 기타(옷장·수납 등): 사각 + 이름
+    } else {                                                  // 기타(옷장·수납 등): 사각
       box();
-      if (w > 40 && d > 24) {
-        ctx.save(); ctx.fillStyle = '#6b7079'; ctx.font = '10px "Noto Sans KR", sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        if (Math.abs(w) >= Math.abs(d)) ctx.fillText(c.name, 0, 0);
-        else { ctx.rotate(-Math.PI / 2); ctx.fillText(c.name, 0, 0); }
-        ctx.restore();
-      }
     }
+    // 이름 라벨 — '이름 표시' 옵션이 켜져 있으면 모든 항목에 표시
+    if (showName && w > 30 && d > 14) this._furnLabel(c, w, d);
+  }
+
+  // 가구 이름 라벨 (긴 쪽으로 눕히고 흰 배경으로 가독성 확보)
+  _furnLabel(c, w, d) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = '10px "Noto Sans KR", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (Math.abs(w) < Math.abs(d)) ctx.rotate(-Math.PI / 2);
+    const tw = ctx.measureText(c.name).width;
+    ctx.fillStyle = 'rgba(255,255,255,0.86)'; ctx.fillRect(-tw / 2 - 3, -7, tw + 6, 14);
+    ctx.fillStyle = '#3a3f44'; ctx.fillText(c.name, 0, 0);
+    ctx.restore();
   }
 
   _drawScaleBar() {

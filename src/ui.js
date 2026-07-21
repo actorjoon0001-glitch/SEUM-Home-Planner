@@ -1129,7 +1129,7 @@ function furnForm(f) {
       <label class="fld"><span>Y 위치</span><input id="f-y" type="number" step="50" value="${f.y}"></label>
     </div>
     <label class="ck"><input type="checkbox" id="f-cross"${f.cross ? ' checked' : ''}> ✕ 표시 (박스+대각선 — 냉장고·세탁기 등)</label>
-    <label class="ck"><input type="checkbox" id="f-showname"${f.showName !== false ? ' checked' : ''}> 이름 표시 (✕ 표시일 때)</label>
+    <label class="ck"><input type="checkbox" id="f-showname"${f.showName ? ' checked' : ''}> 이름 표시</label>
     <div class="btn-row">
       <button class="mini" id="f-rotl">⟲ 90°</button>
       <button class="mini" id="f-rotr">⟳ 90°</button>

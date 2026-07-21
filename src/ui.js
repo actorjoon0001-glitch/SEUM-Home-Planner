@@ -1128,6 +1128,7 @@ function furnForm(f) {
       <label class="fld"><span>X 위치</span><input id="f-x" type="number" step="50" value="${f.x}"></label>
       <label class="fld"><span>Y 위치</span><input id="f-y" type="number" step="50" value="${f.y}"></label>
     </div>
+    <label class="ck"><input type="checkbox" id="f-cross"${f.cross ? ' checked' : ''}> ✕ 표시 (박스+대각선 — 냉장고·세탁기 등)</label>
     <div class="btn-row">
       <button class="mini" id="f-rotl">⟲ 90°</button>
       <button class="mini" id="f-rotr">⟳ 90°</button>
@@ -1142,6 +1143,7 @@ function bindFurnForm(f) {
   document.getElementById('f-w').onchange = (e) => upd(() => f.w = Math.max(100, +e.target.value || 100));
   document.getElementById('f-d').onchange = (e) => upd(() => f.d = Math.max(100, +e.target.value || 100));
   document.getElementById('f-rot').onchange = (e) => upd(() => f.rotation = ((+e.target.value % 360) + 360) % 360);
+  document.getElementById('f-cross').onchange = (e) => upd(() => f.cross = e.target.checked);
   document.getElementById('f-x').onchange = (e) => upd(() => f.x = +e.target.value || 0);
   document.getElementById('f-y').onchange = (e) => upd(() => f.y = +e.target.value || 0);
   document.getElementById('f-rotl').onclick = () => upd(() => f.rotation = (((f.rotation || 0) - 90) % 360 + 360) % 360);

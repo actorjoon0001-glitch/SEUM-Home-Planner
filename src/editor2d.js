@@ -373,7 +373,7 @@ export class Editor2D {
     ctx.lineWidth = selected ? 2 : 1.2;
     // 너무 작으면 단순 사각형
     if (w < 14 || d < 14) { ctx.fillStyle = light; ctx.fillRect(-hw, -hd, w, d); ctx.strokeStyle = stroke; ctx.strokeRect(-hw, -hd, w, d); return; }
-    // 'X 표시' 옵션: 박스 + 대각선 X (냉장고·세탁기 등 도면 관례)
+    // 'X 표시' 옵션: 박스 + 대각선 X + 이름 (냉장고·세탁기 등 도면 관례)
     if (cross) {
       ctx.fillStyle = light; ctx.fillRect(-hw, -hd, w, d);
       ctx.strokeStyle = stroke; ctx.strokeRect(-hw, -hd, w, d);
@@ -381,6 +381,17 @@ export class Editor2D {
       ctx.moveTo(-hw, -hd); ctx.lineTo(hw, hd);
       ctx.moveTo(hw, -hd); ctx.lineTo(-hw, hd);
       ctx.stroke();
+      // 이름 라벨 — X 위에 흰 배경 깔고 표시 (긴 쪽으로 눕힘)
+      if (w > 30 && d > 14) {
+        ctx.save();
+        ctx.font = '10px "Noto Sans KR", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (Math.abs(w) < Math.abs(d)) ctx.rotate(-Math.PI / 2);
+        const tw = ctx.measureText(c.name).width;
+        ctx.fillStyle = 'rgba(255,255,255,0.86)'; ctx.fillRect(-tw / 2 - 3, -7, tw + 6, 14);
+        ctx.fillStyle = '#3a3f44'; ctx.fillText(c.name, 0, 0);
+        ctx.restore();
+      }
       return;
     }
     const rrect = (x, y, ww, hh, r) => {
@@ -474,14 +485,22 @@ export class Editor2D {
       const n = Math.max(2, Math.round(w / Math.max(8, 400 * this.scale)));   // 기둥 간격 ≈400mm
       ctx.fillStyle = stroke;
       for (let i = 0; i <= n; i++) { const gx = -hw + w * i / n; ctx.beginPath(); ctx.arc(gx, 0, ry + 1, 0, Math.PI * 2); ctx.fill(); }
-    } else if (id === 'ceilfan') {                            // 실링팬: 날개 4장 + 허브
-      ctx.strokeStyle = stroke; ctx.fillStyle = '#f0ede6';
-      for (let k = 0; k < 4; k++) {
-        ctx.save(); ctx.rotate(k * Math.PI / 2);
-        ctx.beginPath(); ctx.ellipse(0, -hd * 0.5, hw * 0.16, hd * 0.42, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (id === 'ceilfan') {                            // 실링팬: 회전 반경 원 + 물방울 날개 + 허브
+      const R = Math.min(hw, hd);
+      ctx.strokeStyle = 'rgba(140,150,160,0.45)';             // 회전 반경(옅은 원)
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.94, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = stroke; ctx.fillStyle = '#efece5';
+      const blades = 4;
+      for (let k = 0; k < blades; k++) {                      // 물방울 날개(허브 좁고 끝 넓게), 대각 배치
+        ctx.save(); ctx.rotate(k * 2 * Math.PI / blades + Math.PI / blades);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(-R * 0.16, -R * 0.5, 0, -R * 0.86);
+        ctx.quadraticCurveTo(R * 0.16, -R * 0.5, 0, 0);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.restore();
       }
-      ctx.beginPath(); ctx.arc(0, 0, Math.min(hw, hd) * 0.18, 0, Math.PI * 2); ctx.fillStyle = '#d9d4c8'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.17, 0, Math.PI * 2); ctx.fillStyle = '#d9d4c8'; ctx.fill(); ctx.stroke();
     } else if (kind === 'tv') {                               // TV/스크린: 얇은 막대
       ctx.fillStyle = '#d6d8db'; ctx.fillRect(-hw, -hd, w, d); ctx.strokeRect(-hw, -hd, w, d);
     } else {                                                  // 기타(옷장·수납 등): 사각 + 이름

@@ -346,7 +346,7 @@ export class Editor2D {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((f.rotation || 0) * Math.PI / 180);
-    this._drawFurnitureSymbol(c, w, d, selected, f.cross);   // 항목별 2D 도면 기호(+X 옵션)
+    this._drawFurnitureSymbol(c, w, d, selected, f.cross, f.showName !== false);   // 항목별 2D 도면 기호(+X/이름 옵션)
     ctx.restore();
     // 회전 핸들
     if (selected) {
@@ -364,7 +364,7 @@ export class Editor2D {
   }
 
   // 가구·가전·소품을 2D 도면 기호로 그림 (로컬 좌표: 중심 원점, 앞쪽 = +y).
-  _drawFurnitureSymbol(c, w, d, selected, cross) {
+  _drawFurnitureSymbol(c, w, d, selected, cross, showName) {
     const ctx = this.ctx;
     const hw = w / 2, hd = d / 2;
     const stroke = selected ? '#c8102e' : '#7c828b';
@@ -381,8 +381,8 @@ export class Editor2D {
       ctx.moveTo(-hw, -hd); ctx.lineTo(hw, hd);
       ctx.moveTo(hw, -hd); ctx.lineTo(-hw, hd);
       ctx.stroke();
-      // 이름 라벨 — X 위에 흰 배경 깔고 표시 (긴 쪽으로 눕힘)
-      if (w > 30 && d > 14) {
+      // 이름 라벨 — '이름 표시' 옵션이 켜져 있을 때만 (X 위에 흰 배경, 긴 쪽으로 눕힘)
+      if (showName && w > 30 && d > 14) {
         ctx.save();
         ctx.font = '10px "Noto Sans KR", sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';

@@ -39,7 +39,7 @@ export class Editor2D {
     window.addEventListener('resize', () => { this._resize(); this.draw(); });
     store.subscribe(() => this.draw());
     // 첫 진입 시 화면 맞춤
-    requestAnimationFrame(() => { this.fit(); });
+    requestAnimationFrame(() => { this.applyInitialView(); });
   }
 
   // ---- 좌표 변환 ----
@@ -82,6 +82,24 @@ export class Editor2D {
     this.oy = -minY * this.scale + (this.cssH - (maxY - minY) * this.scale) / 2;
     this.draw();
   }
+
+  // 도면을 열 때의 초기 화면 — '위치 고정'이 저장돼 있으면 그 화면 그대로, 없으면 자동 맞춤
+  applyInitialView() {
+    const v = store.design && store.design.view;
+    if (v && typeof v.scale === 'number' && v.scale > 0) {
+      this.scale = v.scale; this.ox = v.ox; this.oy = v.oy;
+      this.draw();
+    } else {
+      this.fit();
+    }
+  }
+  isViewLocked() { return !!(store.design && store.design.view); }
+  // 현재 보이는 화면(확대/위치)을 저장 → 새로고침·불러오기 시 항상 이 화면으로 열림
+  lockView() {
+    store.commit((d) => { d.view = { scale: this.scale, ox: this.ox, oy: this.oy }; });
+    return true;
+  }
+  unlockView() { store.commit((d) => { d.view = null; }); return false; }
 
   // 도면 전체를 화면 상태와 무관하게 고해상도 PNG(dataURL)로 렌더 (인쇄/내보내기용)
   toImage(w = 1600, h = 1100, mime = 'image/png', quality) {

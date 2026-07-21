@@ -109,7 +109,7 @@ function enterEditor(loadFn) {
   try { if (loadFn) loadFn(); } catch (e) { alert('불러오기 실패: ' + e.message); return; }
   hideDashboard();
   if (_dash && _dash.onModeChange) _dash.onModeChange('2d');
-  if (_dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.fit(); }, 0);
+  if (_dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.applyInitialView(); }, 0);
 }
 function projectCard(name, design, meta, onOpen, onDelete) {
   const card = document.createElement('div');
@@ -1262,6 +1262,19 @@ function buildToolbar({ editor, viewer, onModeChange }) {
       const wt = $('wt-snap'); if (wt) wt.checked = on;               // 벽 도구 체크박스와 동기화
       flash(on ? '격자 스냅 켜짐 (100mm 단위)' : '미세 이동 — 10mm 단위로 움직입니다');
     };
+  }
+
+  // 위치 고정 토글 — 현재 화면(확대·위치)을 저장, 새로고침·불러오기 때 항상 이 화면으로 열림
+  const lockBtn = $('tb-lockview');
+  const syncLock = () => { if (lockBtn) lockBtn.classList.toggle('on', editor.isViewLocked()); };
+  if (lockBtn) {
+    lockBtn.onclick = () => {
+      if (editor.isViewLocked()) { editor.unlockView(); flash('위치 고정 해제 — 열 때 화면을 자동으로 맞춥니다'); }
+      else { editor.lockView(); flash('📌 현재 화면으로 위치 고정 — 새로고침·불러오기 때 이 화면으로 열립니다'); }
+      syncLock();
+    };
+    store.subscribe(syncLock);   // 다른 도면 불러오면 그 도면의 고정 상태 반영
+    syncLock();
   }
 
   const homeBtn = $('tb-home');

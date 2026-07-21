@@ -454,19 +454,26 @@ export class Editor2D {
     } else if (kind === 'plant') {                            // 화분/조명: 원
       oval(0, 0, hw * 0.9, hd * 0.9); ctx.fillStyle = light; ctx.fill(); ctx.stroke();
       oval(0, 0, hw * 0.5, hd * 0.5); ctx.stroke();
-    } else if (id === 'induction') {                          // 인덕션: 상판 + 화구 원
+    } else if (id === 'induction' || id === 'induction2') {   // 인덕션: 상판 + 화구 원 (4구/2구)
       rrect(-hw, -hd, w, d, Math.min(6, d * 0.1)); ctx.fillStyle = '#e9e9ec'; ctx.fill(); ctx.stroke();
-      const r = Math.min(w, d) * 0.19;
-      for (const sx of [-1, 1]) for (const sy of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * w * 0.22, sy * d * 0.22, r, 0, Math.PI * 2); ctx.stroke(); }
+      if (id === 'induction2') {                              // 2구: 좌우 원 2개
+        const r = Math.min(w / 2, d) * 0.32;
+        for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * w * 0.24, 0, r, 0, Math.PI * 2); ctx.stroke(); }
+      } else {                                                 // 4구: 2×2
+        const r = Math.min(w, d) * 0.19;
+        for (const sx of [-1, 1]) for (const sy of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * w * 0.22, sy * d * 0.22, r, 0, Math.PI * 2); ctx.stroke(); }
+      }
     } else if (id === 'sinkwf') {                             // 폭포수전 싱크대: 상판 + 볼 + 사각 폭포수전
       box();
       rrect(-hw + w * 0.12, -hd + d * 0.2, w * 0.5, d * 0.6, Math.min(6, d * 0.12)); ctx.stroke();  // 개수대 볼
       ctx.fillStyle = stroke; ctx.fillRect(hw - w * 0.28, -hd + d * 0.1, w * 0.14, d * 0.06);        // 사각 폭포 수전
-    } else if (id === 'railing') {                            // 난간: 위아래 레일 + 세로 살
-      ctx.strokeStyle = stroke;
-      ctx.beginPath(); ctx.moveTo(-hw, -hd * 0.5); ctx.lineTo(hw, -hd * 0.5); ctx.moveTo(-hw, hd * 0.5); ctx.lineTo(hw, hd * 0.5); ctx.stroke();
-      const n = Math.max(2, Math.round(w / Math.max(6, 250 * this.scale)));
-      for (let i = 0; i <= n; i++) { const gx = -hw + w * i / n; ctx.beginPath(); ctx.moveTo(gx, -hd * 0.5); ctx.lineTo(gx, hd * 0.5); ctx.stroke(); }
+    } else if (id === 'railing') {                            // 난간: 얇은 레일 바 + 일정 간격 기둥(점)
+      const ry = Math.max(1.5, Math.min(hd * 0.5, 3));
+      ctx.fillStyle = '#e9e9ec'; ctx.strokeStyle = stroke;
+      rrect(-hw, -ry, w, ry * 2, ry); ctx.fill(); ctx.stroke();               // 레일 바
+      const n = Math.max(2, Math.round(w / Math.max(8, 400 * this.scale)));   // 기둥 간격 ≈400mm
+      ctx.fillStyle = stroke;
+      for (let i = 0; i <= n; i++) { const gx = -hw + w * i / n; ctx.beginPath(); ctx.arc(gx, 0, ry + 1, 0, Math.PI * 2); ctx.fill(); }
     } else if (id === 'ceilfan') {                            // 실링팬: 날개 4장 + 허브
       ctx.strokeStyle = stroke; ctx.fillStyle = '#f0ede6';
       for (let k = 0; k < 4; k++) {

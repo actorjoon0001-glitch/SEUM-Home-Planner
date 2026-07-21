@@ -2022,7 +2022,7 @@ export class Editor2D {
       for (let ei = 0; ei < eMax; ei++) {
         const A = pts[ei], B = pts[(ei + 1) % n];
         const r = this._distToSeg(mx, my, A[0], A[1], B[0], B[1]);
-        if (!outBest || r.dist < outBest.dist) outBest = { pathIndex: pi, edgeIndex: ei, pos: r.along, dist: r.dist };
+        if (!outBest || r.dist < outBest.dist) outBest = { pathIndex: pi, edgeIndex: ei, pos: r.along, dist: r.dist, len: Math.hypot(B[0] - A[0], B[1] - A[1]) };
       }
     });
     // 3) 더 가까운 쪽에 부착 — 방 벽과 외벽이 겹칠 땐 방 벽을 우선(50mm 편향),
@@ -2033,7 +2033,7 @@ export class Editor2D {
     if (bestDist > 800) { this._addFreeOpening(winType, mx, my); return; }
     store.commit((dd) => {
       const o = useOutline
-        ? openingOutline(outBest.pathIndex, outBest.edgeIndex, this.snap(outBest.pos), winType)
+        ? openingOutline(outBest.pathIndex, outBest.edgeIndex, outBest.len / 2, winType)   // 외벽에 달면 그 변의 정중앙에 자동 배치
         : opening(roomBest.room.id, roomBest.side, this.snap(roomBest.pos), winType);
       dd.openings.push(o);
       store.selectedOpening = o.id;

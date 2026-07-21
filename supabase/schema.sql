@@ -35,6 +35,25 @@ drop policy if exists "read shared/templates (anon)" on public.designs;
 create policy "read shared/templates (anon)" on public.designs
   for select to anon using (is_shared or is_template);
 
+-- 2-1) 관리자: 모든 직원의 도면 열람/관리 -----------------------------------
+-- 관리자 이메일로 로그인한 계정은 모두가 만든 도면을 보고(삭제 등) 관리할 수 있습니다.
+-- 아래 배열의 이메일 목록을 필요에 맞게 수정하세요. (config.js 의 adminEmails 와 동일하게 유지)
+create or replace function public.is_seum_admin()
+returns boolean language sql stable as $$
+  select coalesce(
+    (auth.jwt() ->> 'email') = any (array[
+      'actorjoon0001@gmail.com'
+    ]),
+    false
+  );
+$$;
+
+drop policy if exists "admin - all designs" on public.designs;
+create policy "admin - all designs" on public.designs
+  for all to authenticated
+  using (public.is_seum_admin())
+  with check (public.is_seum_admin());
+
 -- 3) updated_at 자동 갱신 트리거 ---------------------------------------------
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$

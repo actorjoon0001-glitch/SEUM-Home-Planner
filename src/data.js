@@ -299,6 +299,7 @@ export function normalize(design) {
   if (typeof design.slabThickness !== 'number') design.slabThickness = 0; // 슬래브 두께(mm, 구조 정보)
   if (typeof design.wallThickness !== 'number') design.wallThickness = 150; // 외벽 두께(mm)
   if (!Array.isArray(design.labels)) design.labels = [];         // 텍스트 라벨 [{id,x,y,text}]
+  if (!('view' in design)) design.view = null;                   // 위치 고정 화면 {scale,ox,oy} (없으면 자동 맞춤)
   return design;
 }
 

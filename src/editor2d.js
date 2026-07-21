@@ -267,6 +267,20 @@ export class Editor2D {
         for (let gy = y; gy <= y + h + 0.5; gy += tile) { ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); }
         ctx.stroke();
       }
+    } else if (room.type === 'deck' || room.type === 'porch') {
+      // 데크·포치는 널판(plank) 선 패턴. 방향(가로/세로)은 room.deckDir 로 조절
+      const plank = 150 * this.scale;
+      if (plank > 3) {
+        ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        ctx.strokeStyle = this.monoMode ? 'rgba(60,64,68,0.55)' : 'rgba(150,120,80,0.5)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        if ((room.deckDir || 'h') === 'v') {   // 세로 널판 → 세로 선
+          for (let gx = x + plank; gx <= x + w - 0.5; gx += plank) { ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); }
+        } else {                               // 가로 널판(기본) → 가로 선
+          for (let gy = y + plank; gy <= y + h - 0.5; gy += plank) { ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); }
+        }
+        ctx.stroke();
+      }
     }
     ctx.restore();
     // 벽 (면별로 그림 — 트인(open) 면은 점선 통로로 표시). 벽 투명도 적용.

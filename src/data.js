@@ -130,6 +130,7 @@ export const FURNITURE_CATALOG = [
   { id: 'desk',    cat: '가구', name: '책상',         kind: 'table',    w: 1400, d: 700,  h: 740,  color: '#b89a74' },
   { id: 'shelf',   cat: '가구', name: '책장/수납장',  kind: 'box',      w: 900,  d: 350,  h: 1800, color: '#cbbca3' },
   { id: 'dresser', cat: '가구', name: '화장대',       kind: 'box',      w: 1000, d: 450,  h: 1300, color: '#ddc9d4' },
+  { id: 'stairs',  cat: '가구', name: '계단',         kind: 'stairs',   w: 1000, d: 2800, h: 2400, color: '#e2e2e2' },
 
   // 주방/가전
   { id: 'fridge',  cat: '가전', name: '냉장고',       kind: 'box',      w: 900,  d: 800,  h: 1850, color: '#d9dde0' },

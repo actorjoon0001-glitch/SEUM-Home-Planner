@@ -531,6 +531,8 @@ export class Viewer3D {
     const g = new THREE.Group();
     g.position.set(px, 60, pz);
     g.rotation.y = -(f.rotation || 0) * Math.PI / 180;
+    // 개별 크기 조절(2D에서 바꾼 W/D) 반영 — 카탈로그 대비 비율로 스케일
+    g.scale.set((f.w || c.w) / c.w, 1, (f.d || c.d) / c.d);
     const mat = (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 });
     // finish: 'fabric'|'wood' → 질감 텍스처, 그 외(undefined) → 단색
     const finMat = (col, w, dd, finish) => {

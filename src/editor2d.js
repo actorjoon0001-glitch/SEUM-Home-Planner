@@ -329,7 +329,7 @@ export class Editor2D {
     if (!c) return;
     const ctx = this.ctx;
     const [cx, cy] = this.toPx(f.x, f.y);
-    const w = c.w * this.scale, d = c.d * this.scale;
+    const w = (f.w || c.w) * this.scale, d = (f.d || c.d) * this.scale;
     const selected = f.id === store.selectedFurniture;
     ctx.save();
     ctx.translate(cx, cy);
@@ -347,6 +347,7 @@ export class Editor2D {
       ctx.fillStyle = '#c8102e';
       ctx.beginPath(); ctx.arc(0, hy, 6, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
+      this._drawFurnHandles(f);   // 모서리 크기조절 핸들
     }
   }
 
@@ -631,13 +632,35 @@ export class Editor2D {
   _hitFurnitureRotate(f, px, py) {
     const c = catalogOf(f.catalogId); if (!c) return false;
     const [cx, cy] = this.toPx(f.x, f.y);
-    const d = c.d * this.scale;
+    const d = (f.d || c.d) * this.scale;
     const ang = (f.rotation || 0) * Math.PI / 180;
     // 회전 핸들 위치 계산 (로컬 좌표 → 화면 좌표)
     const lx = 0, ly = -d / 2 - 18;
     const wx = cx + (lx * Math.cos(ang) - ly * Math.sin(ang));
     const wy = cy + (lx * Math.sin(ang) + ly * Math.cos(ang));
     return Math.hypot(px - wx, py - wy) <= 9;
+  }
+
+  // 선택된 가구의 네 모서리 크기조절 핸들 (회전 반영, 화면 좌표)
+  _furnHandlePoints(f) {
+    const c = catalogOf(f.catalogId); if (!c) return null;
+    const [cx, cy] = this.toPx(f.x, f.y);
+    const hw = (f.w || c.w) * this.scale / 2, hd = (f.d || c.d) * this.scale / 2;
+    const ang = (f.rotation || 0) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
+    const cn = (lx, ly) => [cx + lx * ca - ly * sa, cy + lx * sa + ly * ca];
+    return { nw: cn(-hw, -hd), ne: cn(hw, -hd), se: cn(hw, hd), sw: cn(-hw, hd) };
+  }
+  _hitFurnHandle(f, px, py) {
+    const pts = this._furnHandlePoints(f); if (!pts) return null;
+    for (const [k, p] of Object.entries(pts)) if (Math.abs(px - p[0]) <= HANDLE && Math.abs(py - p[1]) <= HANDLE) return k;
+    return null;
+  }
+  _drawFurnHandles(f) {
+    const pts = this._furnHandlePoints(f); if (!pts) return;
+    const ctx = this.ctx;
+    ctx.save(); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2;
+    for (const p of Object.values(pts)) { ctx.fillRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE); ctx.strokeRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE); }
+    ctx.restore();
   }
 
   _hitFurniture(px, py) {
@@ -650,7 +673,7 @@ export class Editor2D {
       const dx = px - cx, dy = py - cy;
       const lx = dx * Math.cos(ang) - dy * Math.sin(ang);
       const ly = dx * Math.sin(ang) + dy * Math.cos(ang);
-      const w = c.w * this.scale / 2, h = c.d * this.scale / 2;
+      const w = (f.w || c.w) * this.scale / 2, h = (f.d || c.d) * this.scale / 2;
       if (Math.abs(lx) <= w && Math.abs(ly) <= h) return f;
     }
     return null;
@@ -909,11 +932,15 @@ export class Editor2D {
         return;
       }
     }
-    // 선택된 가구 회전 핸들
+    // 선택된 가구 회전/크기 핸들
     const selF = d.furniture.find((f) => f.id === store.selectedFurniture);
     if (selF && this._hitFurnitureRotate(selF, px, py)) {
       this.drag = { mode: 'rotate', f: selF };
       return;
+    }
+    if (selF) {
+      const hk = this._hitFurnHandle(selF, px, py);
+      if (hk) { this.drag = { mode: 'resizef', f: selF }; return; }
     }
 
     // 창호 클릭 (벽 가장자리 또는 자유 배치)
@@ -1041,6 +1068,14 @@ export class Editor2D {
       this._resizeRoom(drag.room, drag.handle, mx, my);
     } else if (drag.mode === 'resizeoutline') {
       this._resizeOutline(drag, mx, my);
+    } else if (drag.mode === 'resizef') {
+      const ang = -(drag.f.rotation || 0) * Math.PI / 180;   // world → local
+      const dxmm = mx - drag.f.x, dymm = my - drag.f.y;
+      const lx = dxmm * Math.cos(ang) - dymm * Math.sin(ang);
+      const ly = dxmm * Math.sin(ang) + dymm * Math.cos(ang);
+      const nw = Math.max(100, Math.round(Math.abs(lx) * 2 / 10) * 10);   // 중심 고정 대칭 확대
+      const nd = Math.max(100, Math.round(Math.abs(ly) * 2 / 10) * 10);
+      store.liveUpdate(() => { drag.f.w = nw; drag.f.d = nd; });
     } else if (drag.mode === 'rotate') {
       const [cx, cy] = this.toPx(drag.f.x, drag.f.y);
       let ang = Math.atan2(py - cy, px - cx) * 180 / Math.PI + 90;
@@ -1063,7 +1098,7 @@ export class Editor2D {
 
   _up() {
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
-    if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline', 'resizeoutline'].includes(this.drag.mode)) {
+    if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline', 'resizeoutline', 'resizef'].includes(this.drag.mode)) {
       store.liveEnd();
     }
     this.drag = null;
@@ -1752,6 +1787,10 @@ export class Editor2D {
     if (cur === 'default' && store.selectedOutline != null) {
       const hk = this._hitOutlineHandle(store.selectedOutline, px, py);
       if (hk) cur = RC[hk];
+    }
+    if (cur === 'default' && store.selectedFurniture) {
+      const sf = d.furniture.find((f) => f.id === store.selectedFurniture);
+      if (sf && this._hitFurnHandle(sf, px, py)) cur = RC[this._hitFurnHandle(sf, px, py)];
     }
     if (cur === 'default') {
       if (this._hitOpening(px, py)) cur = 'move';

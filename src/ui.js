@@ -1119,7 +1119,10 @@ function furnForm(f) {
   return `
     <p class="ph">가구 속성</p>
     <div class="info-row"><span>이름</span><b>${esc(c.name || '')}</b></div>
-    <div class="info-row"><span>크기</span><b>${c.w}×${c.d}×${c.h}mm</b></div>
+    <div class="grid2">
+      <label class="fld"><span>가로 W (mm)</span><input id="f-w" type="number" step="50" value="${Math.round(f.w || c.w)}"></label>
+      <label class="fld"><span>세로 D (mm)</span><input id="f-d" type="number" step="50" value="${Math.round(f.d || c.d)}"></label>
+    </div>
     <label class="fld"><span>회전 (°)</span><input id="f-rot" type="number" step="15" value="${f.rotation || 0}"></label>
     <div class="grid2">
       <label class="fld"><span>X 위치</span><input id="f-x" type="number" step="50" value="${f.x}"></label>
@@ -1136,6 +1139,8 @@ function furnForm(f) {
 
 function bindFurnForm(f) {
   const upd = (m) => store.commit(() => m());
+  document.getElementById('f-w').onchange = (e) => upd(() => f.w = Math.max(100, +e.target.value || 100));
+  document.getElementById('f-d').onchange = (e) => upd(() => f.d = Math.max(100, +e.target.value || 100));
   document.getElementById('f-rot').onchange = (e) => upd(() => f.rotation = ((+e.target.value % 360) + 360) % 360);
   document.getElementById('f-x').onchange = (e) => upd(() => f.x = +e.target.value || 0);
   document.getElementById('f-y').onchange = (e) => upd(() => f.y = +e.target.value || 0);

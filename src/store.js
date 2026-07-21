@@ -82,8 +82,64 @@ class Store {
     this.emit();
   }
 
+  // --- 층(다층/복층) ---
+  // 활성 층의 도면(방·가구·창호·외벽)을 floors[activeFloor] 에 반영. persist 때마다 자동 동기화.
+  _syncActiveFloor() {
+    const d = this.design;
+    if (!Array.isArray(d.floors)) return;
+    const f = d.floors[d.activeFloor || 0];
+    if (!f) return;
+    f.rooms = d.rooms; f.furniture = d.furniture; f.openings = d.openings; f.outline = d.outline;
+  }
+  floorList() { return Array.isArray(this.design.floors) ? this.design.floors : []; }
+  activeFloorIndex() { return this.design.activeFloor || 0; }
+  // 활성 층 전환 — 현재 층을 저장하고, 대상 층의 도면을 최상위로 올림
+  switchFloor(idx) {
+    const d = this.design;
+    if (!Array.isArray(d.floors) || !d.floors[idx] || idx === d.activeFloor) return;
+    this._syncActiveFloor();
+    d.activeFloor = idx;
+    const f = d.floors[idx];
+    d.rooms = f.rooms || []; d.furniture = f.furniture || []; d.openings = f.openings || []; d.outline = f.outline || null;
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null; this.selectedOutline = null;
+    this._history = []; this._future = [];
+    this.persist();
+    this.emit();
+  }
+  // 현재 층을 복제해 위층 추가 (예: 1층 → 2층 복층) → 새 층으로 전환
+  addFloorFromCurrent() {
+    const d = this.design;
+    if (!Array.isArray(d.floors)) { d.floors = [{ name: '1층', rooms: d.rooms, furniture: d.furniture, openings: d.openings, outline: d.outline }]; d.activeFloor = 0; }
+    this._syncActiveFloor();
+    const src = d.floors[d.activeFloor];
+    const copy = JSON.parse(JSON.stringify({ rooms: src.rooms || [], furniture: src.furniture || [], openings: src.openings || [], outline: src.outline || null }));
+    const floor = { name: (d.floors.length + 1) + '층', rooms: copy.rooms, furniture: copy.furniture, openings: copy.openings, outline: copy.outline };
+    d.floors.push(floor);
+    d.activeFloor = d.floors.length - 1;
+    d.rooms = floor.rooms; d.furniture = floor.furniture; d.openings = floor.openings; d.outline = floor.outline;
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null; this.selectedOutline = null;
+    this._history = []; this._future = [];
+    this.persist();
+    this.emit();
+    return d.activeFloor;
+  }
+  removeFloor(idx) {
+    const d = this.design;
+    if (!Array.isArray(d.floors) || d.floors.length <= 1 || !d.floors[idx]) return;
+    this._syncActiveFloor();
+    d.floors.splice(idx, 1);
+    d.floors.forEach((f, i) => { f.name = (i + 1) + '층'; });   // 이름 재정렬
+    d.activeFloor = Math.max(0, Math.min(d.activeFloor > idx ? d.activeFloor - 1 : d.activeFloor, d.floors.length - 1));
+    const f = d.floors[d.activeFloor];
+    d.rooms = f.rooms || []; d.furniture = f.furniture || []; d.openings = f.openings || []; d.outline = f.outline || null;
+    this.selectedRoom = this.selectedFurniture = this.selectedOpening = null; this.selectedOutline = null;
+    this._history = []; this._future = [];
+    this.persist();
+    this.emit();
+  }
+
   // --- 영속화 ---
-  persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(this.design)); } catch (e) {} }
+  persist() { this._syncActiveFloor(); try { localStorage.setItem(LS_KEY, JSON.stringify(this.design)); } catch (e) {} }
   _load() {
     try { const s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; }
   }

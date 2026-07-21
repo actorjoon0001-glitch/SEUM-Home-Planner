@@ -707,9 +707,12 @@ function renderProperties(editor) {
 
       <label class="fld"><span>도면 이름</span><input id="p-name" value="${esc(d.name)}"></label>
 
-      <p class="ph">층 관리</p>
-      <label class="fld"><span>현재 층</span><select id="p-floor"><option>Floor 1</option></select></label>
-      <button id="p-addfloor" class="wide-btn">층 추가하기</button>
+      <p class="ph">층 관리 (복층)</p>
+      <label class="fld"><span>현재 층</span><select id="p-floor">
+        ${store.floorList().map((f, i) => `<option value="${i}"${i === store.activeFloorIndex() ? ' selected' : ''}>${esc(f.name)}</option>`).join('')}
+      </select></label>
+      <button id="p-addfloor" class="wide-btn">＋ 위층 추가 (현재 층 복제)</button>
+      ${store.floorList().length > 1 ? `<button id="p-delfloor" class="wide-btn danger-outline">현재 층(${esc(store.floorList()[store.activeFloorIndex()].name)}) 삭제</button>` : ''}
       <label class="fld"><span>층 높이 (mm)</span><input id="p-ceil" type="number" step="50" value="${d.ceilingHeight}"></label>
 
       <p class="ph mt">상세 설정</p>
@@ -730,7 +733,18 @@ function renderProperties(editor) {
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
   document.getElementById('p-slab').onchange = (e) => store.commit((dd) => dd.slabThickness = Math.max(0, +e.target.value || 0));
-  document.getElementById('p-addfloor').onclick = () => flash('여러 층(다층) 설계 기능은 곧 추가됩니다');
+  const afterFloorChange = () => { if (_editor) _editor.applyInitialView(); if (_viewer) _viewer.dirty = true; };
+  document.getElementById('p-floor').onchange = (e) => { store.switchFloor(+e.target.value); afterFloorChange(); };
+  document.getElementById('p-addfloor').onclick = () => {
+    const i = store.addFloorFromCurrent();
+    afterFloorChange();
+    flash(`${store.floorList()[i].name} 추가됨 — 아래층 도면을 복제했습니다`);
+  };
+  const delFloor = document.getElementById('p-delfloor');
+  if (delFloor) delFloor.onclick = () => {
+    const cur = store.floorList()[store.activeFloorIndex()];
+    if (confirm(`${cur.name} 도면을 삭제할까요? (되돌릴 수 없습니다)`)) { store.removeFloor(store.activeFloorIndex()); afterFloorChange(); }
+  };
   const woRange = document.getElementById('wo-range');
   if (woRange) woRange.oninput = (e) => {
     const v = parseFloat(e.target.value);

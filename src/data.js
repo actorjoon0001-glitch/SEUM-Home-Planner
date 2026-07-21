@@ -300,6 +300,26 @@ export function normalize(design) {
   if (typeof design.wallThickness !== 'number') design.wallThickness = 150; // 외벽 두께(mm)
   if (!Array.isArray(design.labels)) design.labels = [];         // 텍스트 라벨 [{id,x,y,text}]
   if (!('view' in design)) design.view = null;                   // 위치 고정 화면 {scale,ox,oy} (없으면 자동 맞춤)
+  // 층(다층/복층): floors[] 에 각 층의 도면을 저장, 활성 층은 최상위(rooms/furniture/openings/outline)에 미러링
+  if (!Array.isArray(design.floors) || !design.floors.length) {
+    design.floors = [{ name: '1층', rooms: design.rooms, furniture: design.furniture, openings: design.openings, outline: design.outline }];
+    design.activeFloor = 0;
+  } else {
+    if (typeof design.activeFloor !== 'number' || !design.floors[design.activeFloor]) design.activeFloor = 0;
+    const af = design.floors[design.activeFloor];
+    // 최상위를 활성 층 데이터로 맞춤 (저장 시 동기화되지만 안전하게 재확정)
+    design.rooms = Array.isArray(af.rooms) ? af.rooms : [];
+    design.furniture = Array.isArray(af.furniture) ? af.furniture : [];
+    design.openings = Array.isArray(af.openings) ? af.openings : [];
+    design.outline = af.outline || null;
+  }
+  design.floors.forEach((f, i) => {
+    if (!Array.isArray(f.rooms)) f.rooms = [];
+    if (!Array.isArray(f.furniture)) f.furniture = [];
+    if (!Array.isArray(f.openings)) f.openings = [];
+    if (!('outline' in f)) f.outline = null;
+    if (!f.name) f.name = (i + 1) + '층';
+  });
   return design;
 }
 

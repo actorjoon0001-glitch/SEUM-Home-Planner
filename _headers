@@ -1,0 +1,10 @@
+# Netlify 캐시 헤더 — 앱 코드는 항상 최신 확인(재검증)해서 배포 즉시 반영되게
+# (매 배포마다 옛 파일이 캐시에 남아 "안 바뀐다" 문제 방지)
+/index.html
+  Cache-Control: no-cache
+/config.js
+  Cache-Control: no-cache
+/src/*
+  Cache-Control: no-cache
+/styles/*
+  Cache-Control: no-cache

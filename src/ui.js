@@ -1095,7 +1095,7 @@ function outlineForm() {
     </div>
     <div class="info-row"><span>면적</span><b>${area.toFixed(2)} m² (${(area / 3.305).toFixed(1)}평)</b></div>
     <label class="fld"><span>외벽 선 두께 <b id="ol-lw-val">${_editor ? _editor.outlineLineW() : 3}</b> px</span>
-      <input id="ol-lw" type="range" min="1" max="14" step="1" value="${_editor ? _editor.outlineLineW() : 3}"></label>
+      <input id="ol-lw" type="range" min="1" max="30" step="1" value="${_editor ? _editor.outlineLineW() : 3}"></label>
     ${floorOpacityHTML()}
     ${layerControlsHTML()}
     <div class="btn-row">

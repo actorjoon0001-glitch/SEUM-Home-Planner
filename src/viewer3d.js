@@ -22,6 +22,9 @@ export class Viewer3D {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // 톤매핑 — 밋밋한 회색 느낌 대신 자연스럽고 화사한 실내 톤
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.12;
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -54,17 +57,20 @@ export class Viewer3D {
   }
 
   _lights() {
-    this.scene.add(new THREE.HemisphereLight('#ffffff', '#9aa1ab', 0.9));
-    const sun = new THREE.DirectionalLight('#fff6e8', 1.1);
+    // 하늘빛/바닥 반사광 — 실내를 부드럽게 채움 (톤매핑에 맞춰 강도 상향)
+    this.scene.add(new THREE.HemisphereLight('#fff8ee', '#b7bcc4', 1.15));
+    this.scene.add(new THREE.AmbientLight('#ffffff', 0.25));
+    const sun = new THREE.DirectionalLight('#fff2df', 2.3);   // 따뜻한 햇빛
     sun.position.set(8000, 14000, 6000);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.bias = -0.0004;
     const s = 16000;
     sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
     sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
     sun.shadow.camera.far = 60000;
     this.scene.add(sun);
-    const fill = new THREE.DirectionalLight('#dce6ff', 0.35);
+    const fill = new THREE.DirectionalLight('#e6eeff', 0.6);  // 반대편 채움광
     fill.position.set(-6000, 8000, -4000);
     this.scene.add(fill);
   }
@@ -255,8 +261,14 @@ export class Viewer3D {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dep), mat);
       m.position.set(cx, (yLo + yHi) / 2, cz); m.castShadow = true; m.receiveShadow = true;
       this.modelGroup.add(m);
+      // 걸레받이(바닥 몰딩) — 바닥에 닿는 벽 하단에 살짝 튀어나온 띠
+      if (yLo < 80) {
+        const bb = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : dep + 24, 90, horiz ? dep + 24 : len), this._baseboardMat());
+        bb.position.set(cx, 105, cz); bb.receiveShadow = true; this.modelGroup.add(bb);
+      }
     }
   }
+  _baseboardMat() { return this.__bbMat || (this.__bbMat = new THREE.MeshStandardMaterial({ color: '#e7e2d8', roughness: 0.75 })); }
 
   // 창호: 벽면에 끼워지는 창틀 + 유리(또는 문짝)
   _buildOpening(o, b) {

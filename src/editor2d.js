@@ -116,12 +116,18 @@ export class Editor2D {
     this.ctx = octx; this.cssW = w; this.cssH = h; this._export = true;
     octx.setTransform(1, 0, 0, 1, 0, 0);
 
-    // 도면을 캔버스에 맞춤
+    // 도면을 캔버스에 맞춤 — 방뿐 아니라 외벽·가구·창호·라벨까지 모두 포함해 전체가 나오게
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const r of d.rooms) {
-      minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
-      maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
+    const acc = (x, y) => { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; };
+    for (const r of d.rooms) { acc(r.x, r.y); acc(r.x + r.w, r.y + r.d); }
+    for (const p of outlineShapes(d.outline)) for (const pt of p.pts) acc(pt[0], pt[1]);
+    for (const f of (d.furniture || [])) {
+      const cat = catalogOf(f.catalogId) || {};
+      const half = Math.hypot((f.w || cat.w || 600), (f.d || cat.d || 600)) / 2;   // 회전 고려한 여유 반경
+      acc(f.x - half, f.y - half); acc(f.x + half, f.y + half);
     }
+    for (const o of (d.openings || [])) if (o.free) { const hw = (o.w || 900) / 2; acc(o.x - hw, o.y - hw); acc(o.x + hw, o.y + hw); }
+    for (const lb of (d.labels || [])) acc(lb.x, lb.y);
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1000; maxY = 1000; }
     const pad = 1500;
     const bw = (maxX - minX) + pad * 2, bh = (maxY - minY) + pad * 2;

@@ -313,10 +313,10 @@ export class Viewer3D {
         kn.position.set(leafW / 2 - 70, -FT / 2, zz); g.add(kn);
       }
     } else {
-      // 유리 — 하늘빛으로 또렷하게(창문임을 확실히 읽히게) + 약한 반사
+      // 유리 — 살짝 불투명한 하늘빛 판(테두리만 보이지 않게 유리면이 확실히 채워지게)
       const glass = new THREE.Mesh(
         new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 16),
-        new THREE.MeshStandardMaterial({ color: '#7ab6dc', transparent: true, opacity: 0.62, roughness: 0.05, metalness: 0.4, emissive: '#3f74a0', emissiveIntensity: 0.28 })
+        new THREE.MeshStandardMaterial({ color: '#bfe0f2', transparent: true, opacity: 0.85, roughness: 0.12, metalness: 0.15, emissive: '#7fb4d6', emissiveIntensity: 0.4 })
       );
       g.add(glass);
       // 세로 분할 프레임(멀리언)

@@ -1321,7 +1321,7 @@ export class Editor2D {
   setShowRoomNames(on) { this.showRoomNames = !!on; this.draw(); }
   // 외벽 2D 선 두께(px) — design 에 저장, 기본 3
   outlineLineW() { return (store.design && store.design.outlineLineW) || 3; }
-  setOutlineLineW(px) { const v = Math.max(1, Math.min(14, +px || 3)); store.commit((d) => { d.outlineLineW = v; }); this.draw(); return v; }
+  setOutlineLineW(px) { const v = Math.max(1, Math.min(30, +px || 3)); store.commit((d) => { d.outlineLineW = v; }); this.draw(); return v; }
 
   // 외곽 점 스냅: (스냅 모드) 격자 100mm + 직전 점과 거의 수평/수직이면 직각 정렬
   //             (직교 모드) 직전 점 기준 무조건 수평/수직으로 강제

@@ -284,8 +284,8 @@ export class Viewer3D {
     g.position.set(cx, cy, cz);
     g.rotation.y = -Math.atan2(pl.uy, pl.ux);
 
-    // 프레임은 밝은 흰색(창틀·문틀) — 어두운 색이면 벽에 파묻힌 '구멍'처럼 보임
-    const frameMat = new THREE.MeshStandardMaterial({ color: '#f1efe9', roughness: 0.7, metalness: 0 });
+    // 프레임 — 중간 회색(알루미늄 새시 느낌). 흰색이면 흰 벽에 묻히고, 검정이면 구멍처럼 보임
+    const frameMat = new THREE.MeshStandardMaterial({ color: '#7c828a', roughness: 0.55, metalness: 0.25 });
     const W = o.w, Hh = o.h, FT = 70; // 프레임 두께
     // 외곽 프레임 (위/아래/좌/우) — 벽 두께보다 살짝만 나오게 해서 파묻힘 방지
     const addFrame = (w, h, x, y) => {
@@ -316,7 +316,7 @@ export class Viewer3D {
       // 유리 — 하늘빛으로 또렷하게(창문임을 확실히 읽히게) + 약한 반사
       const glass = new THREE.Mesh(
         new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 16),
-        new THREE.MeshStandardMaterial({ color: '#8fc4e6', transparent: true, opacity: 0.55, roughness: 0.08, metalness: 0.5, emissive: '#3a6b8a', emissiveIntensity: 0.15 })
+        new THREE.MeshStandardMaterial({ color: '#7ab6dc', transparent: true, opacity: 0.62, roughness: 0.05, metalness: 0.4, emissive: '#3f74a0', emissiveIntensity: 0.28 })
       );
       g.add(glass);
       // 세로 분할 프레임(멀리언)
@@ -655,13 +655,14 @@ export class Viewer3D {
           return true;
         }
         case 'ceilfan': {
-          const y = ceilH - 60 - 130;                                     // 천장 근처 (그룹이 y=60)
-          addBox(28, 130, 28, y + 100, '#9aa0a8');                        // 다운로드(봉)
-          addCyl(85, 90, y, c.color);                                     // 허브
-          for (let k = 0; k < 4; k++) {
-            const bl = new THREE.Mesh(new THREE.BoxGeometry(c.w * 0.46, 16, 150), mat('#b89a6f'));
-            bl.geometry.translate(c.w * 0.28, 0, 0);
-            bl.position.set(0, y, 0); bl.rotation.y = k * Math.PI / 2; bl.castShadow = true; g.add(bl); // 날개 4장
+          const y = ceilH - 60 - 120;                                     // 천장 근처 (그룹이 y=60)
+          addBox(30, 120, 30, y + 95, '#9aa0a8');                         // 다운로드(봉)
+          addCyl(120, 110, y, '#d7d2c8');                                 // 모터 몸통(넉넉하게)
+          addCyl(70, 60, y - 90, '#e9e6df');                             // 아래 등커버(조명)
+          for (let k = 0; k < 5; k++) {                                   // 날개 5장, 넓게
+            const bl = new THREE.Mesh(new THREE.BoxGeometry(c.w * 0.44, 22, 230), mat('#c8ad82'));
+            bl.geometry.translate(c.w * 0.27, 0, 0);
+            bl.position.set(0, y - 10, 0); bl.rotation.y = k * (Math.PI * 2 / 5); bl.castShadow = true; g.add(bl);
           }
           return true;
         }

@@ -272,11 +272,12 @@ export class Viewer3D {
     g.position.set(cx, cy, cz);
     g.rotation.y = -Math.atan2(pl.uy, pl.ux);
 
-    const frameMat = new THREE.MeshStandardMaterial({ color: o.color || '#4a5560', roughness: 0.6, metalness: 0.3 });
+    // 프레임은 밝은 흰색(창틀·문틀) — 어두운 색이면 벽에 파묻힌 '구멍'처럼 보임
+    const frameMat = new THREE.MeshStandardMaterial({ color: '#f1efe9', roughness: 0.7, metalness: 0 });
     const W = o.w, Hh = o.h, FT = 70; // 프레임 두께
-    // 외곽 프레임 (위/아래/좌/우)
+    // 외곽 프레임 (위/아래/좌/우) — 벽 두께보다 살짝만 나오게 해서 파묻힘 방지
     const addFrame = (w, h, x, y) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, WALL_T + 40), frameMat);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, WALL_T + 60), frameMat);
       m.position.set(x, y, 0); m.castShadow = true; g.add(m);
     };
     addFrame(W, FT, 0, Hh / 2 - FT / 2);
@@ -300,10 +301,10 @@ export class Viewer3D {
         kn.position.set(leafW / 2 - 70, -FT / 2, zz); g.add(kn);
       }
     } else {
-      // 유리 (반투명)
+      // 유리 — 하늘빛으로 또렷하게(창문임을 확실히 읽히게) + 약한 반사
       const glass = new THREE.Mesh(
-        new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 18),
-        new THREE.MeshStandardMaterial({ color: '#bcd6e6', transparent: true, opacity: 0.35, roughness: 0.1, metalness: 0.2 })
+        new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 16),
+        new THREE.MeshStandardMaterial({ color: '#8fc4e6', transparent: true, opacity: 0.55, roughness: 0.08, metalness: 0.5, emissive: '#3a6b8a', emissiveIntensity: 0.15 })
       );
       g.add(glass);
       // 세로 분할 프레임(멀리언)

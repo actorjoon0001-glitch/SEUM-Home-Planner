@@ -285,19 +285,28 @@ export class Viewer3D {
     addFrame(FT, Hh, W / 2 - FT / 2, 0);
 
     if (isDoor) {
+      const leafW = W - FT * 2, leafH = Hh - FT;
       const door = new THREE.Mesh(
-        new THREE.BoxGeometry(W - FT * 2, Hh - FT, WALL_T - 10),
-        new THREE.MeshStandardMaterial({ color: '#6b5640', roughness: 0.7 })
+        new THREE.BoxGeometry(leafW, leafH, WALL_T - 20),
+        new THREE.MeshStandardMaterial({ color: '#8a6b49', roughness: 0.65 })   // 밝은 원목 문짝
       );
       door.position.y = -FT / 2; door.castShadow = true; g.add(door);
+      // 패널 몰딩(문짝 표면 홈) — 살짝 들어간 판 2개
+      const panel = (yy) => { const p = new THREE.Mesh(new THREE.BoxGeometry(leafW * 0.66, leafH * 0.34, 8), new THREE.MeshStandardMaterial({ color: '#7a5d3f', roughness: 0.7 })); p.position.set(0, -FT / 2 + yy, (WALL_T - 20) / 2); g.add(p); };
+      panel(leafH * 0.22); panel(-leafH * 0.22);
+      // 손잡이(양면)
+      for (const zz of [(WALL_T - 20) / 2 + 12, -(WALL_T - 20) / 2 - 12]) {
+        const kn = new THREE.Mesh(new THREE.SphereGeometry(28, 12, 10), new THREE.MeshStandardMaterial({ color: '#c9ccd0', metalness: 0.6, roughness: 0.3 }));
+        kn.position.set(leafW / 2 - 70, -FT / 2, zz); g.add(kn);
+      }
     } else {
       // 유리 (반투명)
       const glass = new THREE.Mesh(
-        new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 20),
-        new THREE.MeshStandardMaterial({ color: '#bcd6e6', transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.2 })
+        new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 18),
+        new THREE.MeshStandardMaterial({ color: '#bcd6e6', transparent: true, opacity: 0.35, roughness: 0.1, metalness: 0.2 })
       );
       g.add(glass);
-      // 창짝 분할 세로 프레임(멀리언) — 폴딩은 패널마다 두꺼운 프레임
+      // 세로 분할 프레임(멀리언)
       const panes = Math.max(1, t.panes || 1);
       const mullW = t.fold ? FT : FT * 0.7;
       for (let i = 1; i < panes; i++) {
@@ -305,6 +314,12 @@ export class Viewer3D {
         const mull = new THREE.Mesh(new THREE.BoxGeometry(mullW, Hh - FT * 2, WALL_T), frameMat);
         mull.position.set(x, 0, 0); g.add(mull);
       }
+      // 가로 중간 살(창살)
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(W - FT * 2, FT * 0.6, WALL_T * 0.8), frameMat);
+      rail.position.set(0, 0, 0); g.add(rail);
+      // 창턱(실) — 아래쪽 바깥으로 살짝 튀어나온 판
+      const sill = new THREE.Mesh(new THREE.BoxGeometry(W + 40, 40, WALL_T + 90), frameMat);
+      sill.position.set(0, -Hh / 2 + 20, 0); g.add(sill);
     }
     this.modelGroup.add(g);
   }
@@ -312,6 +327,15 @@ export class Viewer3D {
   // 개구부(창/문)를 평면 좌표 기준으로 환산 — 외곽 벽에서도 같은 자리에 구멍을 뚫기 위함
   _openingWorld(o) {
     const half = (o.w || 900) / 2;
+    // 벽 없이 자유 배치된 개구부 — 3D에도 그 자리·각도에 세워 보이게
+    if (o.free) {
+      const ang = o.angle || 0;
+      const ux = Math.cos(ang), uy = Math.sin(ang);
+      return {
+        cx: o.x, cy: o.y, ux, uy, horiz: Math.abs(ux) >= Math.abs(uy), half,
+        sill: Math.max(0, o.sill || 0), top: (o.sill || 0) + (o.h || 1200), free: true,
+      };
+    }
     // 외벽(외곽)에 부착된 개구부
     if (o.onOutline) {
       const shapes = outlineShapes(store.design.outline);
@@ -350,6 +374,7 @@ export class Viewer3D {
     const out = [];
     for (const o of (store.design.openings || [])) {
       const w = this._openingWorld(o); if (!w) continue;
+      if (w.free) continue;               // 자유 배치 개구부는 벽을 뚫지 않음(독립)
       if (w.horiz !== edgeHoriz) continue; // 변 방향과 개구부 방향 일치
       const [pcx, pcz] = this._p(w.cx, w.cy, b);
       const vx = pcx - A[0], vz = pcz - A[1];

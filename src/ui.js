@@ -246,20 +246,27 @@ async function renderDash() {
     } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
   } else if (_dashView === 'all') {
     title.textContent = '전체 도면 (관리자)';
-    sub.textContent = '모든 직원이 만든 도면입니다. 작성자별로 모아 보고, 열어서 확인할 수 있어요.';
-    if (!(cloud.configured() && cloud.isAdmin())) { grid.innerHTML = '<p class="dash-empty">관리자 계정으로 로그인해야 볼 수 있습니다.</p>'; return; }
+    const email = (cloud.user && cloud.user.email) || '(로그인 안 됨)';
+    const adminOk = cloud.configured() && cloud.isAdmin();
+    sub.textContent = `로그인: ${email} · 관리자권한: ${adminOk ? '○' : '✗'}`;
+    if (!adminOk) { grid.innerHTML = `<p class="dash-empty">관리자 계정으로 로그인해야 볼 수 있습니다.<br>현재 로그인: <b>${esc(email)}</b><br>(관리자 이메일: actorjoon0001@gmail.com 로 로그인하세요)</p>`; return; }
     grid.innerHTML = '<p class="dash-empty">불러오는 중…</p>';
     try {
       const rows = await cloud.listAll();
       grid.innerHTML = '';
+      const myId = cloud.user && cloud.user.id;
+      const others = rows.filter((r) => r.owner !== myId).length;
+      sub.textContent = `로그인: ${email} · 불러온 도면 ${rows.length}개 (남의 것 ${others}개)`;
       if (!rows.length) {
-        grid.innerHTML = '<p class="dash-empty">아직 도면이 없거나, Supabase에서 관리자 전체 열람 권한(RLS)이 설정되지 않았습니다.</p>';
+        grid.innerHTML = '<p class="dash-empty">아직 저장된 도면이 없습니다.</p>';
         return;
+      }
+      if (others === 0) {
+        grid.insertAdjacentHTML('beforeend', '<p class="dash-empty" style="grid-column:1/-1">※ 다른 직원이 클라우드에 저장한 도면이 아직 없습니다. (남의 도면 0개) — 서버 권한은 정상이면 곧 직원들 저장분이 여기 표시됩니다.</p>');
       }
       // 작성자(owner)별 그룹 — 내 것은 맨 위
       const groups = {};
       for (const r of rows) { const k = r.owner || '알 수 없음'; (groups[k] = groups[k] || []).push(r); }
-      const myId = cloud.user && cloud.user.id;
       const keys = Object.keys(groups).sort((a, b) => (a === myId ? -1 : b === myId ? 1 : 0));
       for (const owner of keys) {
         const list = groups[owner];

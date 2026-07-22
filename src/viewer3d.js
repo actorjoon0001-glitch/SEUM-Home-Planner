@@ -137,7 +137,7 @@ export class Viewer3D {
     if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
     for (const room of d.rooms) this._buildRoom(room, b, H);
     for (const o of (d.openings || [])) this._buildOpening(o, b);
-    for (const f of d.furniture) this._buildFurniture(f, b);
+    for (const f of d.furniture) this._buildFurniture(f, b, H);
 
     // 외장재 + 지붕 (토글)
     if (this.showExterior) this._buildExterior(d, b, H);
@@ -525,7 +525,7 @@ export class Viewer3D {
     this.modelGroup.add(grp);
   }
 
-  _buildFurniture(f, b) {
+  _buildFurniture(f, b, ceilH = 2400) {
     const c = catalogOf(f.catalogId); if (!c) return;
     const [px, pz] = this._p(f.x, f.y, b);
     const g = new THREE.Group();
@@ -546,8 +546,96 @@ export class Viewer3D {
       g.add(m); return m;
     };
 
+    const addCyl = (r, h, y, col, z = 0, x = 0, seg = 20) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(col));
+      m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+    };
+
     // 수납 가구(옷장/책장/화장대)는 원목 결, 그 외 box(가전·욕실)는 단색
     const woodBox = ['wardrobe', 'shelf', 'dresser'].includes(c.id);
+
+    // 설비·가전·욕실은 id 별 전용 3D 모양 (밋밋한 박스 대신). 없으면 아래 kind 로.
+    const fixture = () => {
+      switch (c.id) {
+        case 'toilet': {
+          addBox(c.w, 120, c.d * 0.5, 60, c.color, c.d * 0.22);            // 바닥받침
+          addBox(c.w, 380, c.d * 0.62, 250, c.color, c.d * 0.13);          // 변기 몸통
+          addBox(c.w, 60, c.d * 0.62, 470, '#dfe3e5', c.d * 0.13);         // 시트
+          addBox(c.w, 430, 180, 265, c.color, -c.d / 2 + 90);             // 물탱크
+          return true;
+        }
+        case 'basin': {
+          addBox(200, 620, 220, 310, c.color, c.d * 0.06);                // 받침대
+          addBox(c.w, 150, c.d, 785, c.color);                            // 세면 상판
+          addBox(c.w * 0.66, 70, c.d * 0.66, 730, '#dfe6ea');             // 볼 안쪽
+          addCyl(16, 150, 900, '#c9ced3', -c.d / 2 + 90);                // 수전
+          return true;
+        }
+        case 'bathtub': {
+          addBox(c.w, c.h, c.d, c.h / 2, c.color);                        // 욕조 외형
+          addBox(c.w - 180, 120, c.d - 180, c.h - 30, '#e0ebef');         // 안쪽 물칸(연한색)
+          return true;
+        }
+        case 'sink': case 'sinkwf': case 'cooktop': {
+          addBox(c.w, c.h - 60, c.d, (c.h - 60) / 2, c.color, 0, 0, 'wood'); // 하부장
+          addBox(c.w, 60, c.d, c.h - 30, '#3a3d42');                      // 상판(진회색)
+          if (c.id !== 'cooktop') {
+            addBox(c.w * 0.3, 46, c.d * 0.62, c.h - 8, '#c7ccd0', 0, c.w * 0.26); // 싱크볼 테두리
+            addCyl(15, 230, c.h + 95, '#b9bec3', -c.d / 2 + 130, c.w * 0.26);     // 수전
+          }
+          return true;
+        }
+        case 'induction': case 'induction2': {
+          addBox(c.w, 60, c.d, 40, '#26292d');                            // 검정 유리 상판
+          const bs = c.id === 'induction'
+            ? [[-c.w * 0.22, -c.d * 0.18], [c.w * 0.22, -c.d * 0.18], [-c.w * 0.22, c.d * 0.18], [c.w * 0.22, c.d * 0.18]]
+            : [[-c.w * 0.2, 0], [c.w * 0.2, 0]];
+          for (const [ux, uz] of bs) addCyl(Math.min(c.w, c.d) * 0.16, 4, 74, '#43474c', uz, ux);
+          return true;
+        }
+        case 'fridge': {
+          addBox(c.w, c.h, c.d, c.h / 2, c.color);                        // 몸통
+          addBox(c.w, 14, c.d, c.h * 0.42, '#b7bdc1', c.d / 2 - 7);       // 냉동/냉장 구분선
+          addBox(44, c.h * 0.9, 32, c.h / 2, '#aeb4b8', c.d / 2 - 16, -c.w / 2 + 70); // 손잡이
+          return true;
+        }
+        case 'washer': {
+          addBox(c.w, c.h, c.d, c.h / 2, c.color);                        // 몸통
+          const dr = new THREE.Mesh(new THREE.CylinderGeometry(c.h * 0.3, c.h * 0.3, 40, 24), mat('#9aa6ad'));
+          dr.rotation.x = Math.PI / 2; dr.position.set(0, c.h * 0.5, c.d / 2 - 12); dr.castShadow = true; g.add(dr);
+          return true;
+        }
+        case 'stairs': {
+          const steps = 12, rise = c.h / steps, run = c.d / steps;
+          for (let i = 0; i < steps; i++) addBox(c.w, rise, c.d - run * i, rise / 2 + rise * i, c.color, run * i / 2); // 오르는 계단
+          return true;
+        }
+        case 'railing': {
+          addBox(c.w, 50, c.d, c.h - 25, c.color);                        // 상단 손잡이 바
+          const posts = Math.max(2, Math.round(c.w / 350));
+          for (let i = 0; i <= posts; i++) addBox(45, c.h, c.d, c.h / 2, c.color, 0, -c.w / 2 + (c.w / posts) * i); // 기둥
+          return true;
+        }
+        case 'ceilfan': {
+          const y = ceilH - 60 - 130;                                     // 천장 근처 (그룹이 y=60)
+          addBox(28, 130, 28, y + 100, '#9aa0a8');                        // 다운로드(봉)
+          addCyl(85, 90, y, c.color);                                     // 허브
+          for (let k = 0; k < 4; k++) {
+            const bl = new THREE.Mesh(new THREE.BoxGeometry(c.w * 0.46, 16, 150), mat('#b89a6f'));
+            bl.geometry.translate(c.w * 0.28, 0, 0);
+            bl.position.set(0, y, 0); bl.rotation.y = k * Math.PI / 2; bl.castShadow = true; g.add(bl); // 날개 4장
+          }
+          return true;
+        }
+        case 'faucet': {
+          addCyl(22, 40, 20, c.color);
+          addCyl(11, 170, 105, c.color);
+          return true;
+        }
+        default: return false;
+      }
+    };
+    if (fixture()) { this.modelGroup.add(g); return; }
 
     switch (c.kind) {
       case 'sofa': {

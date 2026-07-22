@@ -67,12 +67,6 @@ function buildDashboard(deps) {
   el.querySelectorAll('.dash-navb').forEach((b) => b.onclick = () => {
     _dashView = b.dataset.view;
     el.querySelectorAll('.dash-navb').forEach((x) => x.classList.toggle('active', x === b));
-    if (b.dataset.view === 'all') {
-      alert('[진단] 전체도면 클릭됨\nview=' + _dashView
-        + '\nconfigured=' + cloud.configured()
-        + '\nuser=' + (cloud.user && cloud.user.email)
-        + '\nisAdmin=' + cloud.isAdmin());
-    }
     renderDash();
   });
   const lo = el.querySelector('#dash-logout');

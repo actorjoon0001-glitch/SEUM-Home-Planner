@@ -63,6 +63,7 @@ body {
 /* 프로젝트 대시보드 (로그인 후 첫 화면) */
 .dashboard { position: fixed; inset: 0; z-index: 1500; display: flex; background: #f4f6f9; }
 .dashboard.hidden { display: none; }
+.dash-navb.hidden { display: none; }
 .dash-side { width: 240px; flex: 0 0 auto; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 18px 14px; }
 .dash-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; margin-bottom: 22px; }
 .dash-brand-t { color: var(--ink); }

@@ -42,7 +42,8 @@ create or replace function public.is_seum_admin()
 returns boolean language sql stable as $$
   select coalesce(
     (auth.jwt() ->> 'email') = any (array[
-      'actorjoon0001@gmail.com'
+      'actorjoon0001@gmail.com',
+      'harold0001@naver.com'
     ]),
     false
   );

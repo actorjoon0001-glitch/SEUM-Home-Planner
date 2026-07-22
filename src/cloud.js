@@ -12,7 +12,7 @@ const cfg = (typeof window !== 'undefined' && window.SEUM_CONFIG) || {};
 // config.js 의 adminEmails 로 덮어쓸 수 있음(문자열 배열).
 const ADMIN_EMAILS = (Array.isArray(cfg.adminEmails) && cfg.adminEmails.length
   ? cfg.adminEmails
-  : ['actorjoon0001@gmail.com']).map((e) => String(e).trim().toLowerCase());
+  : ['actorjoon0001@gmail.com', 'harold0001@naver.com']).map((e) => String(e).trim().toLowerCase());
 
 // Supabase 라이브러리를 여러 CDN에서 순차 시도 (한 곳이 막혀도 다음 것으로)
 async function loadSupabase() {

@@ -130,13 +130,26 @@ export class Viewer3D {
     const b = this._bounds();
     const H = d.ceilingHeight || 2400;
 
-    // 바닥 그라운드
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(b.w + 8000, b.h + 8000),
-      new THREE.MeshStandardMaterial({ color: '#dfe3e8' })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -2;
+    // 바닥 그라운드 — 부지(땅) 이미지가 있으면 위성/항공 지면, 없으면 기본 회색
+    const site = d.site;
+    let ground;
+    if (site && site.image) {
+      const wMM = (site.widthM || 20) * 1000;
+      const hMM = wMM * (site.aspect || 1);            // aspect = 이미지 세로/가로
+      const tex = new THREE.TextureLoader().load(site.image);
+      if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      ground = new THREE.Mesh(new THREE.PlaneGeometry(wMM, hMM),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+      ground.rotation.x = -Math.PI / 2;
+      ground.rotation.z = -(site.rot || 0) * Math.PI / 180;   // 지면 회전
+      ground.position.set(site.dx || 0, -2, site.dy || 0);
+    } else {
+      ground = new THREE.Mesh(new THREE.PlaneGeometry(b.w + 8000, b.h + 8000),
+        new THREE.MeshStandardMaterial({ color: '#dfe3e8' }));
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -2;
+    }
     ground.receiveShadow = true;
     this.modelGroup.add(ground);
 

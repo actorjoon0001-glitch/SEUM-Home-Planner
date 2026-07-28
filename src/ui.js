@@ -1354,6 +1354,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   };
   $('tb-templates').onclick = () => openTemplateDialog();
   $('tb-underlay').onclick = () => openUnderlayDialog(editor);
+  if ($('tb-site')) $('tb-site').onclick = () => openSiteDialog();
   $('tb-cloud').onclick = () => openCloudDialog();
 
   // 모노톤(흑백) 도면 토글 — 종이 카달로그 인쇄용. 화면·내보내기·인쇄에 모두 반영
@@ -1766,6 +1767,87 @@ async function openTemplateDialog() {
 // ---------------------------------------------------------------------------
 // 밑그림(참조 도면): PDF/이미지를 배경에 깔고 그 위에 방을 그려 편집 도면으로 변환
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 부지(땅) — 위성/항공 이미지를 3D 지면에 깔기 (주소검색: VWorld, 또는 이미지 업로드)
+// ---------------------------------------------------------------------------
+function vworldKey() { return (window.SEUM_CONFIG && window.SEUM_CONFIG.vworldKey) || ''; }
+function siteState() { return store.design.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }; }
+function setSite(patch) {
+  store.commit((d) => { d.site = { ...(d.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }), ...patch }; });
+  if (_viewer) _viewer.dirty = true;
+}
+function clearSite() { store.commit((d) => { d.site = null; }); if (_viewer) _viewer.dirty = true; }
+
+// 지번주소 → 좌표 → 위성 정지영상(dataURL) + 실제 가로폭(m) 계산 (VWorld 오픈API)
+async function vworldFetchSite(addr) {
+  const key = vworldKey();
+  if (!key) throw new Error('VWorld 인증키가 없습니다. config.js 의 vworldKey 를 설정하세요.');
+  const geoU = `https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=EPSG:4326&format=json&type=PARCEL&key=${key}&address=${encodeURIComponent(addr)}`;
+  const g = await fetch(geoU).then((r) => r.json());
+  if (!g.response || g.response.status !== 'OK' || !g.response.result) {
+    throw new Error('주소를 찾지 못했습니다. (지번 주소로 입력해 보세요)');
+  }
+  const pt = g.response.result.point; const lng = +pt.x, lat = +pt.y;
+  const zoom = 18, size = 1024;
+  const imgU = `https://api.vworld.kr/req/image?service=image&request=getmap&format=png&basemap=SATELLITE&crs=EPSG:4326&center=${lng},${lat}&zoom=${zoom}&size=${size},${size}&key=${key}`;
+  const res = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); // m/픽셀
+  const widthM = Math.round(res * size * 10) / 10;
+  const blob = await fetch(imgU).then((r) => { if (!r.ok) throw new Error('위성 이미지를 불러오지 못했습니다.'); return r.blob(); });
+  const image = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
+  return { image, widthM, aspect: 1, addr };
+}
+
+function openSiteDialog() {
+  const body = document.createElement('div');
+  const hasKey = !!vworldKey();
+  function render() {
+    const s = store.design.site;
+    body.innerHTML = `
+      <p class="m-sub">고객 땅(필지)을 3D 도면 아래 지면으로 깔아 "이 땅에 이 집" 을 보여줍니다.</p>
+      <div class="fld"><span>지번 주소로 검색 ${hasKey ? '' : '<small style="color:#c8102e">(VWorld 키 설정 필요)</small>'}</span>
+        <div style="display:flex;gap:6px">
+          <input id="site-addr" placeholder="예: 세종특별자치시 조치원읍 원리 123-4" style="flex:1" ${hasKey ? '' : 'disabled'}>
+          <button class="mini" id="site-search" ${hasKey ? '' : 'disabled'}>검색</button>
+        </div>
+      </div>
+      <div class="fld"><span>또는 위성/항공 사진 직접 올리기 (네이버지도·구글어스 캡처)</span>
+        <input id="site-file" type="file" accept="image/*"></div>
+      ${s && s.image ? `
+      <div class="info-row"><span>부지 이미지</span><b>적용됨${s.addr ? ' · ' + esc(s.addr) : ''}</b></div>
+      <div class="grid2">
+        <label class="fld"><span>실제 가로폭 (m)</span><input id="site-w" type="number" step="1" value="${s.widthM || 30}"></label>
+        <label class="fld"><span>회전 (°)</span><input id="site-rot" type="number" step="5" value="${s.rot || 0}"></label>
+      </div>
+      <div class="grid2">
+        <label class="fld"><span>좌우 이동 (mm)</span><input id="site-dx" type="number" step="500" value="${s.dx || 0}"></label>
+        <label class="fld"><span>상하 이동 (mm)</span><input id="site-dy" type="number" step="500" value="${s.dy || 0}"></label>
+      </div>
+      <p class="hint">가로폭(m)을 실제 땅 크기에 맞추면 집과 비율이 맞습니다. 3D에서 확인하며 회전·이동으로 앉히세요.</p>
+      <button class="wide-btn danger-outline" id="site-clear">부지 지우기</button>
+      ` : '<p class="hint">주소 검색하거나 이미지를 올리면 3D 바닥에 땅이 깔립니다.</p>'}`;
+
+    const g = (id) => body.querySelector('#' + id);
+    if (g('site-search')) g('site-search').onclick = async () => {
+      const addr = g('site-addr').value.trim(); if (!addr) return;
+      g('site-search').textContent = '검색중…'; g('site-search').disabled = true;
+      try { const site = await vworldFetchSite(addr); setSite(site); flash('부지를 불러왔습니다'); render(); }
+      catch (e) { alert('부지 검색 실패: ' + (e.message || e)); g('site-search').textContent = '검색'; g('site-search').disabled = false; }
+    };
+    if (g('site-file')) g('site-file').onchange = (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const fr = new FileReader();
+      fr.onload = () => { const im = new Image(); im.onload = () => { setSite({ image: fr.result, aspect: im.naturalHeight / im.naturalWidth }); flash('부지 이미지 적용됨'); render(); }; im.src = fr.result; };
+      fr.readAsDataURL(f);
+    };
+    for (const [id, key] of [['site-w', 'widthM'], ['site-rot', 'rot'], ['site-dx', 'dx'], ['site-dy', 'dy']]) {
+      if (g(id)) g(id).onchange = (e) => setSite({ [key]: +e.target.value || 0 });
+    }
+    if (g('site-clear')) g('site-clear').onclick = () => { clearSite(); render(); };
+  }
+  render();
+  modal('부지(땅) 넣기', body);
+}
+
 function openUnderlayDialog(editor) {
   const body = document.createElement('div');
   // 밑그림 변경은 undo 히스토리에 큰 이미지가 쌓이지 않도록 liveUpdate 로 처리

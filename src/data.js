@@ -300,6 +300,7 @@ export function normalize(design) {
   if (typeof design.wallThickness !== 'number') design.wallThickness = 150; // 외벽 두께(mm)
   if (!Array.isArray(design.labels)) design.labels = [];         // 텍스트 라벨 [{id,x,y,text}]
   if (!('view' in design)) design.view = null;                   // 위치 고정 화면 {scale,ox,oy} (없으면 자동 맞춤)
+  if (!('site' in design)) design.site = null;                   // 부지(땅) {image, widthM, rot, dx, dy, boundary?} — 3D/2D 지면
   // 층(다층/복층): floors[] 에 각 층의 도면을 저장, 활성 층은 최상위(rooms/furniture/openings/outline)에 미러링
   if (!Array.isArray(design.floors) || !design.floors.length) {
     design.floors = [{ name: '1층', rooms: design.rooms, furniture: design.furniture, openings: design.openings, outline: design.outline }];

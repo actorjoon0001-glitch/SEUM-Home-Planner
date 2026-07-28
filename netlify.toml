@@ -1,0 +1,6 @@
+# Netlify 설정 — 정적 사이트(루트 그대로 배포) + 서버 함수(VWorld 프록시)
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"

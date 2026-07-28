@@ -11,5 +11,5 @@ window.SEUM_CONFIG = {
   // 부지(땅) 검색 — VWorld(브이월드) 오픈API 인증키. 발급: https://www.vworld.kr
   //   활용 도메인에 배포 주소(예: https://seum-home-planner.netlify.app)를 등록해야 작동.
   //   비어 있으면 '부지' 창에서 직접 이미지 업로드만 가능(주소 자동검색은 비활성).
-  vworldKey: '',
+  vworldKey: 'CCC06DB0-13C5-372F-8803-682171C0EB91',
 };

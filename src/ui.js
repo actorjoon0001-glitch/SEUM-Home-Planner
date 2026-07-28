@@ -1792,9 +1792,17 @@ async function vworldFetchSite(addr) {
   const imgU = `https://api.vworld.kr/req/image?service=image&request=getmap&format=png&basemap=SATELLITE&crs=EPSG:4326&center=${lng},${lat}&zoom=${zoom}&size=${size},${size}&key=${key}`;
   const res = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); // m/픽셀
   const widthM = Math.round(res * size * 10) / 10;
-  const blob = await fetch(imgU).then((r) => { if (!r.ok) throw new Error('위성 이미지를 불러오지 못했습니다.'); return r.blob(); });
-  const image = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
-  return { image, widthM, aspect: 1, addr };
+  // 위성 이미지 → 캔버스 → dataURL (3D 텍스처로 쓰려면 CORS-clean 필요)
+  const img = await new Promise((ok, no) => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => ok(im);
+    im.onerror = () => no(new Error('위성 이미지를 불러오지 못했습니다. (VWorld 인증키의 활용 도메인에 이 사이트 주소가 등록됐는지 확인하세요)'));
+    im.src = imgU;
+  });
+  const cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  cv.getContext('2d').drawImage(img, 0, 0);
+  const image = cv.toDataURL('image/jpeg', 0.9);
+  return { image, widthM, aspect: img.naturalHeight / img.naturalWidth, addr };
 }
 
 function openSiteDialog() {

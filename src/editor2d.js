@@ -101,6 +101,35 @@ export class Editor2D {
   }
   unlockView() { store.commit((d) => { d.view = null; }); return false; }
 
+  // 원터치 방/다락 추가 — 그리지 않고 기본 크기 공간을 좋은 위치에 바로 놓고 선택
+  addRoom(type = 'room') {
+    const d = store.design;
+    const w = 3000, dd = 3000;
+    // 배치 기준점: 외곽 중앙 → 없으면 방들 오른쪽 → 없으면 원점
+    let x, y;
+    const pts = [];
+    for (const p of outlineShapes(d.outline)) for (const q of p.pts) pts.push(q);
+    if (pts.length) {
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+      x = (Math.min(...xs) + Math.max(...xs)) / 2 - w / 2;
+      y = (Math.min(...ys) + Math.max(...ys)) / 2 - dd / 2;
+    } else if (d.rooms.length) {
+      const r = d.rooms[d.rooms.length - 1]; x = r.x + r.w + 1000; y = r.y;
+    } else { x = 0; y = 0; }
+    x = Math.round(x / 100) * 100; y = Math.round(y / 100) * 100;
+    // 기존 방과 겹치면 오른쪽/아래로 밀어 빈자리 찾기
+    const hit = (rx, ry) => d.rooms.some((r) => rx < r.x + r.w && rx + w > r.x && ry < r.y + r.d && ry + dd > r.y);
+    let guard = 0;
+    while (hit(x, y) && guard++ < 40) { x += 500; if (guard % 8 === 0) { x -= 4000; y += 500; } }
+    const room = { id: rid(), type, name: '', x, y, w, d: dd, open: [] };
+    store.commit((dz) => { dz.rooms.push(room); });
+    store.selectedRoom = room.id;
+    store.selectedFurniture = store.selectedOpening = null; store.selectedOutline = null;
+    store.emit();
+    this.draw();
+    return room;
+  }
+
   // 도면 전체를 화면 상태와 무관하게 고해상도 PNG(dataURL)로 렌더 (인쇄/내보내기용)
   toImage(w = 1600, h = 1100, mime = 'image/png', quality) {
     const d = store.design;

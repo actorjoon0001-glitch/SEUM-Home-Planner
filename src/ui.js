@@ -1355,6 +1355,17 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('tb-templates').onclick = () => openTemplateDialog();
   $('tb-underlay').onclick = () => openUnderlayDialog(editor);
   if ($('tb-site')) $('tb-site').onclick = () => openSiteDialog();
+
+  // 원터치 방/다락 추가 (상담 중 빠른 편집) — 추가 후 2D에서 위치·크기 조정
+  const quickAdd = (type, label) => {
+    const r = editor.addRoom(type);
+    if (viewer.active) { onModeChange('2d'); setTimeout(() => editor.fit(), 0); }  // 3D 중이면 2D로 와서 바로 조정
+    flash(`${label} 추가됨 — 크기·위치를 조정하세요`);
+    return r;
+  };
+  if ($('tb-addroom')) $('tb-addroom').onclick = () => quickAdd('room', '방');
+  if ($('tb-addattic')) $('tb-addattic').onclick = () => quickAdd('attic', '다락');
+  if ($('tb-finish')) $('tb-finish').onclick = () => showSection('finish');
   $('tb-cloud').onclick = () => openCloudDialog();
 
   // 모노톤(흑백) 도면 토글 — 종이 카달로그 인쇄용. 화면·내보내기·인쇄에 모두 반영
@@ -2246,16 +2257,23 @@ function closeModal() {
 
 // 공유 링크(?id=)로 진입 시 해당 도면 자동 로드
 async function handleShareLink() {
-  const id = new URLSearchParams(window.location.search).get('id');
-  if (!id || !cloud.configured()) return;
-  try {
-    await cloud.init();
-    const row = await cloud.getDesign(id);
-    store.loadInto(row.data, { cloudId: cloud.user && row.owner === cloud.user.id ? id : null });
-    flash(`'${row.name}' (공유 도면) 불러옴`);
-  } catch (e) {
-    console.warn('공유 링크 로드 실패:', e);
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+  const mode = (params.get('mode') || params.get('view') || '').toLowerCase();
+  if (!id && mode !== '3d' && mode !== '2d') return;   // 딥링크 파라미터 없으면 평소대로(대시보드)
+  if (id && cloud.configured()) {
+    try {
+      await cloud.init();
+      const row = await cloud.getDesign(id);
+      store.loadInto(row.data, { cloudId: cloud.user && row.owner === cloud.user.id ? id : null });
+      flash(`'${row.name}' 불러옴`);
+    } catch (e) { console.warn('공유 링크 로드 실패:', e); }
   }
+  // 대시보드 닫고 요청한 모드로 진입 (전자계약서 "3D 도면 추가" 버튼 → ?id=..&mode=3d)
+  hideDashboard();
+  const wanted = mode === '3d' ? '3d' : '2d';
+  if (_dash && _dash.onModeChange) _dash.onModeChange(wanted);
+  if (wanted === '2d' && _dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.applyInitialView(); }, 0);
 }
 
 // ---------------------------------------------------------------------------

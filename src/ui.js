@@ -2259,14 +2259,24 @@ function closeModal() {
 async function handleShareLink() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
+  const tpl = params.get('tpl');                                   // 내장 기본 도면 id
+  const asCopy = params.get('copy') === '1' || params.get('copy') === 'true';
   const mode = (params.get('mode') || params.get('view') || '').toLowerCase();
-  if (!id && mode !== '3d' && mode !== '2d') return;   // 딥링크 파라미터 없으면 평소대로(대시보드)
-  if (id && cloud.configured()) {
+  if (!id && !tpl && mode !== '3d' && mode !== '2d') return;       // 딥링크 파라미터 없으면 평소대로(대시보드)
+
+  if (tpl) {
+    // 내장 기본 도면(카탈로그 모델) → 항상 사본으로 (원본 보호)
+    try { const nd = instantiateTemplate(tpl); if (nd) store.loadInto(nd, { cloudId: null }); flash('기본 도면 열림 (사본 — 원본 안전)'); }
+    catch (e) { console.warn('기본 도면 열기 실패:', e); }
+  } else if (id && cloud.configured()) {
     try {
       await cloud.init();
       const row = await cloud.getDesign(id);
-      store.loadInto(row.data, { cloudId: cloud.user && row.owner === cloud.user.id ? id : null });
-      flash(`'${row.name}' 불러옴`);
+      // 카탈로그(템플릿)이거나 copy=1 이면 사본으로 열어 원본 모델을 보호
+      const copy = asCopy || !!row.is_template;
+      const cloudId = (!copy && cloud.user && row.owner === cloud.user.id) ? id : null;
+      store.loadInto(row.data, { cloudId });
+      flash(copy ? `'${row.name}' 사본 열림 (원본 보호)` : `'${row.name}' 불러옴`);
     } catch (e) { console.warn('공유 링크 로드 실패:', e); }
   }
   // 대시보드 닫고 요청한 모드로 진입 (전자계약서 "3D 도면 추가" 버튼 → ?id=..&mode=3d)

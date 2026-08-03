@@ -1587,6 +1587,7 @@ async function openTemplateDialog() {
         <button class="mini" id="tpl-add-cancel">취소</button>
       </div>
     </div>
+    <div class="cl-filter" id="tpl-typefilter"></div>
     <div class="cl-filter" id="tpl-filter"></div>
     <div id="tpl-local-wrap" style="display:none">
       <p class="m-sub" style="margin-top:6px">📌 내 기본 도면 <span style="color:var(--muted)">(이 기기에 저장)</span></p>
@@ -1600,16 +1601,18 @@ async function openTemplateDialog() {
   const dlg = modal('기본 도면 라이브러리', body);
 
   let cloudTpls = [];
-  let filter = '';
+  let filter = '';        // 전시장 필터
+  let typeFilter = '';    // 제품종류 필터 (주택/체류형 쉼터/농막)
 
-  // 전시장 기준 필터
+  // 전시장 + 제품종류 기준 필터
   const matches = (sr) => !filter || (sr || '') === filter;
+  const matchesType = (ty) => !typeFilter || (ty || '') === typeFilter;
 
   const renderBuiltin = () => {
     const grid = body.querySelector('#tpl-builtin');
     grid.innerHTML = '';
     for (const t of builtin) {
-      if (!matches(t.showroom)) continue;
+      if (!matches(t.showroom) || !matchesType(t.category)) continue;
       const card = document.createElement('button');
       card.className = 'tpl-card';
       card.innerHTML = `<div class="tpl-ico">${PRODUCT_ICON[t.category] || '🏠'}</div><div class="tpl-name">${esc(t.title)}</div>
@@ -1626,7 +1629,7 @@ async function openTemplateDialog() {
   const renderLocal = () => {
     const wrap = body.querySelector('#tpl-local-wrap');
     const grid = body.querySelector('#tpl-local');
-    const shown = store.localTemplates().filter((t) => matches(t.showroom || ''));
+    const shown = store.localTemplates().filter((t) => matches(t.showroom || '') && matchesType((t.productType || '').trim()));
     wrap.style.display = shown.length ? '' : 'none';
     grid.innerHTML = '';
     for (const t of shown) {
@@ -1657,7 +1660,7 @@ async function openTemplateDialog() {
   const renderCloud = () => {
     const wrap = body.querySelector('#tpl-cloud-wrap');
     const cg = body.querySelector('#tpl-cloud');
-    const shown = cloudTpls.filter((t) => matches((t.data?.showroom || '').trim()));
+    const shown = cloudTpls.filter((t) => matches((t.data?.showroom || '').trim()) && matchesType((t.data?.productType || '').trim()));
     wrap.style.display = shown.length ? '' : 'none';
     cg.innerHTML = '';
     for (const t of shown) {
@@ -1674,11 +1677,23 @@ async function openTemplateDialog() {
     }
   };
 
+  const renderAll = () => { renderTypeFilter(); renderFilter(); renderLocal(); renderBuiltin(); renderCloud(); };
+
+  const renderTypeFilter = () => {
+    const bar = body.querySelector('#tpl-typefilter');
+    if (!bar) return;
+    const cats = ['', ...PRODUCT_TYPES];
+    bar.innerHTML = cats.map((c) =>
+      `<button class="chip${typeFilter === c ? ' on' : ''}" data-c="${esc(c)}">${c ? `${PRODUCT_ICON[c] || ''} ${esc(c)}` : '전체 종류'}</button>`
+    ).join('');
+    bar.querySelectorAll('.chip').forEach((ch) => ch.onclick = () => { typeFilter = ch.dataset.c; renderAll(); });
+  };
+
   const renderFilter = () => {
     const bar = body.querySelector('#tpl-filter');
     const cats = ['', ...collectShowrooms()];
     bar.innerHTML = cats.map((c) =>
-      `<button class="chip${filter === c ? ' on' : ''}" data-c="${esc(c)}">${c ? `🏢 ${esc(c)}` : '전체'}</button>`
+      `<button class="chip${filter === c ? ' on' : ''}" data-c="${esc(c)}">${c ? `🏢 ${esc(c)}` : '전체 전시장'}</button>`
     ).join('');
     bar.querySelectorAll('.chip').forEach((ch) => ch.onclick = () => {
       filter = ch.dataset.c;
@@ -1761,6 +1776,7 @@ async function openTemplateDialog() {
     inp.click();
   };
 
+  renderTypeFilter();
   renderFilter();
   renderLocal();
   renderBuiltin();

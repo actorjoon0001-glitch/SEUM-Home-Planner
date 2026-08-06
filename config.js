@@ -12,4 +12,9 @@ window.SEUM_CONFIG = {
   //   활용 도메인에 배포 주소(예: https://seum-home-planner.netlify.app)를 등록해야 작동.
   //   비어 있으면 '부지' 창에서 직접 이미지 업로드만 가능(주소 자동검색은 비활성).
   vworldKey: 'CCC06DB0-13C5-372F-8803-682171C0EB91',
+
+  // 주소 자동검색용 프록시 base URL — VWorld 가 해외(미국) IP 를 막아서,
+  //   서울 리전(Vercel icn1)에 배포한 프록시를 통해 호출한다.
+  //   예: 'https://seum-vworld.vercel.app' (끝에 / 없이). 비우면 Netlify 함수(미국)로 폴백.
+  vworldProxy: '',
 };

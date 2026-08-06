@@ -1807,9 +1807,14 @@ function setSite(patch) {
 function clearSite() { store.commit((d) => { d.site = null; }); if (_viewer) _viewer.dirty = true; }
 
 // 지번주소 → 좌표 → 위성 정지영상(dataURL) + 실제 가로폭(m) 계산 (VWorld 오픈API)
+// 프록시 base — 서울리전(Vercel)이 설정돼 있으면 그쪽, 아니면 Netlify 함수(미국·VWorld 막힘)
+function vworldBase() {
+  const p = (window.SEUM_CONFIG && window.SEUM_CONFIG.vworldProxy || '').replace(/\/$/, '');
+  return p ? `${p}/api/vworld` : '/.netlify/functions/vworld';
+}
 async function vworldFetchSite(addr) {
-  // 브라우저 → 같은 출처 Netlify 함수(프록시) → VWorld (CORS 우회)
-  const g = await fetch(`/.netlify/functions/vworld?type=geocode&address=${encodeURIComponent(addr)}`).then((r) => r.json());
+  const EP = vworldBase();
+  const g = await fetch(`${EP}?type=geocode&address=${encodeURIComponent(addr)}`).then((r) => r.json());
   if (!g.response || g.response.status !== 'OK' || !g.response.result) {
     throw new Error('주소를 찾지 못했습니다. (지번 주소로 입력해 보세요)');
   }
@@ -1817,10 +1822,11 @@ async function vworldFetchSite(addr) {
   const zoom = 18, size = 1024;
   const res = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); // m/픽셀
   const widthM = Math.round(res * size * 10) / 10;
-  // 위성 이미지도 프록시 경유(같은 출처) → 캔버스 → dataURL (텍스처 안전)
-  const imgU = `/.netlify/functions/vworld?type=image&lng=${lng}&lat=${lat}&zoom=${zoom}&size=${size}`;
+  // 위성 이미지도 프록시 경유 → 캔버스 → dataURL (교차출처면 CORS 허용됨: 프록시가 * 헤더)
+  const imgU = `${EP}?type=image&lng=${lng}&lat=${lat}&zoom=${zoom}&size=${size}`;
   const img = await new Promise((ok, no) => {
     const im = new Image();
+    im.crossOrigin = 'anonymous';   // 다른 출처(vercel) 이미지도 텍스처로 쓰려면 필요
     im.onload = () => ok(im);
     im.onerror = () => no(new Error('위성 이미지를 불러오지 못했습니다.'));
     im.src = imgU;

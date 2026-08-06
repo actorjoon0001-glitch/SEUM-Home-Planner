@@ -1412,6 +1412,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('view-iso').onclick = () => viewer.view('iso');
   $('view-top').onclick = () => viewer.view('top');
   $('view-front').onclick = () => viewer.view('front');
+  if ($('view-inside')) $('view-inside').onclick = () => { if (!viewer.active) onModeChange('3d'); viewer.view('interior'); };
 
   // 키보드 단축키
   window.addEventListener('keydown', (e) => {

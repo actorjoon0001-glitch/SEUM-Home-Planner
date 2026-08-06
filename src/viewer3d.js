@@ -768,6 +768,19 @@ export class Viewer3D {
   // 외부에서 카메라 프리셋
   view(type) {
     const b = this._bounds();
+    if (type === 'interior') {
+      // 실내 시점 — 집 안 눈높이(1450mm)에서 반대편을 바라봄. 둘러보기 가능.
+      this.camera.fov = 62; this.camera.updateProjectionMatrix();
+      this.controls.maxPolarAngle = Math.PI * 0.9;   // 살짝 아래(바닥·가구)까지 볼 수 있게
+      this.controls.minDistance = 400;
+      this.camera.position.set(-(b.w / 2 - 700), 1450, (b.h / 2 - 700));
+      this.controls.target.set(b.w * 0.06, 1120, -(b.h * 0.36));
+      this.controls.update();
+      return;
+    }
+    // 외부(조감) 시점 프리셋
+    this.camera.fov = 50; this.camera.updateProjectionMatrix();
+    this.controls.maxPolarAngle = Math.PI / 2.05;    // 지면 아래로는 못 내려가게
     const d = Math.max(b.w, b.h) * 1.1 + 5000;
     if (type === 'top') this.camera.position.set(0, d * 1.4, 1);
     else if (type === 'front') this.camera.position.set(0, d * 0.4, d);

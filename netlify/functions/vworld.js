@@ -10,6 +10,19 @@ exports.handler = async (event) => {
   const q = (event && event.queryStringParameters) || {};
   const cors = { 'Access-Control-Allow-Origin': '*' };
   try {
+    if (q.type === 'diag') {
+      const out = {};
+      // 1) 외부망 자체 되는지 + 함수 egress IP 확인
+      try { const r = await fetch('https://api.ipify.org?format=json'); out.ip = await r.json(); }
+      catch (e) { out.ipError = String((e && e.message) || e); }
+      // 2) VWorld 도달 여부
+      try {
+        const r = await fetch(`https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=EPSG:4326&format=json&type=ROAD&key=${KEY}&address=${encodeURIComponent('서울특별시 중구 세종대로 110')}`, { headers: { Referer: REFERER } });
+        out.vworldStatus = r.status;
+        out.vworldBody = (await r.text()).slice(0, 200);
+      } catch (e) { out.vworldError = String((e && e.message) || e); out.vworldCause = e && e.cause ? String((e.cause.code || e.cause.message || e.cause)) : null; }
+      return { statusCode: 200, headers: { ...cors, 'Content-Type': 'application/json' }, body: JSON.stringify(out) };
+    }
     if (q.type === 'geocode') {
       const addr = q.address || '';
       const base = (type) => `https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=EPSG:4326&format=json&type=${type}&key=${KEY}&address=${encodeURIComponent(addr)}`;
@@ -31,6 +44,15 @@ exports.handler = async (event) => {
     }
     return { statusCode: 400, headers: { ...cors, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'type 파라미터 필요' }) };
   } catch (e) {
-    return { statusCode: 500, headers: { ...cors, 'Content-Type': 'application/json' }, body: JSON.stringify({ error: String((e && e.message) || e) }) };
+    // 원인 진단용: undici cause(코드/원인)까지 노출
+    const cause = e && e.cause;
+    return { statusCode: 500, headers: { ...cors, 'Content-Type': 'application/json' }, body: JSON.stringify({
+      error: String((e && e.message) || e),
+      causeMessage: cause ? String(cause.message || cause) : null,
+      causeCode: cause && cause.code ? String(cause.code) : null,
+    }) };
   }
 };
+
+// 진단용: VWorld 도달 가능 여부 + 응답 헤더 확인 (?type=diag)
+exports._diag = true;

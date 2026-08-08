@@ -1366,6 +1366,30 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   if ($('tb-addroom')) $('tb-addroom').onclick = () => quickAdd('room', '방');
   if ($('tb-addattic')) $('tb-addattic').onclick = () => quickAdd('attic', '다락');
   if ($('tb-finish')) $('tb-finish').onclick = () => showSection('finish');
+
+  // 전자계약서에서 열렸을 때(?ret=contract): "계약서로 보내기" 활성 → 도면 이미지를 계약서 창으로 전송
+  const cparams = new URLSearchParams(window.location.search);
+  const retMode = (cparams.get('ret') || cparams.get('return') || '').toLowerCase();
+  if (retMode === 'contract') {
+    const cid = cparams.get('cid') || cparams.get('token') || '';
+    const targetOrigin = cparams.get('origin') || '*';   // 보안상 계약서 도메인 지정 권장
+    const sendBtn = $('tb-tocontract');
+    if (sendBtn) {
+      sendBtn.classList.remove('hidden');
+      sendBtn.classList.add('tb-primary');
+      sendBtn.onclick = () => {
+        let planImage = '', view3d = '';
+        try { planImage = editor.toImage(1600, 1100, 'image/jpeg', 0.85); } catch (e) { /* noop */ }
+        try { view3d = viewer.toImage(); } catch (e) { /* noop */ }
+        const msg = { type: 'SEUM_DESIGN', cid, name: store.design.name || '무제 도면', planImage, view3d, ts: Date.now() };
+        let sent = false;
+        try { if (window.opener && !window.opener.closed) { window.opener.postMessage(msg, targetOrigin); sent = true; } } catch (e) { /* noop */ }
+        try { if (!sent && window.parent && window.parent !== window) { window.parent.postMessage(msg, targetOrigin); sent = true; } } catch (e) { /* noop */ }
+        flash(sent ? '📄 계약서로 전송했습니다 — 계약서 창에서 협의도면 첨부를 확인하세요'
+                   : '계약서 창을 찾지 못했습니다. 계약서의 "3D도면 만들기" 버튼으로 열어야 전송됩니다.');
+      };
+    }
+  }
   $('tb-cloud').onclick = () => openCloudDialog();
 
   // 모노톤(흑백) 도면 토글 — 종이 카달로그 인쇄용. 화면·내보내기·인쇄에 모두 반영

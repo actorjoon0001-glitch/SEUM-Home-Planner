@@ -1863,15 +1863,16 @@ async function vworldFetchSite(addr) {
 
 function openSiteDialog() {
   const body = document.createElement('div');
-  const hasKey = !!vworldKey();
+  // 주소 자동검색은 서울리전 프록시(config.vworldProxy)가 있어야 동작 (VWorld 가 해외 서버 차단)
+  const canSearch = !!((window.SEUM_CONFIG && window.SEUM_CONFIG.vworldProxy) || '').trim();
   function render() {
     const s = store.design.site;
     body.innerHTML = `
       <p class="m-sub">고객 땅(필지)을 3D 도면 아래 지면으로 깔아 "이 땅에 이 집" 을 보여줍니다.</p>
-      <div class="fld"><span>지번 주소로 검색 ${hasKey ? '' : '<small style="color:#c8102e">(VWorld 키 설정 필요)</small>'}</span>
+      <div class="fld"><span>지번 주소로 검색 ${canSearch ? '' : '<small style="color:#c8102e">(준비중 — 아래 이미지 업로드를 사용하세요)</small>'}</span>
         <div style="display:flex;gap:6px">
-          <input id="site-addr" placeholder="예: 세종특별자치시 조치원읍 원리 123-4" style="flex:1" ${hasKey ? '' : 'disabled'}>
-          <button class="mini" id="site-search" ${hasKey ? '' : 'disabled'}>검색</button>
+          <input id="site-addr" placeholder="예: 세종특별자치시 조치원읍 원리 123-4" style="flex:1" ${canSearch ? '' : 'disabled'}>
+          <button class="mini" id="site-search" ${canSearch ? '' : 'disabled'}>검색</button>
         </div>
       </div>
       <div class="fld"><span>또는 위성/항공 사진 직접 올리기 (네이버지도·구글어스 캡처)</span>

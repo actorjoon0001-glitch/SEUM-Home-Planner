@@ -1823,6 +1823,33 @@ async function openTemplateDialog() {
 // 부지(땅) — 위성/항공 이미지를 3D 지면에 깔기 (주소검색: VWorld, 또는 이미지 업로드)
 // ---------------------------------------------------------------------------
 function vworldKey() { return (window.SEUM_CONFIG && window.SEUM_CONFIG.vworldKey) || ''; }
+function mapboxToken() { return (window.SEUM_CONFIG && window.SEUM_CONFIG.mapboxToken) || ''; }
+
+// Mapbox — 브라우저에서 바로 지오코딩 + 위성 정지영상(서버·프록시 불필요, CORS 지원)
+async function mapboxFetchSite(addr) {
+  const token = mapboxToken();
+  const gu = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addr)}.json?access_token=${token}&country=kr&language=ko&limit=1`;
+  const g = await fetch(gu).then((r) => r.json());
+  if (!g.features || !g.features.length) throw new Error('주소를 찾지 못했습니다. (도로명 주소나 인근 지명으로 시도해 보세요)');
+  const [lng, lat] = g.features[0].center;
+  const zoom = 17, size = 1024;
+  const res = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); // m/픽셀
+  const widthM = Math.round(res * size * 10) / 10;
+  const imgU = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/${lng},${lat},${zoom},0/${size}x${size}@2x?access_token=${token}`;
+  const img = await new Promise((ok, no) => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => ok(im);
+    im.onerror = () => no(new Error('위성 이미지를 불러오지 못했습니다. (Mapbox 토큰 확인)'));
+    im.src = imgU;
+  });
+  const cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  cv.getContext('2d').drawImage(img, 0, 0);
+  return { image: cv.toDataURL('image/jpeg', 0.9), widthM, aspect: img.naturalHeight / img.naturalWidth, addr: g.features[0].place_name || addr };
+}
+// 주소 검색 — Mapbox 토큰이 있으면 Mapbox(브라우저 직접), 아니면 VWorld 프록시
+async function fetchSiteByAddress(addr) {
+  return mapboxToken() ? mapboxFetchSite(addr) : vworldFetchSite(addr);
+}
 function siteState() { return store.design.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }; }
 function setSite(patch) {
   store.commit((d) => { d.site = { ...(d.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }), ...patch }; });
@@ -1863,8 +1890,8 @@ async function vworldFetchSite(addr) {
 
 function openSiteDialog() {
   const body = document.createElement('div');
-  // 주소 자동검색은 서울리전 프록시(config.vworldProxy)가 있어야 동작 (VWorld 가 해외 서버 차단)
-  const canSearch = !!((window.SEUM_CONFIG && window.SEUM_CONFIG.vworldProxy) || '').trim();
+  // 주소 자동검색: Mapbox 토큰(브라우저 직접) 또는 VWorld 서울프록시가 있으면 활성
+  const canSearch = !!(mapboxToken() || ((window.SEUM_CONFIG && window.SEUM_CONFIG.vworldProxy) || '').trim());
   function render() {
     const s = store.design.site;
     body.innerHTML = `
@@ -1895,7 +1922,7 @@ function openSiteDialog() {
     if (g('site-search')) g('site-search').onclick = async () => {
       const addr = g('site-addr').value.trim(); if (!addr) return;
       g('site-search').textContent = '검색중…'; g('site-search').disabled = true;
-      try { const site = await vworldFetchSite(addr); setSite(site); flash('부지를 불러왔습니다'); render(); }
+      try { const site = await fetchSiteByAddress(addr); setSite(site); flash('부지를 불러왔습니다'); render(); }
       catch (e) { alert('부지 검색 실패: ' + (e.message || e)); g('site-search').textContent = '검색'; g('site-search').disabled = false; }
     };
     if (g('site-file')) g('site-file').onchange = (e) => {

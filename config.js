@@ -17,4 +17,9 @@ window.SEUM_CONFIG = {
   //   서울 리전(Vercel icn1)에 배포한 프록시를 통해 호출한다.
   //   예: 'https://seum-vworld.vercel.app' (끝에 / 없이). 비우면 Netlify 함수(미국)로 폴백.
   vworldProxy: '',
+
+  // 주소 자동검색(Mapbox) — 위성사진을 브라우저에서 바로 불러옴(서버·프록시 불필요).
+  //   발급: https://account.mapbox.com (무료·카드 불필요). public 토큰(pk....) 붙여넣기.
+  //   설정하면 '부지(땅)' 창에서 지번/도로명 주소검색 → 위성사진 자동 로드.
+  mapboxToken: '',
 };

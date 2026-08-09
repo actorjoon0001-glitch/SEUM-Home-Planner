@@ -1253,7 +1253,20 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   const $ = (id) => document.getElementById(id);
 
   $('tb-2d').onclick = () => onModeChange('2d');
-  $('tb-3d').onclick = () => onModeChange('3d');
+  // 3D 전환 시: 방만 있고 외곽벽이 없으면 자동 생성 제안 (안 하면 방들이 분리돼 보임)
+  $('tb-3d').onclick = () => {
+    const d = store.design;
+    if ((d.rooms || []).length && !d.outline) {
+      if (confirm('외곽벽(외벽)이 없어 3D에서 방들이 따로 떨어져 보일 수 있어요.\n방들을 감싸는 외곽벽을 자동으로 만들까요?')) {
+        if (editor.autoOutline()) flash('외곽벽을 자동으로 만들었습니다');
+      }
+    }
+    onModeChange('3d');
+  };
+  if ($('tb-autooutline')) $('tb-autooutline').onclick = () => {
+    if (editor.autoOutline()) flash('🏠 방들을 감싸는 외곽벽을 만들었습니다');
+    else flash('먼저 방을 그려주세요');
+  };
 
   // 하단 줌 버튼 — 활성 화면(2D/3D)에 맞춰 동작
   const zoom = (f) => { if (viewer.active) viewer.zoom(f); else editor.zoomBy(f); };

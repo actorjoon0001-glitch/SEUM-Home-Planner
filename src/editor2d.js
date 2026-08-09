@@ -1278,6 +1278,56 @@ export class Editor2D {
 
   // 도면 전체 반전/회전 — 방·가구·라벨·외곽점·개구부를 한꺼번에 변환
   // kind: 'flipH'(좌우) | 'flipV'(상하) | 'rotCW'(시계90°) | 'rotCCW'(반시계90°)
+  // 방들을 감싸는 외곽벽(외벽) 자동 생성 — 방만 그린 도면이 3D에서 분리돼 보이는 것 해결.
+  // 닫힌 방들의 합집합(union) 외곽선을 만들어 한 집으로 감쌈. (발코니 등 개방형은 제외)
+  autoOutline() {
+    const OPEN = ['balcony', 'deck', 'porch'];
+    const rooms = store.design.rooms.filter((r) => !OPEN.includes(r.type));
+    if (rooms.length < 1) return false;
+    const xs = [...new Set(rooms.flatMap((r) => [r.x, r.x + r.w]))].sort((a, b) => a - b);
+    const ys = [...new Set(rooms.flatMap((r) => [r.y, r.y + r.d]))].sort((a, b) => a - b);
+    const cov = (i, j) => {
+      if (i < 0 || j < 0 || i >= xs.length - 1 || j >= ys.length - 1) return false;
+      const cx = (xs[i] + xs[i + 1]) / 2, cy = (ys[j] + ys[j + 1]) / 2;
+      return rooms.some((r) => cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.d);
+    };
+    // 덮인 셀 경계를 CCW 방향 변으로 수집
+    const segs = [];
+    for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < ys.length - 1; j++) {
+      if (!cov(i, j)) continue;
+      const x0 = xs[i], x1 = xs[i + 1], y0 = ys[j], y1 = ys[j + 1];
+      if (!cov(i, j - 1)) segs.push([[x0, y0], [x1, y0]]);   // 아래 →
+      if (!cov(i + 1, j)) segs.push([[x1, y0], [x1, y1]]);   // 오른 ↑
+      if (!cov(i, j + 1)) segs.push([[x1, y1], [x0, y1]]);   // 위 ←
+      if (!cov(i - 1, j)) segs.push([[x0, y1], [x0, y0]]);   // 왼 ↓
+    }
+    if (!segs.length) return false;
+    const key = (p) => p[0] + ',' + p[1];
+    const outMap = new Map();
+    for (const s of segs) { const k = key(s[0]); (outMap.get(k) || outMap.set(k, []).get(k)).push(s); }
+    let s0 = segs[0];
+    for (const s of segs) if (s[0][0] < s0[0][0] || (s[0][0] === s0[0][0] && s[0][1] < s0[0][1])) s0 = s;
+    const poly = []; const used = new Set(); let cur = s0;
+    for (let guard = 0; guard < segs.length + 5 && cur; guard++) {
+      poly.push(cur[0]); used.add(cur);
+      const outs = (outMap.get(key(cur[1])) || []).filter((s) => !used.has(s));
+      if (!outs.length) break;
+      const dir = [Math.sign(cur[1][0] - cur[0][0]), Math.sign(cur[1][1] - cur[0][1])];
+      cur = outs.find((o) => Math.sign(o[1][0] - o[0][0]) === dir[0] && Math.sign(o[1][1] - o[0][1]) === dir[1]) || outs[0];
+      if (key(cur[0]) === key(s0[0])) break;
+    }
+    // 공선점 제거
+    const pts = [];
+    for (let k = 0; k < poly.length; k++) {
+      const a = poly[(k - 1 + poly.length) % poly.length], b = poly[k], c = poly[(k + 1) % poly.length];
+      if (!((a[0] === b[0] && b[0] === c[0]) || (a[1] === b[1] && b[1] === c[1]))) pts.push([b[0], b[1]]);
+    }
+    if (pts.length < 3) return false;
+    store.commit((d) => { d.outline = { paths: [{ closed: true, points: pts }] }; });
+    this.draw();
+    return true;
+  }
+
   transformDesign(kind) {
     const d = store.design;
     // 중심(바운딩 박스) — 방 + 외곽 기준

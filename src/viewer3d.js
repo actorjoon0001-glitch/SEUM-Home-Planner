@@ -861,6 +861,8 @@ export class Viewer3D {
   _edMove(e) {
     if (!this._edrag) return;
     const g = this._groundHit(e); if (!g) return;
+    // 드래그당 한 번만 스냅샷 → Ctrl+Z 되돌리기 지원(2D 편집과 동일)
+    if (!this._edrag.snapped) { store.snapshot(); this._edrag.snapped = true; }
     const snap = (v) => Math.round(v / 100) * 100;
     const dr = this._edrag, room = dr.room;
     if (dr.mode === 'move') {

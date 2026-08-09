@@ -1832,7 +1832,7 @@ async function mapboxFetchSite(addr) {
   const g = await fetch(gu).then((r) => r.json());
   if (!g.features || !g.features.length) throw new Error('주소를 찾지 못했습니다. (도로명 주소나 인근 지명으로 시도해 보세요)');
   const [lng, lat] = g.features[0].center;
-  const zoom = 17, size = 1024;
+  const zoom = 19, size = 1024;   // zoom19 ≈ 가로 240m 정도 담김(필지+주변). 축척은 자동계산되어 실제 크기 정확
   const res = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); // m/픽셀
   const widthM = Math.round(res * size * 10) / 10;
   const imgU = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/${lng},${lat},${zoom},0/${size}x${size}@2x?access_token=${token}`;

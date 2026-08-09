@@ -30,7 +30,10 @@ export class Viewer3D {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI / 2.05;
-    this.controls.zoomSpeed = 0.5;      // 휠 한 칸당 이동을 작게 → 2D처럼 조금씩 확대/축소
+    // 휠 줌: 기본 OrbitControls 줌은 마우스/트랙패드의 deltaY 크기에 비례해
+    //   기기에 따라 한 번에 확 튀어(사이즈가 2단계처럼 보임). 직접 처리해
+    //   방향만 보고 한 틱당 고정 비율(8%)로 조금씩 당기고 밀어 2D처럼 세밀하게.
+    this.controls.enableZoom = false;
 
     // WebGL 컨텍스트 손실(반복 탭 전환/GPU 상황) → 흰 화면 방지: 복구 시 재빌드
     const cv = this.renderer.domElement;
@@ -54,6 +57,7 @@ export class Viewer3D {
     cv.addEventListener('pointerdown', (e) => this._edDown(e));
     cv.addEventListener('pointermove', (e) => this._edMove(e));
     window.addEventListener('pointerup', () => this._edUp());
+    cv.addEventListener('wheel', (e) => this._wheelZoom(e), { passive: false });
 
     store.subscribe(() => { this.dirty = true; });
     window.addEventListener('resize', () => this._resize());
@@ -185,6 +189,20 @@ export class Viewer3D {
     return m;
   }
 
+  // 휠 줌 — 방향만 보고 한 틱당 8%씩 부드럽게(기기별 deltaY 편차 무시), 범위 클램프
+  _wheelZoom(e) {
+    if (!this.active) return;
+    e.preventDefault();
+    const step = e.deltaY > 0 ? 1.08 : 1 / 1.08;   // 아래로 굴리면 축소, 위로 굴리면 확대
+    const t = this.controls.target;
+    const dir = this.camera.position.clone().sub(t);
+    const min = this.controls.minDistance || 1;
+    const max = isFinite(this.controls.maxDistance) ? this.controls.maxDistance : dir.length() * 8;
+    const dist = Math.max(min, Math.min(max, dir.length() * step));
+    this.camera.position.copy(t).add(dir.setLength(dist));
+    this.controls.update();
+  }
+
   // 카메라 줌 (하단 줌 버튼) — 타깃 기준 당기기/밀기
   zoom(factor) {
     const t = this.controls.target;
@@ -203,8 +221,8 @@ export class Viewer3D {
   }
   _aerialZoomLimits(b) {              // 조감(외부) 시점 휠 줌 한계
     const m = Math.max(b.w, b.h);
-    this.controls.minDistance = m * 0.55 + 4000;   // 최대 확대 시에도 바닥 속으로 들어가지 않게
-    this.controls.maxDistance = m * 2.0 + 15000;   // 최대 축소 시에도 집이 점처럼 작아지지 않게
+    this.controls.minDistance = m * 0.32 + 2500;   // 가까이 당겨 디테일 확인 (바닥 속으로는 안 들어가게)
+    this.controls.maxDistance = m * 2.4 + 18000;   // 멀리 밀어도 집이 점처럼 작아지지 않게
   }
 
   _buildRoom(room, b, ceilH) {

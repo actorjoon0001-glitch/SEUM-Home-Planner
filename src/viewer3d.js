@@ -265,16 +265,33 @@ export class Viewer3D {
     }
   }
 
-  // 한 벽면(room+side)에 있는 개구부들을 축 좌표로 정리 (a..c2, sill, top)
+  // 한 벽면(room+side) 위에 놓인 개구부들을 축 좌표로 정리 (a..c2, sill, top)
+  //   소속 방과 무관하게 '이 벽선 위'에 있는 문/창을 모두 뚫는다 → 두 방이 맞닿은
+  //   경계(주방↔방 등)에서 문이 양쪽 벽을 관통해 3D에서도 실제로 통하게 됨.
   _collectOps(room, side, L) {
-    return (store.design.openings || [])
-      .filter((o) => o.roomId === room.id && o.side === side)
-      .map((o) => {
-        const half = (o.w || 900) / 2;
-        const c = Math.max(half, Math.min(L - half, o.pos));
-        return { a: c - half, c2: c + half, sill: Math.max(0, o.sill || 0), top: (o.sill || 0) + (o.h || 1200) };
-      })
-      .sort((p, q) => p.a - q.a);
+    const TOL = 300;               // 맞닿은 두 벽 사이 간격 허용치(mm)
+    const horiz = (side === 'n' || side === 's');
+    // 이 벽선의 시작점 P0 과 진행 방향 dir (mm 좌표)
+    let P0, dir;
+    if (side === 'n') { P0 = [room.x, room.y]; dir = [1, 0]; }
+    else if (side === 's') { P0 = [room.x, room.y + room.d]; dir = [1, 0]; }
+    else if (side === 'w') { P0 = [room.x, room.y]; dir = [0, 1]; }
+    else { P0 = [room.x + room.w, room.y]; dir = [0, 1]; }
+    const out = [];
+    for (const o of (store.design.openings || [])) {
+      const w = this._openingWorld(o); if (!w) continue;
+      if (w.free) continue;                 // 자유 배치 개구부는 벽을 뚫지 않음
+      if (w.horiz !== horiz) continue;      // 벽 방향과 개구부 방향 일치
+      const vx = w.cx - P0[0], vy = w.cy - P0[1];
+      const t = vx * dir[0] + vy * dir[1];               // 벽을 따라간 위치
+      const perp = Math.abs(-vx * dir[1] + vy * dir[0]); // 벽선과의 수직 거리
+      if (perp > TOL) continue;
+      if (t < -w.half || t > L + w.half) continue;
+      const a = Math.max(0, t - w.half), c2 = Math.min(L, t + w.half);
+      if (c2 - a < 1) continue;
+      out.push({ a, c2, sill: w.sill, top: w.top });
+    }
+    return out.sort((p, q) => p.a - q.a);
   }
 
   // 개구부를 제외한 벽 솔리드 사각형 목록 [a, b, yLo, yHi]

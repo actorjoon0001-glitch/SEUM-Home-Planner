@@ -822,6 +822,7 @@ export class Viewer3D {
   }
   _edDown(e) {
     if (!this.editMode) return;
+    if (e.button !== 0) return;            // 좌클릭만 편집 — 휠(가운데)·우클릭은 카메라 이동/회전
     const pick = this._pick(e);
     if (!pick) return;                    // 빈 곳 → 궤도(회전) 그대로
     const room = store.design.rooms.find((r) => r.id === pick.roomId); if (!room) return;

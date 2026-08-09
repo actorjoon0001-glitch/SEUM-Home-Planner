@@ -464,8 +464,8 @@ export class Viewer3D {
   }
 
   // 외곽 한 변(A→B, 중심원점 좌표) 위에 놓인 개구부들을 _wallRects 형식으로 수집
-  _edgeOpenings(A, dir, len, b) {
-    const TOL = 300; // 방 벽과 외벽 사이 간격 허용치(mm)
+  _edgeOpenings(A, dir, len, b, tol) {
+    const TOL = tol || 300; // 방 벽과 외벽 사이 간격 허용치(mm)
     const edgeHoriz = Math.abs(dir[0]) >= Math.abs(dir[1]);
     const out = [];
     for (const o of (store.design.openings || [])) {
@@ -486,11 +486,16 @@ export class Viewer3D {
   }
 
   // 외곽/외장 한 변을 개구부 자리를 비워(뚫어) 만든다 (내벽 _buildWall 과 동일 원리)
+  //   opts.shift[dx,dz]: 개구부는 원래 벽선(A→B)에서 찾되, 벽 박스는 이만큼
+  //     평행이동해 그림 → 외장재를 외벽 바깥면에 덧대면서도 창/문 구멍은 유지.
+  //   opts.tol: 개구부 판정 허용 오차(외벽↔개구부 간격), opts.baseboard: 걸레받이.
   _buildCarvedEdge(A, B, wallH, T, ext, b, matFn, opts) {
     const dx = B[0] - A[0], dz = B[1] - A[1];
     const len = Math.hypot(dx, dz); if (len < 1) return;
     const ux = dx / len, uz = dz / len;
-    const ops = this._edgeOpenings(A, [ux, uz], len, b);
+    const sx = (opts && opts.shift) ? opts.shift[0] : 0;
+    const sz = (opts && opts.shift) ? opts.shift[1] : 0;
+    const ops = this._edgeOpenings(A, [ux, uz], len, b, opts && opts.tol);
     const rects = this._wallRects(len, ops, wallH, ext);
     const ang = -Math.atan2(dz, dx);
     for (const [a, bEnd, yLo, yHi] of rects) {
@@ -498,14 +503,14 @@ export class Viewer3D {
       if (segLen < 1 || h < 1) continue;
       const mid = (a + bEnd) / 2;
       const m = new THREE.Mesh(new THREE.BoxGeometry(segLen, h, T), matFn(segLen, h));
-      m.position.set(A[0] + ux * mid, (yLo + yHi) / 2, A[1] + uz * mid);
+      m.position.set(A[0] + ux * mid + sx, (yLo + yHi) / 2, A[1] + uz * mid + sz);
       m.rotation.y = ang;
       m.castShadow = true; m.receiveShadow = true;
       this.modelGroup.add(m);
       // 걸레받이(바닥 몰딩) — 바닥에 닿는 벽 하단(문 개구부 자리는 rect가 없어 자동으로 비워짐)
       if (opts && opts.baseboard && yLo < 80) {
         const bb = new THREE.Mesh(new THREE.BoxGeometry(segLen, 90, T + 24), this._baseboardMat());
-        bb.position.set(A[0] + ux * mid, 105, A[1] + uz * mid);
+        bb.position.set(A[0] + ux * mid + sx, 105, A[1] + uz * mid + sz);
         bb.rotation.y = ang; bb.receiveShadow = true;
         this.modelGroup.add(bb);
       }
@@ -572,9 +577,11 @@ export class Viewer3D {
           let nx = dz / len, nz = -dx / len;                       // 변의 수직
           const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
           if ((mx - cxs) * nx + (mz - czs) * nz < 0) { nx = -nx; nz = -nz; } // 중심 반대(=바깥)로
-          const A = [a[0] + nx * off, a[1] + nz * off], C = [c[0] + nx * off, c[1] + nz * off];
-          this._buildCarvedEdge(A, C, H, T, T, b, // 창/문 자리는 비워 둠
-            (segLen, h) => TEX.exteriorMaterial(ex.material, col, segLen, h, mDef.roughness, mDef.metalness));
+          // 개구부는 '원래 외벽선(a→c)'에서 찾고(창·문 위치는 여기 있음), 마감 박스만
+          //   바깥으로 off 만큼 평행이동해 그린다 → 겹침 없이 창/문 구멍 유지.
+          this._buildCarvedEdge(a, c, H, T, T, b,
+            (segLen, h) => TEX.exteriorMaterial(ex.material, col, segLen, h, mDef.roughness, mDef.metalness),
+            { shift: [nx * off, nz * off], tol: off + 350 });
         }
       }
       return;

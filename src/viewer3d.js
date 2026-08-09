@@ -558,12 +558,22 @@ export class Viewer3D {
     const oshapes = outlineShapes(d.outline);
     if (oshapes.length) {
       const H = ceilH + 120;
+      // 외장재는 외벽 '바깥면'에 덧대야 한다. 외벽선 위에 겹쳐 그리면 두 벽이
+      //   같은 자리에 겹쳐 z-fighting(깜빡임·얼룩)으로 지저분해진다. 각 변을
+      //   바깥 법선 방향으로 (외벽두께/2 + 마감두께/2)만큼 밀어 겹치지 않게 함.
+      const off = (d.wallThickness || 150) / 2 + T / 2;
       for (const { pts, closed } of oshapes) {
         const P = pts.map((p) => this._p(p[0], p[1], b));
         const n = P.length;
+        let cxs = 0, czs = 0; for (const p of P) { cxs += p[0]; czs += p[1]; } cxs /= n; czs /= n;
         for (let i = 0; i < (closed ? n : n - 1); i++) {
           const a = P[i], c = P[(i + 1) % n];
-          this._buildCarvedEdge(a, c, H, T, T, b, // 창/문 자리는 비워 둠
+          const dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz) || 1;
+          let nx = dz / len, nz = -dx / len;                       // 변의 수직
+          const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
+          if ((mx - cxs) * nx + (mz - czs) * nz < 0) { nx = -nx; nz = -nz; } // 중심 반대(=바깥)로
+          const A = [a[0] + nx * off, a[1] + nz * off], C = [c[0] + nx * off, c[1] + nz * off];
+          this._buildCarvedEdge(A, C, H, T, T, b, // 창/문 자리는 비워 둠
             (segLen, h) => TEX.exteriorMaterial(ex.material, col, segLen, h, mDef.roughness, mDef.metalness));
         }
       }

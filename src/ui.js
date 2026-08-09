@@ -1450,6 +1450,13 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('view-top').onclick = () => viewer.view('top');
   $('view-front').onclick = () => viewer.view('front');
   if ($('view-inside')) $('view-inside').onclick = () => { if (!viewer.active) onModeChange('3d'); viewer.view('interior'); };
+  const editBtn = $('view-edit');
+  if (editBtn) editBtn.onclick = () => {
+    if (!viewer.active) onModeChange('3d');
+    const on = !viewer.editMode; viewer.setEditMode(on);
+    editBtn.classList.toggle('on', on);
+    flash(on ? '3D 편집 — 방을 클릭해 드래그로 이동, 빨간 모서리로 크기조절 (빈 곳 드래그=회전)' : '3D 편집 종료');
+  };
 
   // 키보드 단축키
   window.addEventListener('keydown', (e) => {

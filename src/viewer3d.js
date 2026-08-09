@@ -46,6 +46,14 @@ export class Viewer3D {
     this.wallOpacity = 1;       // 3D 벽 투명도 (1=불투명) — 내부 들여다보기
     this.floorOpacity = 1;      // 3D 바닥 투명도 (1=불투명)
 
+    // 3D 직접 편집 (방 선택·이동·크기조절)
+    this.editMode = false;
+    this._raycaster = new THREE.Raycaster();
+    this._edrag = null;
+    cv.addEventListener('pointerdown', (e) => this._edDown(e));
+    cv.addEventListener('pointermove', (e) => this._edMove(e));
+    window.addEventListener('pointerup', () => this._edUp());
+
     store.subscribe(() => { this.dirty = true; });
     window.addEventListener('resize', () => this._resize());
     // 컨테이너 크기 변화를 직접 감지해 캔버스를 맞춤 (3D 탭 표시/창 크기 변화 등)
@@ -162,6 +170,9 @@ export class Viewer3D {
     if (this.showExterior) this._buildExterior(d, b, H);
     if (this.showRoof) this._buildRoof(d, b, H);
 
+    // 편집 모드: 선택된 방에 모서리 핸들 표시
+    if (this.editMode && store.selectedRoom) this._buildEditHandles(d, b);
+
     if (this._firstFrame === undefined) { this._firstFrame = false; this.resetCamera(b); }
     else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
   }
@@ -202,6 +213,7 @@ export class Viewer3D {
       TEX.floorMaterial(room.type, t.color, room.w, room.d)
     );
     floor.position.set(px + room.w / 2, 30, pz + room.d / 2);
+    floor.userData.roomId = room.id;   // 3D 편집: 방 선택용
     floor.receiveShadow = true;
     if (this.floorOpacity < 1) { floor.material.transparent = true; floor.material.opacity = this.floorOpacity; }
     this.modelGroup.add(floor);
@@ -766,6 +778,82 @@ export class Viewer3D {
   }
 
   // 외부에서 카메라 프리셋
+  // --- 3D 직접 편집 (방 이동·크기조절) ---
+  setEditMode(on) {
+    this.editMode = !!on;
+    if (!on) { if (store.selectedRoom) { store.selectedRoom = null; store.emit(); } }
+    this.dirty = true;
+  }
+  _buildEditHandles(d, b) {
+    const room = d.rooms.find((r) => r.id === store.selectedRoom); if (!room) return;
+    // 선택 방 강조(테두리)
+    const [px, pz] = this._p(room.x, room.y, b);
+    const ring = new THREE.Mesh(new THREE.BoxGeometry(room.w, 40, room.d),
+      new THREE.MeshStandardMaterial({ color: '#c8102e', transparent: true, opacity: 0.18 }));
+    ring.position.set(px + room.w / 2, 70, pz + room.d / 2); this.modelGroup.add(ring);
+    // 모서리 핸들 4개
+    const corners = [['nw', room.x, room.y], ['ne', room.x + room.w, room.y], ['sw', room.x, room.y + room.d], ['se', room.x + room.w, room.y + room.d]];
+    for (const [name, cxmm, cymm] of corners) {
+      const [hx, hz] = this._p(cxmm, cymm, b);
+      const h = new THREE.Mesh(new THREE.BoxGeometry(360, 360, 360),
+        new THREE.MeshStandardMaterial({ color: '#c8102e', metalness: 0.2, roughness: 0.5 }));
+      h.position.set(hx, 260, hz); h.userData = { handle: name, roomId: room.id };
+      this.modelGroup.add(h);
+    }
+  }
+  _ndc(e) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 };
+  }
+  _groundHit(e) {   // 화면 포인터 → 지면(y=0) 평면상의 도면 좌표(mm)
+    this._raycaster.setFromCamera(this._ndc(e), this.camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const t = new THREE.Vector3();
+    if (!this._raycaster.ray.intersectPlane(plane, t)) return null;
+    const b = this._bounds();
+    return { x: t.x + b.cx, y: t.z + b.cz };
+  }
+  _pick(e) {        // 핸들/방 선택 (핸들 우선)
+    this._raycaster.setFromCamera(this._ndc(e), this.camera);
+    const hits = this._raycaster.intersectObjects(this.modelGroup.children, true);
+    for (const h of hits) { const u = h.object.userData || {}; if (u.handle) return u; }
+    for (const h of hits) { const u = h.object.userData || {}; if (u.roomId) return u; }
+    return null;
+  }
+  _edDown(e) {
+    if (!this.editMode) return;
+    const pick = this._pick(e);
+    if (!pick) return;                    // 빈 곳 → 궤도(회전) 그대로
+    const room = store.design.rooms.find((r) => r.id === pick.roomId); if (!room) return;
+    const g = this._groundHit(e); if (!g) return;
+    if (store.selectedRoom !== room.id) { store.selectedRoom = room.id; store.emit(); }
+    this.controls.enabled = false;        // 드래그 중 회전 정지
+    this._edrag = pick.handle
+      ? { mode: 'resize', room, handle: pick.handle }
+      : { mode: 'move', room, dx: g.x - room.x, dy: g.y - room.y };
+  }
+  _edMove(e) {
+    if (!this._edrag) return;
+    const g = this._groundHit(e); if (!g) return;
+    const snap = (v) => Math.round(v / 100) * 100;
+    const dr = this._edrag, room = dr.room;
+    if (dr.mode === 'move') {
+      store.liveUpdate(() => { room.x = snap(g.x - dr.dx); room.y = snap(g.y - dr.dy); });
+    } else {
+      const MIN = 800; let { x, y, w, d: dd } = room; const right = x + w, bottom = y + dd;
+      const mx = snap(g.x), my = snap(g.y);
+      if (dr.handle.includes('w')) { x = Math.min(mx, right - MIN); w = right - x; }
+      if (dr.handle.includes('e')) { w = Math.max(MIN, mx - x); }
+      if (dr.handle.includes('n')) { y = Math.min(my, bottom - MIN); dd = bottom - y; }
+      if (dr.handle.includes('s')) { dd = Math.max(MIN, my - y); }
+      store.liveUpdate(() => { room.x = x; room.y = y; room.w = w; room.d = dd; });
+    }
+  }
+  _edUp() {
+    if (this._edrag) { this._edrag = null; store.liveEnd(); }
+    this.controls.enabled = true;
+  }
+
   view(type) {
     const b = this._bounds();
     if (type === 'interior') {

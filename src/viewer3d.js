@@ -30,6 +30,7 @@ export class Viewer3D {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI / 2.05;
+    this.controls.zoomSpeed = 0.5;      // 휠 한 칸당 이동을 작게 → 2D처럼 조금씩 확대/축소
 
     // WebGL 컨텍스트 손실(반복 탭 전환/GPU 상황) → 흰 화면 방지: 복구 시 재빌드
     const cv = this.renderer.domElement;
@@ -202,8 +203,8 @@ export class Viewer3D {
   }
   _aerialZoomLimits(b) {              // 조감(외부) 시점 휠 줌 한계
     const m = Math.max(b.w, b.h);
-    this.controls.minDistance = m * 0.25 + 2000;   // 너무 당겨 집을 통과하지 않게
-    this.controls.maxDistance = m * 3.5 + 40000;   // 너무 밀어 사라지지 않게
+    this.controls.minDistance = m * 0.55 + 4000;   // 최대 확대 시에도 바닥 속으로 들어가지 않게
+    this.controls.maxDistance = m * 2.0 + 15000;   // 최대 축소 시에도 집이 점처럼 작아지지 않게
   }
 
   _buildRoom(room, b, ceilH) {

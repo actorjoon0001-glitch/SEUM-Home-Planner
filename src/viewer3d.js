@@ -197,7 +197,13 @@ export class Viewer3D {
     const dist = Math.max(b.w, b.h) * 1.1 + 5000;
     this.camera.position.set(dist * 0.65, dist * 0.8, dist * 0.85);
     this.controls.target.set(0, 0, 0);
+    this._aerialZoomLimits(b);        // 휠 줌 범위 제한 → 집 통과·무한 축소로 사라지는 것 방지
     this.controls.update();
+  }
+  _aerialZoomLimits(b) {              // 조감(외부) 시점 휠 줌 한계
+    const m = Math.max(b.w, b.h);
+    this.controls.minDistance = m * 0.25 + 2000;   // 너무 당겨 집을 통과하지 않게
+    this.controls.maxDistance = m * 3.5 + 40000;   // 너무 밀어 사라지지 않게
   }
 
   _buildRoom(room, b, ceilH) {
@@ -862,6 +868,7 @@ export class Viewer3D {
       this.camera.fov = 62; this.camera.updateProjectionMatrix();
       this.controls.maxPolarAngle = Math.PI * 0.9;   // 살짝 아래(바닥·가구)까지 볼 수 있게
       this.controls.minDistance = 400;
+      this.controls.maxDistance = Math.max(b.w, b.h) * 1.5 + 8000;
       this.camera.position.set(-(b.w / 2 - 700), 1450, (b.h / 2 - 700));
       this.controls.target.set(b.w * 0.06, 1120, -(b.h * 0.36));
       this.controls.update();
@@ -870,6 +877,7 @@ export class Viewer3D {
     // 외부(조감) 시점 프리셋
     this.camera.fov = 50; this.camera.updateProjectionMatrix();
     this.controls.maxPolarAngle = Math.PI / 2.05;    // 지면 아래로는 못 내려가게
+    this._aerialZoomLimits(b);                        // 휠 줌 범위 제한
     const d = Math.max(b.w, b.h) * 1.1 + 5000;
     if (type === 'top') this.camera.position.set(0, d * 1.4, 1);
     else if (type === 'front') this.camera.position.set(0, d * 0.4, d);

@@ -168,6 +168,7 @@ export class Viewer3D {
 
     if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
     for (const room of d.rooms) this._buildRoom(room, b, H);
+    this._buildInteriorWalls(d, b, H);          // 방 벽(겹친 벽은 한 겹으로 합침)
     for (const o of (d.openings || [])) this._buildOpening(o, b);
     for (const f of d.furniture) this._buildFurniture(f, b, H);
 
@@ -245,12 +246,7 @@ export class Viewer3D {
 
     if (isOpen) return; // 발코니는 벽 생략(난간 느낌)
 
-    // 개방형 공간: 지정된 면(open)은 벽 생략 → 거실·주방 트인 구조 표현
-    // 그 외 벽은 창/문 개구부 자리를 비워(실제로 뚫어) 생성
-    const open = Array.isArray(room.open) ? room.open : [];
-    for (const side of ['n', 's', 'w', 'e']) {
-      if (!open.includes(side)) this._buildWall(room, side, wallH, b);
-    }
+    // 벽은 방마다 그리지 않고 _buildInteriorWalls 에서 한 번에(겹친 벽 합침).
 
     // 다락은 경사 지붕 표현
     if (isAttic) {
@@ -265,13 +261,57 @@ export class Viewer3D {
     }
   }
 
+  // 내벽 전체 — 방마다 4면을 각자 그리면 맞닿은 두 방 경계에 벽이 겹쳐(두 겹)
+  //   지저분해진다. 모든 방의 벽 세그먼트를 모아 같은 선·같은 높이끼리 구간을
+  //   합쳐 '한 겹'으로 그린다. 개구부(문/창)는 _buildCarvedEdge 가 벽선 위 위치를
+  //   기하로 판정해 뚫으므로, 맞닿은 방 사이 문도 그대로 관통한다.
+  _buildInteriorWalls(d, b, ceilH) {
+    const LINE_TOL = 60;   // 같은 벽선으로 볼 허용치(mm)
+    // 1) 방 벽 세그먼트 수집 — o:0 수평(y=line, x:a..b) / o:1 수직(x=line, y:a..b)
+    const segs = [];
+    for (const room of d.rooms) {
+      if (OPEN_ROOM_TYPES.includes(room.type)) continue;   // 발코니 등 벽 없음
+      const h = room.type === 'attic' ? ATTIC_HEIGHT : ceilH;
+      const open = Array.isArray(room.open) ? room.open : [];
+      const x2 = room.x + room.w, y2 = room.y + room.d;
+      if (!open.includes('n')) segs.push({ o: 0, line: room.y, a: room.x, b: x2, h });
+      if (!open.includes('s')) segs.push({ o: 0, line: y2, a: room.x, b: x2, h });
+      if (!open.includes('w')) segs.push({ o: 1, line: room.x, a: room.y, b: y2, h });
+      if (!open.includes('e')) segs.push({ o: 1, line: x2, a: room.y, b: y2, h });
+    }
+    // 2) (방향·선·높이)로 묶기
+    const groups = new Map();
+    for (const s of segs) {
+      const k = s.o + '|' + Math.round(s.line / LINE_TOL) + '|' + Math.round(s.h);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(s);
+    }
+    const wallMat = this._wallMat();
+    for (const arr of groups.values()) {
+      const o = arr[0].o, h = arr[0].h;
+      const line = arr.reduce((t, s) => t + s.line, 0) / arr.length;   // 대표 선값(평균)
+      // 3) 겹치는 구간 병합 → 유니온
+      const iv = arr.map((s) => [Math.min(s.a, s.b), Math.max(s.a, s.b)]).sort((p, q) => p[0] - q[0]);
+      const merged = [];
+      for (const [a, bb] of iv) {
+        const last = merged[merged.length - 1];
+        if (last && a <= last[1] + 1) last[1] = Math.max(last[1], bb);
+        else merged.push([a, bb]);
+      }
+      // 4) 각 구간을 한 벽으로 (개구부는 기하로 뚫림), 걸레받이 포함
+      for (const [a, bb] of merged) {
+        const A = o === 0 ? this._p(a, line, b) : this._p(line, a, b);
+        const B = o === 0 ? this._p(bb, line, b) : this._p(line, bb, b);
+        this._buildCarvedEdge(A, B, h, WALL_T, WALL_T / 2, b, () => wallMat, { baseboard: true });
+      }
+    }
+  }
+
   // 한 벽면(room+side) 위에 놓인 개구부들을 축 좌표로 정리 (a..c2, sill, top)
-  //   소속 방과 무관하게 '이 벽선 위'에 있는 문/창을 모두 뚫는다 → 두 방이 맞닿은
-  //   경계(주방↔방 등)에서 문이 양쪽 벽을 관통해 3D에서도 실제로 통하게 됨.
+  //   소속 방과 무관하게 '이 벽선 위'의 문/창을 모두 잡음. (외장재 마감에서 사용)
   _collectOps(room, side, L) {
-    const TOL = 300;               // 맞닿은 두 벽 사이 간격 허용치(mm)
+    const TOL = 300;
     const horiz = (side === 'n' || side === 's');
-    // 이 벽선의 시작점 P0 과 진행 방향 dir (mm 좌표)
     let P0, dir;
     if (side === 'n') { P0 = [room.x, room.y]; dir = [1, 0]; }
     else if (side === 's') { P0 = [room.x, room.y + room.d]; dir = [1, 0]; }
@@ -280,11 +320,11 @@ export class Viewer3D {
     const out = [];
     for (const o of (store.design.openings || [])) {
       const w = this._openingWorld(o); if (!w) continue;
-      if (w.free) continue;                 // 자유 배치 개구부는 벽을 뚫지 않음
-      if (w.horiz !== horiz) continue;      // 벽 방향과 개구부 방향 일치
+      if (w.free) continue;
+      if (w.horiz !== horiz) continue;
       const vx = w.cx - P0[0], vy = w.cy - P0[1];
-      const t = vx * dir[0] + vy * dir[1];               // 벽을 따라간 위치
-      const perp = Math.abs(-vx * dir[1] + vy * dir[0]); // 벽선과의 수직 거리
+      const t = vx * dir[0] + vy * dir[1];
+      const perp = Math.abs(-vx * dir[1] + vy * dir[0]);
       if (perp > TOL) continue;
       if (t < -w.half || t > L + w.half) continue;
       const a = Math.max(0, t - w.half), c2 = Math.min(L, t + w.half);
@@ -311,30 +351,6 @@ export class Viewer3D {
     return rects;
   }
 
-  // 내벽: 개구부 자리를 비워(뚫어) 벽을 분할 생성
-  _buildWall(room, side, wallH, b) {
-    const [px, pz] = this._p(room.x, room.y, b);
-    const horiz = (side === 'n' || side === 's');
-    const L = horiz ? room.w : room.d;
-    const ops = this._collectOps(room, side, L);
-    const rects = this._wallRects(L, ops, wallH, WALL_T / 2);
-    const mat = this._wallMat();
-    for (const [a, bEnd, yLo, yHi] of rects) {
-      const len = bEnd - a, h = yHi - yLo;
-      if (len < 1 || h < 1) continue;
-      let cx, cz, w, dep;
-      if (horiz) { cx = px + (a + bEnd) / 2; cz = (side === 'n') ? pz : pz + room.d; w = len; dep = WALL_T; }
-      else       { cz = pz + (a + bEnd) / 2; cx = (side === 'w') ? px : px + room.w; w = WALL_T; dep = len; }
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dep), mat);
-      m.position.set(cx, (yLo + yHi) / 2, cz); m.castShadow = true; m.receiveShadow = true;
-      this.modelGroup.add(m);
-      // 걸레받이(바닥 몰딩) — 바닥에 닿는 벽 하단에 살짝 튀어나온 띠
-      if (yLo < 80) {
-        const bb = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : dep + 24, 90, horiz ? dep + 24 : len), this._baseboardMat());
-        bb.position.set(cx, 105, cz); bb.receiveShadow = true; this.modelGroup.add(bb);
-      }
-    }
-  }
   _baseboardMat() { return this.__bbMat || (this.__bbMat = new THREE.MeshStandardMaterial({ color: '#e7e2d8', roughness: 0.75 })); }
 
   // 창호: 벽면에 끼워지는 창틀 + 유리(또는 문짝)
@@ -470,7 +486,7 @@ export class Viewer3D {
   }
 
   // 외곽/외장 한 변을 개구부 자리를 비워(뚫어) 만든다 (내벽 _buildWall 과 동일 원리)
-  _buildCarvedEdge(A, B, wallH, T, ext, b, matFn) {
+  _buildCarvedEdge(A, B, wallH, T, ext, b, matFn, opts) {
     const dx = B[0] - A[0], dz = B[1] - A[1];
     const len = Math.hypot(dx, dz); if (len < 1) return;
     const ux = dx / len, uz = dz / len;
@@ -486,6 +502,13 @@ export class Viewer3D {
       m.rotation.y = ang;
       m.castShadow = true; m.receiveShadow = true;
       this.modelGroup.add(m);
+      // 걸레받이(바닥 몰딩) — 바닥에 닿는 벽 하단(문 개구부 자리는 rect가 없어 자동으로 비워짐)
+      if (opts && opts.baseboard && yLo < 80) {
+        const bb = new THREE.Mesh(new THREE.BoxGeometry(segLen, 90, T + 24), this._baseboardMat());
+        bb.position.set(A[0] + ux * mid, 105, A[1] + uz * mid);
+        bb.rotation.y = ang; bb.receiveShadow = true;
+        this.modelGroup.add(bb);
+      }
     }
   }
 

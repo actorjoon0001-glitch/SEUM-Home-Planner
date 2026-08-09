@@ -1461,8 +1461,9 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   // 키보드 단축키
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); store.undo(); }
-    else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); store.redo(); }
+    // 물리 키(e.code)로 판정 → 한글 입력모드에서도 Ctrl+Z 동작 (e.key 는 'ㅋ' 이 되어 실패)
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); }
+    else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') { e.preventDefault(); store.redo(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') {
       if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
       else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });

@@ -30,7 +30,7 @@ export function buildUI({ editor, viewer, onModeChange }) {
   store.subscribe(() => renderProperties(editor));
   renderProperties(editor);
   handleShareLink();
-  initAiChat({ flash });   // 🤖 AI 도면 편집 채팅 (우하단 버튼)
+  initAiChat({ flash, onShowRoof: showRoof, onShowExterior: showExterior });   // 🤖 AI 도면 편집 채팅 (우하단 버튼)
 }
 
 // ---------------------------------------------------------------------------

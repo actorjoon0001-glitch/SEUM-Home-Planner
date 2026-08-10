@@ -16,6 +16,7 @@ const ROOM_LABELS = {
 const WIN_TYPES = ['double', 'sliding', 'casement', 'casement2', 'fixed', 'foldWin', 'balcony',
   'door', 'swingDoor', 'doubleDoor', 'slideDoor', 'pocketDoor', 'pivotDoor', 'folding'];
 const EXT_MATERIALS = ['metal', 'cement', 'ceramic', 'stucco', 'brick', 'wood', 'stone'];
+const ROOF_TYPES = ['flat', 'gable', 'asymGable', 'hip', 'shed'];
 
 const TOOLS = [
   {
@@ -61,6 +62,10 @@ const TOOLS = [
   {
     name: 'set_exterior', description: '집 외장재(외벽 마감)를 바꾼다.',
     input_schema: { type: 'object', additionalProperties: false, properties: { material: { type: 'string', enum: EXT_MATERIALS }, color: { type: 'string', description: '색상 hex(선택), 예: #b7bdc4' } }, required: ['material'] },
+  },
+  {
+    name: 'set_roof', description: '지붕 형태를 바꾼다. flat(평지붕)/gable(박공)/asymGable(비대칭 박공)/hip(우진각·모임)/shed(외쪽).',
+    input_schema: { type: 'object', additionalProperties: false, properties: { roof_type: { type: 'string', enum: ROOF_TYPES }, color: { type: 'string', description: '색상 hex(선택)' } }, required: ['roof_type'] },
   },
   {
     name: 'add_floor', description: '현재 층을 복제해 위층(복층)을 추가한다.',

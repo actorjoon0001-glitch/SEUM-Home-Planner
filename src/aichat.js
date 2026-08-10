@@ -19,6 +19,7 @@ function summarize() {
     rooms: (d.rooms || []).map((r) => ({ id: r.id, type: r.type, name: r.name || '', x: r.x, y: r.y, w: r.w, d: r.d })),
     openings: (d.openings || []).map((o) => ({ id: o.id, roomId: o.roomId, side: o.side, winType: o.winType })),
     exterior: d.exterior || null,
+    roof: d.roof || null,
     floors: Array.isArray(d.floors) ? d.floors.length : 1,
     activeFloor: d.activeFloor || 0,
   };
@@ -56,6 +57,7 @@ function applyOps(ops) {
               break;
             }
             case 'set_exterior': { d.exterior = d.exterior || {}; d.exterior.material = p.material; if (p.color) d.exterior.color = p.color; applied++; break; }
+            case 'set_roof': { d.roof = d.roof || {}; d.roof.type = p.roof_type; if (p.color) d.roof.color = p.color; applied++; break; }
           }
         } catch (e) { /* 한 명령 실패해도 나머지 계속 */ }
       }
@@ -67,7 +69,7 @@ function applyOps(ops) {
 
 const OP_LABEL = {
   add_room: '공간 추가', move_room: '공간 이동', resize_room: '크기 조절', delete_room: '공간 삭제',
-  rename_room: '이름 변경', add_opening: '창/문 추가', set_exterior: '외장재 변경', add_floor: '위층 추가',
+  rename_room: '이름 변경', add_opening: '창/문 추가', set_exterior: '외장재 변경', set_roof: '지붕 변경', add_floor: '위층 추가',
 };
 
 export function initAiChat(opts = {}) {

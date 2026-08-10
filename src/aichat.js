@@ -74,6 +74,9 @@ const OP_LABEL = {
 
 export function initAiChat(opts = {}) {
   const flash = opts.flash || (() => {});
+  // 지붕/외장재를 바꾸면 3D 표시(+툴바 버튼)를 자동으로 켜서 결과가 바로 보이게
+  const onShowRoof = opts.onShowRoof || (() => {});
+  const onShowExterior = opts.onShowExterior || (() => {});
   if (document.getElementById('ai-chat-btn')) return;
 
   // 스타일 주입
@@ -150,6 +153,11 @@ export function initAiChat(opts = {}) {
       else {
         const ops = data.ops || [];
         const applied = ops.length ? applyOps(ops) : 0;
+        // 지붕/외장재를 바꿨으면 3D에서 그 표시를 자동으로 켜서 결과가 바로 보이게
+        if (applied) {
+          if (ops.some((o) => o.name === 'set_roof')) onShowRoof();
+          if (ops.some((o) => o.name === 'set_exterior')) onShowExterior();
+        }
         let reply = data.text || '';
         if (applied) { const names = [...new Set(ops.map((o) => OP_LABEL[o.name] || o.name))].join(', '); reply = (reply ? reply + '\n' : '') + `✅ 적용: ${names} (${applied}건)`; flash('AI가 도면을 수정했어요 — 되돌리려면 Ctrl+Z'); }
         else if (!reply) reply = '적용할 변경이 없었어요.';

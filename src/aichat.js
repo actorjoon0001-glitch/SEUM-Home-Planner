@@ -4,7 +4,7 @@
 //   API 키는 서버에만 있고 프론트엔드엔 없다.
 
 import { store } from './store.js';
-import { opening } from './data.js';
+import { opening, WINDOW_TYPES } from './data.js';
 
 const ENDPOINT = (window.SEUM_CONFIG && window.SEUM_CONFIG.aiEndpoint) || '/.netlify/functions/ai-edit';
 const OPEN_TYPES = ['balcony', 'deck', 'porch'];
@@ -56,6 +56,11 @@ function applyOps(ops) {
               if (r) { const span = (p.side === 'n' || p.side === 's') ? r.w : r.d; d.openings.push(opening(r.id, p.side, span / 2, p.win_type || 'double')); applied++; }
               break;
             }
+            case 'change_opening': {
+              const o = (d.openings || []).find((x) => x.id === p.opening_id);
+              if (o) { o.winType = p.win_type; const t = WINDOW_TYPES[p.win_type]; if (t) { o.w = t.w; o.h = t.h; o.sill = t.sill; } applied++; }
+              break;
+            }
             case 'set_exterior': { d.exterior = d.exterior || {}; d.exterior.material = p.material; if (p.color) d.exterior.color = p.color; applied++; break; }
             case 'set_roof': { d.roof = d.roof || {}; d.roof.type = p.roof_type; if (p.color) d.roof.color = p.color; applied++; break; }
           }
@@ -69,7 +74,7 @@ function applyOps(ops) {
 
 const OP_LABEL = {
   add_room: '공간 추가', move_room: '공간 이동', resize_room: '크기 조절', delete_room: '공간 삭제',
-  rename_room: '이름 변경', add_opening: '창/문 추가', set_exterior: '외장재 변경', set_roof: '지붕 변경', add_floor: '위층 추가',
+  rename_room: '이름 변경', add_opening: '창/문 추가', change_opening: '창/문 종류 변경', set_exterior: '외장재 변경', set_roof: '지붕 변경', add_floor: '위층 추가',
 };
 
 export function initAiChat(opts = {}) {

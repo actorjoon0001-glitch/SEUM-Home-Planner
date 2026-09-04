@@ -60,6 +60,31 @@ const TOOLS = [
     },
   },
   {
+    name: 'split_room', description: '기존 방을 벽으로 둘로 나눈다(= 벽 세우기). direction: vertical=세로벽(방을 좌·우로 나눔), horizontal=가로벽(위·아래로 나눔). ratio=원래 방 쪽(왼/위) 비율 0.15~0.85. 새로 생긴 조각에 종류·이름 지정 가능.',
+    input_schema: {
+      type: 'object', additionalProperties: false,
+      properties: {
+        room_id: { type: 'string' }, direction: { type: 'string', enum: ['vertical', 'horizontal'] },
+        ratio: { type: 'number', description: '원래 방(왼쪽/위쪽) 비율. 기본 0.5' },
+        new_type: { type: 'string', enum: ROOM_TYPES, description: '새 조각 종류(선택)' },
+        new_name: { type: 'string', description: '새 조각 이름(선택)' },
+      },
+      required: ['room_id', 'direction'],
+    },
+  },
+  {
+    name: 'auto_outline', description: '현재 방들의 바깥 둘레를 따라 집 외벽(외곽선)을 자동으로 두른다.',
+    input_schema: { type: 'object', additionalProperties: false, properties: {} },
+  },
+  {
+    name: 'set_outline_rect', description: '집 외벽(외곽선)을 직사각형으로 지정한다(좌상단 x,y + 가로 w·세로 d, mm).',
+    input_schema: { type: 'object', additionalProperties: false, properties: { x: { type: 'number' }, y: { type: 'number' }, w: { type: 'number' }, d: { type: 'number' } }, required: ['x', 'y', 'w', 'd'] },
+  },
+  {
+    name: 'clear_outline', description: '집 외벽(외곽선)을 제거한다.',
+    input_schema: { type: 'object', additionalProperties: false, properties: {} },
+  },
+  {
     name: 'change_opening', description: '이미 있는 창/문의 종류를 바꾼다(예: 창문을 여닫이문으로). 도면 요약의 openings[].id 로 지정.',
     input_schema: { type: 'object', additionalProperties: false, properties: { opening_id: { type: 'string' }, win_type: { type: 'string', enum: WIN_TYPES } }, required: ['opening_id', 'win_type'] },
   },
@@ -88,6 +113,8 @@ function systemPrompt() {
     '- 사용자가 특정 공간을 가리키면 현재 도면 목록에서 room_id 로 찾아 그 id 를 도구에 넣어라. 이름이 없으면 종류·위치로 추정.',
     '- "넓혀줘/줄여줘/옮겨줘"는 현재 값 기준 상대 계산해서 절대값으로 도구 호출. (예: 3000→오른쪽 1m 확장이면 w=4000)',
     '- 새 방은 기존 방들과 겹치지 않게 적당한 빈 자리에 배치. 크기 지정 없으면 방 3000x3000, 화장실 2000x2000 정도 기본값.',
+    '- 벽: 독립 벽 객체는 없다. "방을 나눠 벽을 세운다"는 split_room 으로. 집 외벽(외곽선)은 auto_outline(방 둘레 자동)/set_outline_rect(직사각형)/clear_outline 으로 다룬다.',
+    '- "재배치/재구성"은 add_room·move_room·resize_room·delete_room 을 조합해 실행하고, 필요하면 마지막에 auto_outline 으로 외벽을 다시 둘러라. 방들이 서로 겹치지 않게 배치.',
     '- 창/문 구분: winType 중 door·swingDoor·doubleDoor·slideDoor·pocketDoor·pivotDoor·folding 은 "문", 나머지(double·sliding·casement·fixed 등)는 "창문". 문을 원하면 문 종류를 써라.',
     '- 애매하면 실행하지 말고 한 문장으로 짧게 되물어라.',
     '항상 마지막에 무엇을 했는지 한국어 한두 문장으로 짧게 설명하라.',

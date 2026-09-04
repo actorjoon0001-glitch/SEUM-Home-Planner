@@ -65,7 +65,7 @@ export function initFacePaint(opts = {}) {
       onNeed3D(); onShowExterior();
       if (!viewer.faceBrush) select(Object.keys(EXTERIOR_MATERIALS)[0]);
       else { const b = viewer.faceBrush; select(b.material || '__default__'); }
-      flash('면별 외장재 — 재질을 고르고 외벽 면을 클릭하세요 (기본↺ = 되돌림)');
+      flash('면별 외장재 — 재질 고르고: 클릭=면 전체, 드래그=드래그한 폭만큼 포인트 띠 (기본↺=되돌림)');
     } else flash('면별 외장재 종료');
   };
 }

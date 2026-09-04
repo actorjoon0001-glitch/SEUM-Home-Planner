@@ -52,6 +52,9 @@ export class Viewer3D {
 
     // 3D 직접 편집 (방 선택·이동·크기조절)
     this.editMode = false;
+    // 면별 외장재 — 벽 면을 클릭해 재질 칠하기
+    this.faceMode = false;
+    this.faceBrush = null;   // { material, color } 또는 { material:null }(=기본으로 되돌림)
     this._raycaster = new THREE.Raycaster();
     this._edrag = null;
     cv.addEventListener('pointerdown', (e) => this._edDown(e));
@@ -506,6 +509,7 @@ export class Viewer3D {
       m.position.set(A[0] + ux * mid + sx, (yLo + yHi) / 2, A[1] + uz * mid + sz);
       m.rotation.y = ang;
       m.castShadow = true; m.receiveShadow = true;
+      if (opts && opts.userData) m.userData = { ...opts.userData };   // 면별 외장재 클릭 식별
       this.modelGroup.add(m);
       // 걸레받이(바닥 몰딩) — 바닥에 닿는 벽 하단(문 개구부 자리는 rect가 없어 자동으로 비워짐)
       if (opts && opts.baseboard && yLo < 80) {
@@ -554,8 +558,10 @@ export class Viewer3D {
   // 외장재: 외곽(outline)이 있으면 그 둘레를, 없으면 방 외벽에 마감을 입힘
   _buildExterior(d, b, ceilH) {
     const ex = d.exterior || {};
-    const mDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
+    const baseMat = ex.material || 'cement';
+    const mDef = EXTERIOR_MATERIALS[baseMat] || EXTERIOR_MATERIALS.cement;
     const col = ex.color || mDef.color;
+    const faces = d.exteriorFaces || {};    // 면별 외장재 오버라이드 { "p0e2": {material,color} }
     const T = 120;            // 벽 바깥에 덧대는 외장 마감 두께
     const EPS = 60;           // 벽 바로 바깥 지점으로 외곽 여부 판정
 
@@ -567,7 +573,7 @@ export class Viewer3D {
       //   같은 자리에 겹쳐 z-fighting(깜빡임·얼룩)으로 지저분해진다. 각 변을
       //   바깥 법선 방향으로 (외벽두께/2 + 마감두께/2)만큼 밀어 겹치지 않게 함.
       const off = (d.wallThickness || 150) / 2 + T / 2;
-      for (const { pts, closed } of oshapes) {
+      oshapes.forEach(({ pts, closed }, pi) => {
         const P = pts.map((p) => this._p(p[0], p[1], b));
         const n = P.length;
         let cxs = 0, czs = 0; for (const p of P) { cxs += p[0]; czs += p[1]; } cxs /= n; czs /= n;
@@ -577,13 +583,19 @@ export class Viewer3D {
           let nx = dz / len, nz = -dx / len;                       // 변의 수직
           const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
           if ((mx - cxs) * nx + (mz - czs) * nz < 0) { nx = -nx; nz = -nz; } // 중심 반대(=바깥)로
+          // 이 변의 재질 — 면별 오버라이드가 있으면 그것, 없으면 기본 외장재
+          const key = 'p' + pi + 'e' + i;
+          const fo = faces[key];
+          const fMat = (fo && fo.material) || baseMat;
+          const fDef = EXTERIOR_MATERIALS[fMat] || mDef;
+          const fCol = (fo && fo.color) || fDef.color;
           // 개구부는 '원래 외벽선(a→c)'에서 찾고(창·문 위치는 여기 있음), 마감 박스만
           //   바깥으로 off 만큼 평행이동해 그린다 → 겹침 없이 창/문 구멍 유지.
           this._buildCarvedEdge(a, c, H, T, T, b,
-            (segLen, h) => TEX.exteriorMaterial(ex.material, col, segLen, h, mDef.roughness, mDef.metalness),
-            { shift: [nx * off, nz * off], tol: off + 350 });
+            (segLen, h) => TEX.exteriorMaterial(fMat, fCol, segLen, h, fDef.roughness, fDef.metalness),
+            { shift: [nx * off, nz * off], tol: off + 350, userData: { extFace: key } });
         }
-      }
+      });
       return;
     }
 
@@ -866,6 +878,25 @@ export class Viewer3D {
     if (!on) { if (store.selectedRoom) { store.selectedRoom = null; store.emit(); } }
     this.dirty = true;
   }
+  // 면별 외장재 모드 on/off
+  setFaceMode(on) { this.faceMode = !!on; if (!on) this.faceBrush = null; }
+  // 클릭한 외장 면(외곽선 변) 키 찾기
+  _facePick(e) {
+    this._raycaster.setFromCamera(this._ndc(e), this.camera);
+    const hits = this._raycaster.intersectObjects(this.modelGroup.children, true);
+    for (const h of hits) { const u = h.object.userData || {}; if (u.extFace) return u.extFace; }
+    return null;
+  }
+  // 클릭한 면에 현재 붓 재질을 칠함(같은 재질 재클릭·기본 붓이면 오버라이드 제거)
+  _facePaint(key) {
+    const brush = this.faceBrush; if (!brush) return false;
+    store.commit((d) => {
+      d.exteriorFaces = d.exteriorFaces || {};
+      if (!brush.material) delete d.exteriorFaces[key];   // 기본으로 되돌림
+      else d.exteriorFaces[key] = { material: brush.material, color: brush.color };
+    });
+    return true;
+  }
   _buildEditHandles(d, b) {
     const room = d.rooms.find((r) => r.id === store.selectedRoom); if (!room) return;
     // 선택 방 강조(테두리)
@@ -903,6 +934,8 @@ export class Viewer3D {
     return null;
   }
   _edDown(e) {
+    // 면별 외장재 모드: 좌클릭한 외장 면에 재질 칠하기
+    if (this.faceMode && e.button === 0) { const k = this._facePick(e); if (k) { this._facePaint(k); } return; }
     if (!this.editMode) return;
     if (e.button !== 0) return;            // 좌클릭만 편집 — 휠(가운데)·우클릭은 카메라 이동/회전
     const pick = this._pick(e);

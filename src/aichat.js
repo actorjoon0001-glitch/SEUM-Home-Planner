@@ -6,6 +6,9 @@
 import { store } from './store.js';
 import { opening, WINDOW_TYPES } from './data.js';
 
+// 스스로 commit/콜백을 실행하는 명령(메인 commit 뒤에 처리) — 나머지는 한 commit 으로 묶음
+const POST_OPS = new Set(['add_floor', 'auto_outline']);
+
 const ENDPOINT = (window.SEUM_CONFIG && window.SEUM_CONFIG.aiEndpoint) || '/.netlify/functions/ai-edit';
 const OPEN_TYPES = ['balcony', 'deck', 'porch'];
 
@@ -26,9 +29,9 @@ function summarize() {
 }
 
 // AI 편집 명령(ops)을 도면에 적용 → store.commit 으로 되돌리기·3D 갱신 자동
-function applyOps(ops) {
+function applyOps(ops, cb = {}) {
   let applied = 0;
-  const roomOps = ops.filter((o) => o.name !== 'add_floor');
+  const roomOps = ops.filter((o) => !POST_OPS.has(o.name));
   if (roomOps.length) {
     store.commit((d) => {
       d.openings = d.openings || [];
@@ -56,6 +59,28 @@ function applyOps(ops) {
               if (r) { const span = (p.side === 'n' || p.side === 's') ? r.w : r.d; d.openings.push(opening(r.id, p.side, span / 2, p.win_type || 'double')); applied++; }
               break;
             }
+            case 'split_room': {
+              const r = find(p.room_id); if (!r) break;
+              const ratio = Math.min(0.85, Math.max(0.15, +p.ratio || 0.5));
+              const nr = { id: newRoomId(), type: p.new_type || r.type, name: p.new_name || '', open: [] };
+              if (p.direction === 'horizontal') {           // 가로벽 → 위/아래로 나눔
+                const d1 = Math.max(800, Math.round(r.d * ratio));
+                nr.x = r.x; nr.y = r.y + d1; nr.w = r.w; nr.d = Math.max(800, r.d - d1);
+                r.d = d1;
+              } else {                                        // 세로벽 → 좌/우로 나눔
+                const w1 = Math.max(800, Math.round(r.w * ratio));
+                nr.x = r.x + w1; nr.y = r.y; nr.w = Math.max(800, r.w - w1); nr.d = r.d;
+                r.w = w1;
+              }
+              d.rooms.push(nr); applied++; break;
+            }
+            case 'set_outline_rect': {
+              const x = Math.round(+p.x || 0), y = Math.round(+p.y || 0);
+              const w = Math.max(800, Math.round(+p.w || 0)), dd = Math.max(800, Math.round(+p.d || 0));
+              d.outline = { paths: [{ closed: true, points: [[x, y], [x + w, y], [x + w, y + dd], [x, y + dd]] }] };
+              applied++; break;
+            }
+            case 'clear_outline': { d.outline = null; applied++; break; }
             case 'change_opening': {
               const o = (d.openings || []).find((x) => x.id === p.opening_id);
               if (o) { o.winType = p.win_type; const t = WINDOW_TYPES[p.win_type]; if (t) { o.w = t.w; o.h = t.h; o.sill = t.sill; } applied++; }
@@ -68,13 +93,18 @@ function applyOps(ops) {
       }
     });
   }
-  for (const op of ops) if (op.name === 'add_floor') { try { store.addFloorFromCurrent(); applied++; } catch (e) {} }
+  for (const op of ops) {
+    if (op.name === 'add_floor') { try { store.addFloorFromCurrent(); applied++; } catch (e) {} }
+    else if (op.name === 'auto_outline') { try { if (cb.onAutoOutline && cb.onAutoOutline() !== false) applied++; } catch (e) {} }
+  }
   return applied;
 }
 
 const OP_LABEL = {
   add_room: '공간 추가', move_room: '공간 이동', resize_room: '크기 조절', delete_room: '공간 삭제',
-  rename_room: '이름 변경', add_opening: '창/문 추가', change_opening: '창/문 종류 변경', set_exterior: '외장재 변경', set_roof: '지붕 변경', add_floor: '위층 추가',
+  rename_room: '이름 변경', split_room: '방 나누기(벽)', add_opening: '창/문 추가', change_opening: '창/문 종류 변경',
+  auto_outline: '외벽 자동', set_outline_rect: '외벽(사각형)', clear_outline: '외벽 제거',
+  set_exterior: '외장재 변경', set_roof: '지붕 변경', add_floor: '위층 추가',
 };
 
 export function initAiChat(opts = {}) {
@@ -82,6 +112,7 @@ export function initAiChat(opts = {}) {
   // 지붕/외장재를 바꾸면 3D 표시(+툴바 버튼)를 자동으로 켜서 결과가 바로 보이게
   const onShowRoof = opts.onShowRoof || (() => {});
   const onShowExterior = opts.onShowExterior || (() => {});
+  const onAutoOutline = opts.onAutoOutline || (() => false);   // 방 둘레 자동 외벽
   if (document.getElementById('ai-chat-btn')) return;
 
   // 스타일 주입
@@ -157,7 +188,7 @@ export function initAiChat(opts = {}) {
       if (data.error) { add('a', '⚠️ ' + data.error); }
       else {
         const ops = data.ops || [];
-        const applied = ops.length ? applyOps(ops) : 0;
+        const applied = ops.length ? applyOps(ops, { onAutoOutline }) : 0;
         // 지붕/외장재를 바꿨으면 3D에서 그 표시를 자동으로 켜서 결과가 바로 보이게
         if (applied) {
           if (ops.some((o) => o.name === 'set_roof')) onShowRoof();

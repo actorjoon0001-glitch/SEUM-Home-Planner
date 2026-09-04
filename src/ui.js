@@ -10,6 +10,7 @@ import { cloud } from './cloud.js';
 import { dxfToUnderlay } from './dxf.js';
 import { swatchDataURL, EXT_KIND } from './textures.js';
 import { initAiChat } from './aichat.js';
+import { initFacePaint } from './facepaint.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
@@ -31,6 +32,7 @@ export function buildUI({ editor, viewer, onModeChange }) {
   renderProperties(editor);
   handleShareLink();
   initAiChat({ flash, onShowRoof: showRoof, onShowExterior: showExterior, onAutoOutline: () => editor.autoOutline() });   // 🤖 AI 도면 편집 채팅 (우하단 버튼)
+  initFacePaint({ viewer, flash, onShowExterior: showExterior, onNeed3D: () => { if (!viewer.active) onModeChange('3d'); } });   // 🎨 면별 외장재
 }
 
 // ---------------------------------------------------------------------------

@@ -55,6 +55,7 @@ export class Viewer3D {
     // 면별 외장재 — 벽 면을 클릭해 재질 칠하기
     this.faceMode = false;
     this.faceBrush = null;   // { material, color } 또는 { material:null }(=기본으로 되돌림)
+    this._faceDrag = null;   // 면 위 드래그 상태 { key, u0, u1 }
     this._raycaster = new THREE.Raycaster();
     this._edrag = null;
     cv.addEventListener('pointerdown', (e) => this._edDown(e));
@@ -594,6 +595,20 @@ export class Viewer3D {
           this._buildCarvedEdge(a, c, H, T, T, b,
             (segLen, h) => TEX.exteriorMaterial(fMat, fCol, segLen, h, fDef.roughness, fDef.metalness),
             { shift: [nx * off, nz * off], tol: off + 350, userData: { extFace: key } });
+          // 같은 면 안의 포인트 자재 띠 — 기본 마감보다 살짝 앞으로(양각) 덧댐
+          const bands = (fo && Array.isArray(fo.bands)) ? fo.bands : [];
+          const boff = off + 60 + 25;  // 기본 마감 바깥면(off+60) 앞으로 25mm 양각
+          for (const bd of bands) {
+            const u0 = Math.max(0, Math.min(1, Math.min(bd.u0, bd.u1)));
+            const u1 = Math.max(0, Math.min(1, Math.max(bd.u0, bd.u1)));
+            if (u1 - u0 < 0.01) continue;
+            const A2 = [a[0] + (c[0] - a[0]) * u0, a[1] + (c[1] - a[1]) * u0];
+            const C2 = [a[0] + (c[0] - a[0]) * u1, a[1] + (c[1] - a[1]) * u1];
+            const bMat = bd.material || baseMat, bDef = EXTERIOR_MATERIALS[bMat] || mDef, bCol = bd.color || bDef.color;
+            this._buildCarvedEdge(A2, C2, H, 50, 0, b,
+              (segLen, h) => TEX.exteriorMaterial(bMat, bCol, segLen, h, bDef.roughness, bDef.metalness),
+              { shift: [nx * boff, nz * boff], tol: boff + 350, userData: { extFace: key } });
+          }
         }
       });
       return;
@@ -887,15 +902,59 @@ export class Viewer3D {
     for (const h of hits) { const u = h.object.userData || {}; if (u.extFace) return u.extFace; }
     return null;
   }
-  // 클릭한 면에 현재 붓 재질을 칠함(같은 재질 재클릭·기본 붓이면 오버라이드 제거)
+  // 클릭한 면 전체에 현재 붓 재질을 칠함(기본 붓이면 면 재질·띠 모두 제거)
   _facePaint(key) {
     const brush = this.faceBrush; if (!brush) return false;
     store.commit((d) => {
       d.exteriorFaces = d.exteriorFaces || {};
-      if (!brush.material) delete d.exteriorFaces[key];   // 기본으로 되돌림
-      else d.exteriorFaces[key] = { material: brush.material, color: brush.color };
+      if (!brush.material) { delete d.exteriorFaces[key]; return; }   // 기본으로 완전 초기화
+      const fo = d.exteriorFaces[key] || {};
+      fo.material = brush.material; fo.color = brush.color;           // 밴드(fo.bands)는 유지
+      d.exteriorFaces[key] = fo;
     });
     return true;
+  }
+  // 면의 u0~u1 구간(폭)에 자재 띠를 추가. 기본 붓이면 그 구간과 겹치는 띠 제거
+  _facePaintBand(key, u0, u1) {
+    const brush = this.faceBrush; if (!brush) return false;
+    store.commit((d) => {
+      d.exteriorFaces = d.exteriorFaces || {};
+      const fo = d.exteriorFaces[key] || {};
+      if (!brush.material) {
+        if (Array.isArray(fo.bands)) fo.bands = fo.bands.filter((bd) => Math.max(bd.u0, bd.u1) <= u0 || Math.min(bd.u0, bd.u1) >= u1);
+      } else {
+        fo.bands = Array.isArray(fo.bands) ? fo.bands : [];
+        fo.bands.push({ u0, u1, material: brush.material, color: brush.color });
+      }
+      d.exteriorFaces[key] = fo;
+    });
+    return true;
+  }
+  // 외장 면(외곽선 변)의 3D 시작점 A·방향 dir·길이 len (월드 XZ)
+  _faceEdgeInfo(key) {
+    const m = /^p(\d+)e(\d+)$/.exec(key); if (!m) return null;
+    const pi = +m[1], ei = +m[2];
+    const sh = outlineShapes(store.design.outline)[pi]; if (!sh) return null;
+    const pts = sh.pts, n = pts.length; const A0 = pts[ei], B0 = pts[(ei + 1) % n];
+    if (!A0 || !B0) return null;
+    const b = this._bounds();
+    const A = this._p(A0[0], A0[1], b), B = this._p(B0[0], B0[1], b);
+    const dx = B[0] - A[0], dz = B[1] - A[1], len = Math.hypot(dx, dz) || 1;
+    return { A, dir: [dx / len, dz / len], len };
+  }
+  // 클릭 지점의 외장 면 + 변을 따라간 위치(0~1) 반환
+  _facePickAt(e) {
+    this._raycaster.setFromCamera(this._ndc(e), this.camera);
+    const hits = this._raycaster.intersectObjects(this.modelGroup.children, true);
+    for (const h of hits) {
+      const u = h.object.userData || {};
+      if (!u.extFace) continue;
+      const info = this._faceEdgeInfo(u.extFace);
+      let frac = 0.5;
+      if (info && h.point) { const px = h.point.x - info.A[0], pz = h.point.z - info.A[1]; frac = Math.min(1, Math.max(0, (px * info.dir[0] + pz * info.dir[1]) / info.len)); }
+      return { key: u.extFace, u: frac };
+    }
+    return null;
   }
   _buildEditHandles(d, b) {
     const room = d.rooms.find((r) => r.id === store.selectedRoom); if (!room) return;
@@ -934,8 +993,12 @@ export class Viewer3D {
     return null;
   }
   _edDown(e) {
-    // 면별 외장재 모드: 좌클릭한 외장 면에 재질 칠하기
-    if (this.faceMode && e.button === 0) { const k = this._facePick(e); if (k) { this._facePaint(k); } return; }
+    // 면별 외장재 모드: 클릭=면 전체, 드래그=드래그한 폭만큼 자재 띠
+    if (this.faceMode && e.button === 0) {
+      const pick = this._facePickAt(e);
+      if (pick) { this._faceDrag = { key: pick.key, u0: pick.u, u1: pick.u }; this.controls.enabled = false; }
+      return;
+    }
     if (!this.editMode) return;
     if (e.button !== 0) return;            // 좌클릭만 편집 — 휠(가운데)·우클릭은 카메라 이동/회전
     const pick = this._pick(e);
@@ -949,6 +1012,11 @@ export class Viewer3D {
       : { mode: 'move', room, dx: g.x - room.x, dy: g.y - room.y };
   }
   _edMove(e) {
+    if (this._faceDrag) {   // 면별 외장재 드래그 — 같은 면 위에서만 폭 갱신
+      const pick = this._facePickAt(e);
+      if (pick && pick.key === this._faceDrag.key) this._faceDrag.u1 = pick.u;
+      return;
+    }
     if (!this._edrag) return;
     const g = this._groundHit(e); if (!g) return;
     // 드래그당 한 번만 스냅샷 → Ctrl+Z 되돌리기 지원(2D 편집과 동일)
@@ -968,6 +1036,13 @@ export class Viewer3D {
     }
   }
   _edUp() {
+    if (this._faceDrag) {
+      const fd = this._faceDrag; this._faceDrag = null; this.controls.enabled = true;
+      const w = Math.abs(fd.u1 - fd.u0);
+      if (w < 0.03) this._facePaint(fd.key);                                   // 살짝 = 클릭 → 면 전체
+      else this._facePaintBand(fd.key, Math.min(fd.u0, fd.u1), Math.max(fd.u0, fd.u1)); // 드래그 → 폭만큼 띠
+      return;
+    }
     if (this._edrag) { this._edrag = null; store.liveEnd(); }
     this.controls.enabled = true;
   }

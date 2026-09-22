@@ -883,6 +883,11 @@ function buildFinish() {
     <div class="swatches" id="fin-ex-sw"></div>
     <div class="tool-group-label" style="margin-top:14px">지붕</div>
     <div class="mat-grid" id="fin-roof"></div>
+    <div class="tool-group-label" style="margin-top:12px">용마루 방향</div>
+    <div class="seg" id="fin-ridge">
+      <button type="button" class="seg-btn" data-ridge="z" title="용마루가 도면 세로(위↕아래) 방향 — 박공 삼각면이 위·아래(북·남)쪽에">세로 ↕</button>
+      <button type="button" class="seg-btn" data-ridge="x" title="용마루가 도면 가로(좌↔우) 방향 — 박공 삼각면이 좌·우(서·동)쪽에">가로 ↔</button>
+    </div>
     <div class="tool-group-label" style="margin-top:12px">지붕 색상</div>
     <div class="swatches" id="fin-rf-sw"></div>
     <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>`;
@@ -916,6 +921,10 @@ function buildFinish() {
     exSw.innerHTML = EXTERIOR_PALETTE.map((c) => `<button class="sw ${c === ex.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
     exSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
       store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.color = b.dataset.c; }); showExterior();
+    });
+    wrap.querySelectorAll('#fin-ridge .seg-btn').forEach((b) => {
+      b.classList.toggle('active', (roof.ridge === 'x' ? 'x' : 'z') === b.dataset.ridge);
+      b.onclick = () => { store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.ridge = b.dataset.ridge; }); showRoof(); };
     });
     const rfSw = wrap.querySelector('#fin-rf-sw');
     rfSw.innerHTML = ROOF_PALETTE.map((c) => `<button class="sw ${c === roof.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');

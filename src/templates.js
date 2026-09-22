@@ -212,6 +212,59 @@ const T = [
       furniture: [],
     },
   },
+  {
+    // 실제 시공 도면(본점19-1 평면도 1:50, 본점19-2 입면도 1:70) 기준
+    id: 'seum-bonjeom-19',
+    title: '세움 본점 19평 (9,000×7,000) + 포치 7평 · 데크 4평',
+    category: '주택',
+    showroom: '본점',
+    tags: ['세움도면', '본점', '19평', '9000x7000', '포치', '데크', '박공'],
+    base: {
+      name: '세움 본점 19평 (9,000×7,000)',
+      productType: '주택',
+      ceilingHeight: 2400,
+      // 벽체 280t 메탈사이딩(우드색)+타이벡 / 지붕 T260 징크판넬 박공(용마루 가로), 전체높이 3,700
+      exterior: { material: 'metal', color: '#7c5a36' },
+      roof: { type: 'gable', color: '#3a3f44', ridge: 'x', rise: 1100 },
+      rooms: [
+        // 본채 9,000×7,000 (x 1500~10500) — 후면(북) 밴드: 욕실1 · 현관 · 주방/식당 · 욕실2 · 세면
+        { key: 'bath1', type: 'bath',     name: '욕실1',     x: 1500, y: 0,    w: 2540, d: 2000 },
+        { key: 'ent',   type: 'entrance', name: '현관',      x: 1500, y: 2000, w: 2540, d: 1440 },
+        { key: 'kit',   type: 'kitchen',  name: '주방·식당', x: 4040, y: 0,    w: 4720, d: 3440, open: ['s'] },
+        { key: 'bath2', type: 'bath',     name: '욕실2',     x: 8760, y: 0,    w: 1740, d: 2520 },
+        { key: 'wash',  type: 'utility',  name: '세면',      x: 8760, y: 2520, w: 1740, d: 920, open: ['w'] },
+        // 전면(남) 밴드 — 방1 · 거실 · 방2
+        { key: 'bed1',  type: 'bedroom',  name: '방1',       x: 1500, y: 3440, w: 2940, d: 3560 },
+        { key: 'liv',   type: 'living',   name: '거실',      x: 4440, y: 3440, w: 3120, d: 3560, open: ['n'] },
+        { key: 'bed2',  type: 'bedroom',  name: '방2',       x: 7560, y: 3440, w: 2940, d: 3560 },
+        // 포치 7평(9,000×2,500, 낮은 외쪽지붕) · 데크 4평(서측 1,500 폭, 주출입구)
+        { key: 'porch', type: 'porch',    name: '포치(7평)', x: 1500, y: 7000, w: 9000, d: 2500 },
+        { key: 'deck',  type: 'deck',     name: '데크(4평)', x: 0,    y: 700,  w: 1500, d: 8800 },
+      ],
+      openings: [
+        // 후면 창
+        { roomKey: 'bath1', side: 'n', pos: 1380, winType: 'double',    w: 1000, h: 900,  sill: 1200 },
+        { roomKey: 'kit',   side: 'n', pos: 1610, winType: 'double',    w: 1500, h: 600,  sill: 1350 },
+        { roomKey: 'bath2', side: 'n', pos: 760,  winType: 'double',    w: 600,  h: 500,  sill: 1500 },
+        // 현관 단열문(데크 쪽) · 3연동 중문 · 욕실 문
+        { roomKey: 'ent',   side: 'w', pos: 950,  winType: 'door',      w: 900,  h: 2100 },
+        { roomKey: 'ent',   side: 'e', pos: 720,  winType: 'slideDoor', w: 1350, h: 2100 },
+        { roomKey: 'bath1', side: 'e', pos: 1500, winType: 'swingDoor', w: 900,  h: 2000 },
+        { roomKey: 'bath2', side: 'w', pos: 2050, winType: 'swingDoor', w: 700,  h: 2000 },
+        // 방 문(3틀)
+        { roomKey: 'bed1',  side: 'n', pos: 2400, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed2',  side: 'n', pos: 540,  winType: 'swingDoor', w: 900,  h: 2100 },
+        // 측면 이중창
+        { roomKey: 'bed1',  side: 'w', pos: 1950, winType: 'double',    w: 1500, h: 1000, sill: 1100 },
+        { roomKey: 'bed2',  side: 'e', pos: 1950, winType: 'double',    w: 1500, h: 1000, sill: 1100 },
+        // 포치 쪽 — 방 픽스창 · 거실 이중창(출입)
+        { roomKey: 'bed1',  side: 's', pos: 1580, winType: 'fixed',     w: 1500, h: 1000, sill: 1100 },
+        { roomKey: 'liv',   side: 's', pos: 1560, winType: 'double',    w: 2000, h: 2100, sill: 0 },
+        { roomKey: 'bed2',  side: 's', pos: 1360, winType: 'fixed',     w: 1500, h: 1000, sill: 1100 },
+      ],
+      furniture: [],
+    },
+  },
 ];
 
 // 템플릿 목록 (썸네일/표시용 메타)

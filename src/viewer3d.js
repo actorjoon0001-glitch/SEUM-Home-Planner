@@ -773,24 +773,32 @@ export class Viewer3D {
   _buildRoof(d, b, ceilH) {
     const roof = d.roof || { type: 'gable', color: '#3a3f44' };
     const type = ROOF_TYPES[roof.type] ? roof.type : 'gable';
-    const rise = ROOF_TYPES[type].rise;
+    const rise = roof.rise > 0 ? roof.rise : ROOF_TYPES[type].rise;   // 도면별 지붕 높이(경사) 지정 가능
     const color = roof.color || '#3a3f44';
+
+    // 지붕이 덮을 범위 = 실내(벽 있는) 공간만. 데크·포치 같은 개방 공간은 본 지붕에서 제외
+    //   (포치는 아래 _buildPorchRoofs 에서 낮은 별도 지붕)
+    const fb = this._roofBounds(d, b);
+    // 용마루 방향: 'z'(도면 세로, 기본) | 'x'(도면 가로). 'x' 면 지붕을 z 기준으로 만든 뒤 90° 돌림
+    const ridgeX = roof.ridge === 'x';
+    const spanW = ridgeX ? fb.h : fb.w, spanL = ridgeX ? fb.w : fb.h;
 
     // 치수(mm) — 외벽 바깥면 기준
     const off = (this.showExterior ? (d.wallThickness || 150) / 2 + 120 : (d.wallThickness || 150) / 2);
-    const Sx = b.w / 2 + off, Sz = b.h / 2 + off;   // 외벽 바깥면까지 반폭
+    const Sx = spanW / 2 + off, Sz = spanL / 2 + off;   // 외벽 바깥면까지 반폭 (Sx: 경사 방향, Sz: 용마루 방향)
     const E = 600;          // 처마 내밀기 (경사 아래쪽)
     const R = 400;          // 박공 쪽 내밀기
     const TH = 180;         // 지붕판 두께
     const plateY = ceilH + 120;                      // 벽(외장) 윗면 = 지붕이 얹히는 높이
     // 기존 도면과 같은 경사 유지: 예전엔 (반폭+750) 에 rise 만큼 올라갔음
-    const k = type === 'shed' ? rise / (2 * (b.w / 2 + 750)) : rise / (b.w / 2 + 750);
+    const k = type === 'shed' ? rise / (2 * (spanW / 2 + 750)) : rise / (spanW / 2 + 750);
 
     const roofMat = TEX.roofMaterial(color, 1500, 1500);   // UV 를 mm/1500 단위로 직접 넣으므로 반복 1
     const trimMat = new THREE.MeshStandardMaterial({ color: '#ebe8e1', roughness: 0.6 });   // 파사드·소핏·물받이
     const capMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.8), roughness: 0.5, metalness: 0.3 });
     const grp = new THREE.Group();
-    grp.position.y = plateY;
+    grp.position.set(fb.cx - b.cx, plateY, fb.cz - b.cz);
+    if (ridgeX) grp.rotation.y = Math.PI / 2;   // 로컬 z(용마루) → 월드 x
     const add = (m) => { m.castShadow = true; m.receiveShadow = true; grp.add(m); return m; };
     // 경사 지붕판 좌표는 '밑면' 기준으로 계산 → 윗면은 두께만큼 위 (밑면이 벽 위에 얹힘)
     const L = (pts) => pts.map(([x, y, z]) => [x, y + TH, z]);
@@ -879,6 +887,74 @@ export class Viewer3D {
       }
     }
     this.modelGroup.add(grp);
+    this._buildPorchRoofs(d, b, ceilH, fb, color);
+  }
+
+  // 본 지붕이 덮을 범위 — 외곽선이 있으면 외곽선, 없으면 벽 있는 방(데크·포치 제외)의 범위
+  _roofBounds(d, b) {
+    const shapes = outlineShapes(d.outline);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    if (shapes.length) {
+      for (const { pts } of shapes) for (const [x, y] of pts) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); }
+    } else {
+      for (const r of d.rooms) {
+        if (OPEN_ROOM_TYPES.includes(r.type)) continue;
+        minX = Math.min(minX, r.x); minY = Math.min(minY, r.y); maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
+      }
+    }
+    if (!isFinite(minX)) return { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY, w: b.w, h: b.h, cx: b.cx, cz: b.cz };
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cz: (minY + maxY) / 2 };
+  }
+
+  // 포치 지붕 — 본채 벽에 붙은 낮은 외쪽 지붕(징크판넬 느낌) + 바깥 모서리 기둥
+  //   본채에 닿은 변이 높고 바깥으로 갈수록 낮아짐. 본채와 떨어진 포치는 평평하게.
+  _buildPorchRoofs(d, b, ceilH, fb, color) {
+    const porches = d.rooms.filter((r) => r.type === 'porch');
+    if (!porches.length) return;
+    const roofMat = TEX.roofMaterial(color, 1500, 1500);
+    const trimMat = new THREE.MeshStandardMaterial({ color: '#ebe8e1', roughness: 0.6 });
+    const postMat = new THREE.MeshStandardMaterial({ color: '#2a2c2f', roughness: 0.5, metalness: 0.4 });
+    // 높은 쪽(본채 벽)·낮은 쪽 높이, 내밀기 — 본채 처마 밑으로 들어가도록 벽 윗면보다 낮게
+    const TH = 100, hHigh = ceilH - 150, hLow = ceilH - 350, O = 300;
+    const EPS = 30;
+    for (const r of porches) {
+      // 본채(지붕 범위)와 맞닿은 변 찾기 → 그쪽이 높은 쪽
+      let side = null;
+      if (Math.abs(r.y - fb.maxY) < EPS) side = 'n';
+      else if (Math.abs(r.y + r.d - fb.minY) < EPS) side = 's';
+      else if (Math.abs(r.x - fb.maxX) < EPS) side = 'w';
+      else if (Math.abs(r.x + r.w - fb.minX) < EPS) side = 'e';
+      const [px, pz] = this._p(r.x, r.y, b);
+      const x0 = px - O, x1 = px + r.w + O, z0 = pz - O, z1 = pz + r.d + O;
+      const hi = hHigh + TH, lo = side ? hLow + TH : hi;
+      // 높이: 본채 쪽 변 = hi, 반대쪽 = lo (본채 쪽은 벽에 붙으므로 내밀기 없음)
+      let top;
+      if (side === 'n') top = [[x0, hi, pz], [x1, hi, pz], [x1, lo, z1], [x0, lo, z1]];
+      else if (side === 's') top = [[x0, lo, z0], [x1, lo, z0], [x1, hi, pz + r.d], [x0, hi, pz + r.d]];
+      else if (side === 'w') top = [[px, hi, z0], [x1, lo, z0], [x1, lo, z1], [px, hi, z1]];
+      else if (side === 'e') top = [[x0, lo, z0], [px + r.w, hi, z0], [px + r.w, hi, z1], [x0, lo, z1]];
+      else top = [[x0, hi, z0], [x1, hi, z0], [x1, hi, z1], [x0, hi, z1]];
+      const eave = (side === 'n' || side === 's') ? [1, 0, 0] : [0, 0, 1];
+      const slab = this._roofSlab(top, eave, TH, roofMat, trimMat);
+      slab.castShadow = true; slab.receiveShadow = true;
+      this.modelGroup.add(slab);
+      // 기둥 — 본채 반대쪽 변(들)을 따라 약 3m 간격, 100×100
+      const postAt = (x, z, h) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(100, h, 100), postMat);
+        m.position.set(x, h / 2, z); m.castShadow = true; this.modelGroup.add(m);
+      };
+      const inset = 150;
+      const edgePosts = (ax, az, bx, bz) => {
+        const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 3000));
+        for (let i = 0; i <= n; i++) { const t = i / n; postAt(ax + (bx - ax) * t, az + (bz - az) * t, hLow); }
+      };
+      const L = px + inset, R = px + r.w - inset, N = pz + inset, S = pz + r.d - inset;
+      if (side === 'n') edgePosts(L, S, R, S);
+      else if (side === 's') edgePosts(L, N, R, N);
+      else if (side === 'w') edgePosts(R, N, R, S);
+      else if (side === 'e') edgePosts(L, N, L, S);
+      else { edgePosts(L, N, R, N); edgePosts(L, S, R, S); }
+    }
   }
 
   // 두께 있는 지붕판 1장 — top: 윗면 다각형(볼록, 월드 좌표 [x,y,z]), eaveDir: 처마선 방향(기와 줄 방향),
@@ -1112,7 +1188,7 @@ export class Viewer3D {
       this.camera.aspect = 1200 / 800;
       this.camera.updateProjectionMatrix();
       this.rebuild();
-    }
+    } else if (this.dirty) this.rebuild();   // 방금 바꾼 설정(지붕·외장 토글 등)이 캡처에 바로 반영되도록
     // 캡처·인쇄는 성능과 무관하게 항상 고화질(구석 음영)로
     const hq = this.hq, pinned = this._hqPinned;
     this.hq = true; this._hqPinned = true;

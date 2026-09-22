@@ -768,50 +768,161 @@ export class Viewer3D {
   }
 
   // 지붕: 형태별 생성 (평지붕/박공/비대칭박공/우진각/외쪽)
+  //   실제 시공처럼 — 두께 있는 지붕판 + 벽 밖으로 내민 처마 + 처마 끝 마감판(파사드)·처마 밑면(소핏)
+  //   + 물받이 + 박공 삼각 벽면(외장재) + 용마루 캡. 용마루는 기존과 같이 Z(도면 세로) 방향.
   _buildRoof(d, b, ceilH) {
     const roof = d.roof || { type: 'gable', color: '#3a3f44' };
     const type = ROOF_TYPES[roof.type] ? roof.type : 'gable';
     const rise = ROOF_TYPES[type].rise;
-    const gap = 250, eave = 500; // 처마 내밀기
-    const W = b.w + gap * 2 + eave * 2;
-    const D = b.h + gap * 2 + eave * 2;
-    const mat = TEX.roofMaterial(roof.color || '#3a3f44', W, D); // 슁글 질감
-    const baseY = ceilH + 180 + 60;
+    const color = roof.color || '#3a3f44';
+
+    // 치수(mm) — 외벽 바깥면 기준
+    const off = (this.showExterior ? (d.wallThickness || 150) / 2 + 120 : (d.wallThickness || 150) / 2);
+    const Sx = b.w / 2 + off, Sz = b.h / 2 + off;   // 외벽 바깥면까지 반폭
+    const E = 600;          // 처마 내밀기 (경사 아래쪽)
+    const R = 400;          // 박공 쪽 내밀기
+    const TH = 180;         // 지붕판 두께
+    const plateY = ceilH + 120;                      // 벽(외장) 윗면 = 지붕이 얹히는 높이
+    // 기존 도면과 같은 경사 유지: 예전엔 (반폭+750) 에 rise 만큼 올라갔음
+    const k = type === 'shed' ? rise / (2 * (b.w / 2 + 750)) : rise / (b.w / 2 + 750);
+
+    const roofMat = TEX.roofMaterial(color, 1500, 1500);   // UV 를 mm/1500 단위로 직접 넣으므로 반복 1
+    const trimMat = new THREE.MeshStandardMaterial({ color: '#ebe8e1', roughness: 0.6 });   // 파사드·소핏·물받이
+    const capMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.8), roughness: 0.5, metalness: 0.3 });
     const grp = new THREE.Group();
-    grp.position.set(0, baseY, 0);
+    grp.position.y = plateY;
+    const add = (m) => { m.castShadow = true; m.receiveShadow = true; grp.add(m); return m; };
+    // 경사 지붕판 좌표는 '밑면' 기준으로 계산 → 윗면은 두께만큼 위 (밑면이 벽 위에 얹힘)
+    const L = (pts) => pts.map(([x, y, z]) => [x, y + TH, z]);
+
+    // 박공·외벽 채움면 재질 (외장재가 켜져 있으면 외장재, 아니면 실내벽 재질)
+    const ex = d.exterior || {};
+    const exDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
+    const fillMat = (len, h) => this.showExterior
+      ? TEX.exteriorMaterial(ex.material || 'cement', ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness)
+      : this._wallMat();
+    // 박공 끝(z = ±Sz) 에 다각형 벽면 — pts: [x, y] (y 는 plate 기준)
+    const gableFill = (pts) => {
+      const sh = new THREE.Shape();
+      pts.forEach(([x, y], i) => (i ? sh.lineTo(x, y) : sh.moveTo(x, y)));
+      sh.closePath();
+      const hMax = Math.max(...pts.map((p) => p[1]));
+      for (const zs of [-1, 1]) {
+        const geo = new THREE.ExtrudeGeometry(sh, { depth: 120, bevelEnabled: false });
+        geo.translate(0, 0, -60);
+        this._planarUV(geo, 2 * Sx, hMax);
+        const m = add(new THREE.Mesh(geo, fillMat(2 * Sx, hMax)));
+        m.position.z = zs * (Sz - 60);
+      }
+    };
+    // 물받이 — 처마 끝선을 따라 (x,z)→(x,z) 구간, 높이 y
+    const gutter = (x0, z0, x1, z1, y) => {
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const m = add(new THREE.Mesh(new THREE.BoxGeometry(len, 120, 110), trimMat));
+      m.position.set((x0 + x1) / 2, y - 60, (z0 + z1) / 2);
+      m.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+    };
 
     if (type === 'flat') {
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(W, 160, D), mat);
-      slab.position.y = 80; slab.castShadow = true; grp.add(slab);
+      // 평지붕: 얇은 슬래브 + 둘레 파라펫 느낌의 마감판
+      const X = Sx + 300, Z = Sz + 300;
+      add(this._roofSlab([[-X, 0, -Z], [X, 0, -Z], [X, 0, Z], [-X, 0, Z]], [1, 0, 0], TH + 60, roofMat, trimMat));
+      grp.position.y = plateY + TH + 60;
     } else if (type === 'hip') {
-      // 우진각: 사각뿔
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(Math.hypot(W, D) / 2, rise, 4), mat);
-      cone.rotation.y = Math.PI / 4;
-      cone.scale.set(W / Math.hypot(W, D) * Math.SQRT2 * 0.5 + 0.5, 1, D / Math.hypot(W, D) * Math.SQRT2 * 0.5 + 0.5);
-      cone.position.y = rise / 2; cone.castShadow = true; grp.add(cone);
-    } else {
-      // 박공/비대칭박공/외쪽: 용마루 위치(ridgeT: 0~1) 로 단면 결정
-      // 용마루는 W(가로) 방향과 직교, D 길이로 길게 뻗음
-      let ridgeT = 0.5;
-      if (type === 'asymGable') ridgeT = 0.32;
-      if (type === 'shed') ridgeT = 1.0;
-      const ridgeX = -W / 2 + W * ridgeT;
-      // 단면(프로파일)을 ExtrudeGeometry 로 D 방향(용마루 방향)으로 압출
-      const shape = new THREE.Shape();
-      shape.moveTo(-W / 2, 0);
-      shape.lineTo(W / 2, 0);
-      if (type === 'shed') {
-        shape.lineTo(W / 2, rise);          // 외쪽: 우측이 높은 한쪽 경사
+      // 우진각(모임): 네 면이 모두 처마로 내려오고, 긴 쪽으로 용마루
+      const X = Sx + E, Z = Sz + E, ye = -k * E, top = ye + k * Math.min(X, Z);
+      let r0, r1;   // 용마루 양 끝
+      if (Z >= X) { r0 = [0, top, -(Z - X)]; r1 = [0, top, Z - X]; }
+      else        { r0 = [-(X - Z), top, 0]; r1 = [X - Z, top, 0]; }
+      const A = [-X, ye, -Z], B = [X, ye, -Z], C = [X, ye, Z], D = [-X, ye, Z];
+      if (Z >= X) {
+        add(this._roofSlab(L([A, D, r1, r0]), [0, 0, 1], TH, roofMat, trimMat));   // 서
+        add(this._roofSlab(L([C, B, r0, r1]), [0, 0, -1], TH, roofMat, trimMat));  // 동
+        add(this._roofSlab(L([B, A, r0]), [-1, 0, 0], TH, roofMat, trimMat));      // 북
+        add(this._roofSlab(L([D, C, r1]), [1, 0, 0], TH, roofMat, trimMat));       // 남
       } else {
-        shape.lineTo(ridgeX, rise);         // 박공/비대칭: 용마루 정점
+        add(this._roofSlab(L([B, A, r0, r1]), [-1, 0, 0], TH, roofMat, trimMat));
+        add(this._roofSlab(L([D, C, r1, r0]), [1, 0, 0], TH, roofMat, trimMat));
+        add(this._roofSlab(L([A, D, r0]), [0, 0, 1], TH, roofMat, trimMat));
+        add(this._roofSlab(L([C, B, r1]), [0, 0, -1], TH, roofMat, trimMat));
       }
-      shape.closePath();
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: D, bevelEnabled: false });
-      geo.translate(0, 0, -D / 2);
-      const m = new THREE.Mesh(geo, mat);
-      m.castShadow = true; grp.add(m);
+      const rl = Math.hypot(r1[0] - r0[0], r1[2] - r0[2]);
+      if (rl > 1) {
+        const cap = add(new THREE.Mesh(new THREE.BoxGeometry(Z >= X ? 220 : rl + 220, 90, Z >= X ? rl + 220 : 220), capMat));
+        cap.position.set(0, top + TH + 45, 0);
+      }
+      gutter(-X, -Z, X, -Z, ye); gutter(X, -Z, X, Z, ye); gutter(X, Z, -X, Z, ye); gutter(-X, Z, -X, -Z, ye);
+    } else {
+      // 박공 / 비대칭 박공 / 외쪽 — 경사면을 X 방향으로, 용마루는 Z 방향
+      const Z = Sz + R;
+      if (type === 'shed') {
+        // 외쪽: 서쪽(-x)이 낮고 동쪽(+x)이 높은 한 면
+        const hHigh = k * 2 * Sx;
+        const x0 = -Sx - E, y0 = -k * E, x1 = Sx + 300, y1 = hHigh + k * 300;
+        add(this._roofSlab(L([[x0, y0, -Z], [x0, y0, Z], [x1, y1, Z], [x1, y1, -Z]]), [0, 0, 1], TH, roofMat, trimMat));
+        gableFill([[-Sx, 0], [Sx, 0], [Sx, hHigh]]);
+        // 높은 쪽 외벽(동쪽) — plate 위 삼각 공간을 벽으로 막음
+        const hw = add(new THREE.Mesh(new THREE.BoxGeometry(120, hHigh, 2 * Sz), fillMat(2 * Sz, hHigh)));
+        hw.position.set(Sx - 60, hHigh / 2, 0);
+        gutter(x0, -Z, x0, Z, y0);
+      } else {
+        const ridgeX = type === 'asymGable' ? -Sx + 2 * Sx * 0.32 : 0;
+        const hR = k * Sx;                                   // 용마루 높이 (plate 기준, 지붕판 밑면)
+        const kL = hR / (ridgeX + Sx), kR = hR / (Sx - ridgeX);   // 좌·우 경사 (비대칭이면 다름)
+        const xl = -Sx - E, yl = -kL * E, xr = Sx + E, yr = -kR * E;
+        add(this._roofSlab(L([[xl, yl, -Z], [xl, yl, Z], [ridgeX, hR, Z], [ridgeX, hR, -Z]]), [0, 0, 1], TH, roofMat, trimMat));
+        add(this._roofSlab(L([[xr, yr, Z], [xr, yr, -Z], [ridgeX, hR, -Z], [ridgeX, hR, Z]]), [0, 0, -1], TH, roofMat, trimMat));
+        gableFill([[-Sx, 0], [Sx, 0], [ridgeX, hR]]);
+        const cap = add(new THREE.Mesh(new THREE.BoxGeometry(260, 110, 2 * Z + 40), capMat));
+        cap.position.set(ridgeX, hR + TH + 40, 0);
+        gutter(xl, -Z, xl, Z, yl); gutter(xr, -Z, xr, Z, yr);
+      }
     }
     this.modelGroup.add(grp);
+  }
+
+  // 두께 있는 지붕판 1장 — top: 윗면 다각형(볼록, 월드 좌표 [x,y,z]), eaveDir: 처마선 방향(기와 줄 방향),
+  //   th: 두께(수직). 윗면 = 기와/슁글, 밑면·옆면 = 마감판(소핏·파사드). 기와 줄이 처마와 나란하도록 UV 계산.
+  _roofSlab(top, eaveDir, th, topMat, sideMat) {
+    const V = top.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+    // 윗면 법선이 위를 향하도록 정점 순서 정리
+    const nrm = new THREE.Vector3().subVectors(V[1], V[0]).cross(new THREE.Vector3().subVectors(V[2], V[0]));
+    if (nrm.y < 0) V.reverse();
+    const n = V.length;
+    const Bv = V.map((p) => new THREE.Vector3(p.x, p.y - th, p.z));
+    const e = new THREE.Vector3(eaveDir[0], eaveDir[1], eaveDir[2]).normalize();
+    // 경사 오르막 방향(면 위에서 처마선에 수직)
+    const faceN = new THREE.Vector3().subVectors(V[1], V[0]).cross(new THREE.Vector3().subVectors(V[2], V[0])).normalize();
+    const up = new THREE.Vector3().crossVectors(faceN, e).normalize();
+    if (up.y < 0) up.negate();
+    const pos = [], uv = [];
+    const push = (p, u, v) => { pos.push(p.x, p.y, p.z); uv.push(u, v); };
+    const T = 1500;   // 텍스처 1장 = 1500mm
+    // 윗면 (부채꼴 삼각형)
+    for (let i = 1; i < n - 1; i++) for (const p of [V[0], V[i], V[i + 1]]) push(p, p.dot(e) / T, p.dot(up) / T);
+    const topCount = pos.length / 3;
+    // 밑면 (반대 방향)
+    for (let i = 1; i < n - 1; i++) for (const p of [Bv[0], Bv[i + 1], Bv[i]]) push(p, p.x / T, p.z / T);
+    // 옆면 (처마 끝 마감판)
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      for (const p of [V[i], Bv[i], Bv[j], V[i], Bv[j], V[j]]) push(p, 0, 0);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.addGroup(0, topCount, 0);
+    geo.addGroup(topCount, pos.length / 3 - topCount, 1);
+    geo.computeVertexNormals();
+    return new THREE.Mesh(geo, [topMat, sideMat]);
+  }
+
+  // 평면(XY) 도형의 UV 를 0..1 로 — 외장재 텍스처 반복(len×h 기준)이 맞게 들어가도록
+  _planarUV(geo, w, h) {
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox, pos = geo.attributes.position, uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (pos.getX(i) - bb.min.x) / (w || 1), (pos.getY(i) - bb.min.y) / (h || 1));
+    uv.needsUpdate = true;
   }
 
   _buildFurniture(f, b, ceilH = 2400) {

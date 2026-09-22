@@ -212,6 +212,8 @@ export class Editor2D {
 
     // 텍스트 라벨 (방 이름 등)
     this._drawLabels();
+    // 도면 위 전체 평수 요약 (실내 · 포치 · 데크 · 합계)
+    this._drawAreaSummary();
 
     // 축척 보정 중 클릭 점/선 표시
     if (this.calib) this._drawCalib();
@@ -224,6 +226,65 @@ export class Editor2D {
 
     // 선택 안내
     this._drawScaleBar();
+  }
+
+  // ---- 전체 평수 요약 — 도면 맨 위 가운데에 "실내 19.1평 · 포치 6.8평 · 데크 4.3평 · 합계 30.2평" ----
+  //   방 면적은 벽 중심선 기준(도면 치수 그대로). 평수 표시(📐)를 끄면 함께 숨김.
+  _drawAreaSummary() {
+    const d = store.design;
+    if (!this.showArea || !d.rooms.length) return;
+    const sum = { in: 0, porch: 0, deck: 0 };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity;
+    for (const r of d.rooms) {
+      const a = (r.w * r.d) / 1e6;
+      if (r.type === 'porch') sum.porch += a;
+      else if (r.type === 'deck' || r.type === 'balcony') sum.deck += a;
+      else sum.in += a;
+      minX = Math.min(minX, r.x); maxX = Math.max(maxX, r.x + r.w); minY = Math.min(minY, r.y);
+    }
+    for (const p of outlineShapes(d.outline)) for (const [px, py] of p.pts) { minX = Math.min(minX, px); maxX = Math.max(maxX, px); minY = Math.min(minY, py); }
+    const py = (m2) => (m2 / 3.305).toFixed(1);
+    const parts = [];
+    if (sum.in > 0) parts.push({ t: `실내 ${py(sum.in)}평`, sub: `(${sum.in.toFixed(1)}m²)`, strong: true });
+    if (sum.porch > 0) parts.push({ t: `포치 ${py(sum.porch)}평` });
+    if (sum.deck > 0) parts.push({ t: `데크 ${py(sum.deck)}평` });
+    if (parts.length > 1) parts.push({ t: `합계 ${py(sum.in + sum.porch + sum.deck)}평` });
+    if (!parts.length) return;
+
+    const ctx = this.ctx;
+    const [x0] = this.toPx(minX, minY), [x1, yTop] = this.toPx(maxX, minY);
+    const cx = (x0 + x1) / 2;
+    const fs = Math.max(12, Math.min(18, (x1 - x0) / 28));
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    // 조각별 폭을 재서 가운데 정렬로 이어 그림 (실내는 굵게 + ㎡)
+    const sep = ' · ';
+    const fontOf = (p) => `${p.strong ? 700 : 500} ${fs}px "Noto Sans KR", sans-serif`;
+    let total = 0;
+    const widths = parts.map((p, i) => {
+      ctx.font = fontOf(p); let w = ctx.measureText(p.t).width;
+      if (p.sub) { ctx.font = `400 ${fs * 0.8}px "Noto Sans KR", sans-serif`; w += 4 + ctx.measureText(p.sub).width; }
+      if (i < parts.length - 1) { ctx.font = fontOf({}); w += ctx.measureText(sep).width; }
+      total += w; return w;
+    });
+    const y = yTop - fs * 2.2 - (this.showDims ? 34 : 0);   // 치수선이 켜져 있으면 그 위로
+    // 배경 알약
+    const padX = fs * 0.9, h = fs * 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.strokeStyle = '#e2e4e8'; ctx.lineWidth = 1;
+    const bx = cx - total / 2 - padX, bw = total + padX * 2, r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, y - h / 2); ctx.arcTo(bx + bw, y - h / 2, bx + bw, y + h / 2, r); ctx.arcTo(bx + bw, y + h / 2, bx, y + h / 2, r);
+    ctx.arcTo(bx, y + h / 2, bx, y - h / 2, r); ctx.arcTo(bx, y - h / 2, bx + bw, y - h / 2, r); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    let x = cx - total / 2;
+    parts.forEach((p, i) => {
+      ctx.textAlign = 'left';
+      ctx.font = fontOf(p); ctx.fillStyle = p.strong ? '#c8102e' : '#2a2d33';
+      ctx.fillText(p.t, x, y); x += ctx.measureText(p.t).width;
+      if (p.sub) { ctx.font = `400 ${fs * 0.8}px "Noto Sans KR", sans-serif`; ctx.fillStyle = '#6b7079'; ctx.fillText(p.sub, x + 4, y); x += 4 + ctx.measureText(p.sub).width; }
+      if (i < parts.length - 1) { ctx.font = fontOf({}); ctx.fillStyle = '#9aa0a8'; ctx.fillText(sep, x, y); x += ctx.measureText(sep).width; }
+    });
+    ctx.restore();
   }
 
   // ---- 밑그림(참조 도면) ----

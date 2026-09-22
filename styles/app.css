@@ -495,3 +495,12 @@ body {
 .photo-btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--seum-red); background: var(--seum-red); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 .photo-btn.ghost { background: #fff; color: var(--seum-red); }
 .photo-btn:disabled { opacity: .45; cursor: default; }
+
+/* 휴지통 (관리자) — 복원 / 영구 삭제 */
+.dash-card.dc-trash { cursor: default; }
+.dash-card.dc-trash .dc-thumb { opacity: .6; }
+.dc-actions { display: flex; gap: 6px; padding: 0 12px 12px; }
+.dc-act { flex: 1; padding: 7px 8px; border-radius: 6px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink); }
+.dc-act:hover { border-color: var(--seum-red); color: var(--seum-red); }
+.dc-act.danger { color: #c8102e; border-color: #e6b3ba; }
+.dc-act.danger:hover { background: #fdf2f3; border-color: #c8102e; }

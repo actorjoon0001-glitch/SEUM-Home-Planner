@@ -116,7 +116,8 @@ function enterEditor(loadFn) {
   if (_dash && _dash.onModeChange) _dash.onModeChange('2d');
   if (_dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.applyInitialView(); }, 0);
 }
-function projectCard(name, design, meta, onOpen, onDelete) {
+// onDelete: 휴지통으로 보내기(관리자) — { hard: true } 면 이 기기 저장처럼 바로 삭제
+function projectCard(name, design, meta, onOpen, onDelete, { hard = false } = {}) {
   const card = document.createElement('div');
   card.className = 'dash-card';
   const cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.className = 'dc-thumb';
@@ -127,11 +128,35 @@ function projectCard(name, design, meta, onOpen, onDelete) {
   card.appendChild(body);
   card.onclick = () => onOpen();
   if (onDelete) {
-    const del = document.createElement('button'); del.className = 'dc-del'; del.textContent = '✕'; del.title = '삭제';
-    del.onclick = (e) => { e.stopPropagation(); if (confirm(`'${name}'을(를) 삭제할까요?`)) { onDelete(); } };
+    const del = document.createElement('button'); del.className = 'dc-del';
+    del.textContent = hard ? '✕' : '🗑'; del.title = hard ? '삭제' : '휴지통으로 보내기 (관리자)';
+    const q = hard ? `'${name}'을(를) 삭제할까요?` : `'${name}'을(를) 휴지통으로 보낼까요?\n(휴지통에서 복원하거나 영구 삭제할 수 있어요)`;
+    del.onclick = (e) => { e.stopPropagation(); if (confirm(q)) { onDelete(); } };
     card.appendChild(del);
   }
   return card;
+}
+
+// 휴지통 카드 — 복원 / 영구 삭제 버튼
+function trashCard(name, design, meta, onRestore, onPurge) {
+  const card = projectCard(name, design, meta, () => {});
+  card.classList.add('dc-trash');
+  card.onclick = null;
+  const bar = document.createElement('div'); bar.className = 'dc-actions';
+  const rb = document.createElement('button'); rb.className = 'dc-act'; rb.textContent = '↩ 복원';
+  rb.onclick = (e) => { e.stopPropagation(); onRestore(); };
+  const pb = document.createElement('button'); pb.className = 'dc-act danger'; pb.textContent = '영구 삭제';
+  pb.onclick = (e) => { e.stopPropagation(); if (confirm(`'${name}'을(를) 영구 삭제할까요?\n되돌릴 수 없습니다.`)) onPurge(); };
+  bar.append(rb, pb);
+  card.appendChild(bar);
+  return card;
+}
+
+// 관리자 작업 공통 — 실패 시 알림 후 목록 새로고침
+async function adminAct(fn, okMsg) {
+  try { await fn(); if (okMsg) flash(okMsg); }
+  catch (e) { alert('실패: ' + (e.message || e)); }
+  renderDash();
 }
 function newCard() {
   const card = document.createElement('div');
@@ -175,12 +200,12 @@ async function renderDash() {
     userEl.textContent = u ? (nm ? `${nm} (${u.email})` : u.email) : '';
   }
   // 관리자 계정일 때만 '전체 도면' 탭 노출
+  const admin = cloud.configured() && cloud.isAdmin();
   const navAll = document.getElementById('dash-nav-all');
-  if (navAll) {
-    const admin = cloud.configured() && cloud.isAdmin();
-    navAll.classList.toggle('hidden', !admin);
-    if (!admin && _dashView === 'all') { _dashView = 'mine'; setActiveNav('mine'); }
-  }
+  const navTrash = document.getElementById('dash-nav-trash');
+  if (navAll) navAll.classList.toggle('hidden', !admin);
+  if (navTrash) navTrash.classList.toggle('hidden', !admin);
+  if (!admin && (_dashView === 'all' || _dashView === 'trash')) { _dashView = 'mine'; setActiveNav('mine'); }
   if (!grid) return;
   grid.innerHTML = '';
   if (_dashView === 'mine') {
@@ -196,7 +221,7 @@ async function renderDash() {
           const cust = (r.data && r.data.customer || '').trim();
           grid.appendChild(projectCard(r.name, r.data, fmtDate(r.updated_at) + (cust ? ` · 📁 ${cust}` : ''),
             () => enterEditor(() => store.loadInto(r.data, { cloudId: r.id })),
-            async () => { try { await cloud.removeDesign(r.id); } catch (e) { /* noop */ } renderDash(); }));
+            admin ? () => adminAct(() => cloud.setTrashed(r, true), '휴지통으로 보냈어요') : null));   // 삭제는 관리자만
         }
       } catch (e) { const l = document.getElementById('dash-loading'); if (l) l.textContent = '불러오기 실패: ' + (e.message || e); }
     } else {
@@ -205,7 +230,7 @@ async function renderDash() {
       for (const s of saves) {
         grid.appendChild(projectCard(s.name, s.data, fmtDate(s.savedAt) + ' · 이 기기',
           () => enterEditor(() => store.loadSaved(s.name)),
-          () => { store.removeSaved(s.name); renderDash(); }));
+          () => { store.removeSaved(s.name); renderDash(); }, { hard: true }));
       }
     }
   } else if (_dashView === 'templates') {
@@ -213,10 +238,17 @@ async function renderDash() {
     sub.textContent = '전시장별 기본 도면입니다. 현재 도면을 전시장에 추가할 수 있어요.';
     grid.appendChild(actionCard('현재 도면을 전시장에 추가', addCurrentAsShowroom));
     // 항목 수집: 내장 템플릿 + 클라우드 전시장 도면(공용) → 전시장(showroom)별 그룹
+    //   관리자가 휴지통에 넣은 내장 템플릿은 숨김 (설정 행의 trashedBuiltin / deletedBuiltin)
     const items = [];
+    const hidden = await builtinHidden();
     for (const t of listTemplates()) {
+      if (hidden.has(t.id)) continue;
       let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
-      items.push({ title: t.title, showroom: (t.showroom || '').trim(), data: d, open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }) });
+      items.push({
+        title: t.title, showroom: (t.showroom || '').trim(), data: d,
+        open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }),
+        del: admin ? () => adminAct(() => trashBuiltin(t.id), '휴지통으로 보냈어요') : null,
+      });
     }
     if (cloud.configured() && cloud.user) {
       try {
@@ -224,7 +256,7 @@ async function renderDash() {
         for (const r of rows) items.push({
           title: r.name, showroom: (r.data && r.data.showroom || '').trim(), data: r.data,
           open: () => enterEditor(() => store.loadInto(r.data)),
-          del: async () => { try { await cloud.removeDesign(r.id); } catch (e) { /* noop */ } renderDash(); },
+          del: admin ? () => adminAct(() => cloud.setTrashed(r, true), '휴지통으로 보냈어요') : null,   // 삭제는 관리자만
         });
       } catch (e) { /* 클라우드 미가용 → 내장만 */ }
     }
@@ -284,11 +316,62 @@ async function renderDash() {
           if (cust) tags.push(`📁 ${cust}`);
           grid.appendChild(projectCard(r.name, r.data, tags.join(' · '),
             () => enterEditor(() => store.loadInto(r.data, { cloudId: r.owner === myId ? r.id : null })),
-            async () => { try { await cloud.removeDesign(r.id); } catch (e) { alert('삭제 실패(권한): ' + (e.message || e)); } renderDash(); }));
+            () => adminAct(() => cloud.setTrashed(r, true), '휴지통으로 보냈어요')));
         }
       }
     } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
+  } else if (_dashView === 'trash') {
+    title.textContent = '휴지통 (관리자)';
+    sub.textContent = '삭제한 도면이 여기 모입니다. 복원하면 원래 자리로 돌아가고, 영구 삭제는 되돌릴 수 없어요.';
+    if (!admin) { grid.innerHTML = '<p class="dash-empty">관리자 계정으로 로그인해야 볼 수 있습니다.</p>'; return; }
+    grid.innerHTML = '<p class="dash-empty">불러오는 중…</p>';
+    try {
+      const [rows, settings] = await Promise.all([cloud.listTrash(), cloud.getSettings()]);
+      grid.innerHTML = '';
+      const tb = (settings.data && settings.data.trashedBuiltin) || {};
+      const builtin = listTemplates().filter((t) => tb[t.id]);
+      if (!rows.length && !builtin.length) { grid.innerHTML = '<p class="dash-empty">휴지통이 비어 있습니다.</p>'; return; }
+      const when = (iso, by) => `🗑 ${fmtDate(iso)}${by ? ` · ${by}` : ''}`;
+      for (const t of builtin) {
+        let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
+        grid.appendChild(trashCard(t.title, d, `🏢 전시장(기본) · ${when(tb[t.id].at, tb[t.id].by)}`,
+          () => adminAct(() => restoreBuiltin(t.id), '복원했어요'),
+          () => adminAct(() => purgeBuiltin(t.id), '영구 삭제했어요')));
+      }
+      for (const r of rows) {
+        const kind = r.is_template ? '🏢 전시장' : `👤 ${r.owner === (cloud.user && cloud.user.id) ? '나' : ownerLabel(r)}`;
+        grid.appendChild(trashCard(r.name, r.data, `${kind} · ${when(r.data.trashedAt, r.data.trashedBy)}`,
+          () => adminAct(() => cloud.setTrashed(r, false), '복원했어요'),
+          () => adminAct(() => cloud.removeDesign(r.id), '영구 삭제했어요')));
+      }
+    } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
   }
+}
+
+// --- 내장(코드) 전시장 도면 휴지통 — 앱 설정 행에 숨김 목록으로 보관 ---
+//   trashedBuiltin: { id: { at, by } } (복원 가능) / deletedBuiltin: [id] (영구 삭제 — 다시 안 보임)
+async function builtinHidden() {
+  if (!(cloud.configured() && cloud.user)) return new Set();
+  try {
+    const { data } = await cloud.getSettings();
+    return new Set([...Object.keys(data.trashedBuiltin || {}), ...(data.deletedBuiltin || [])]);
+  } catch (e) { return new Set(); }
+}
+async function trashBuiltin(id) {
+  const { data } = await cloud.getSettings();
+  const tb = { ...(data.trashedBuiltin || {}), [id]: { at: new Date().toISOString(), by: (cloud.user && cloud.user.email) || '' } };
+  await cloud.saveSettings({ trashedBuiltin: tb });
+}
+async function restoreBuiltin(id) {
+  const { data } = await cloud.getSettings();
+  const tb = { ...(data.trashedBuiltin || {}) }; delete tb[id];
+  await cloud.saveSettings({ trashedBuiltin: tb });
+}
+async function purgeBuiltin(id) {
+  const { data } = await cloud.getSettings();
+  const tb = { ...(data.trashedBuiltin || {}) }; delete tb[id];
+  const del = Array.from(new Set([...(data.deletedBuiltin || []), id]));
+  await cloud.saveSettings({ trashedBuiltin: tb, deletedBuiltin: del });
 }
 // 작성자 표시 라벨 — 도면 데이터에 저장된 작성자명이 있으면 사용, 없으면 owner id 앞부분
 function ownerLabel(row) {
@@ -2290,7 +2373,7 @@ async function loadCloudList(body, which, filter = '') {
         <div class="cl-row-act">
           <button class="mini" data-a="open">열기</button>
           <button class="mini" data-a="link">공유링크</button>
-          ${which === 'mine' ? '<button class="mini danger" data-a="del">삭제</button>' : ''}
+          ${cloud.isAdmin() ? '<button class="mini danger" data-a="del">🗑 휴지통</button>' : ''}
         </div>`;
       row.querySelector('[data-a=open]').onclick = () => {
         // 목록에서 이미 data 를 받았으므로 추가 요청 없이 바로 로드
@@ -2305,8 +2388,8 @@ async function loadCloudList(body, which, filter = '') {
       };
       const del = row.querySelector('[data-a=del]');
       if (del) del.onclick = async () => {
-        if (!confirm(`'${r.name}' 삭제할까요?`)) return;
-        try { await cloud.removeDesign(r.id); loadCloudList(body, which, filter); flash('삭제됨'); }
+        if (!confirm(`'${r.name}'을(를) 휴지통으로 보낼까요?\n(대시보드 휴지통에서 복원·영구 삭제)`)) return;
+        try { await cloud.setTrashed(r, true); loadCloudList(body, which, filter); flash('휴지통으로 보냈어요'); }
         catch (e) { alert('실패: ' + e.message); }
       };
       list.appendChild(row);

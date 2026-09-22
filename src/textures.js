@@ -15,7 +15,7 @@ const TILE = {
   brick: 1600, metalSiding: 1300, cementSiding: 1500, ceramicSiding: 1400,
   stucco: 2200, woodSiding: 1500, stone: 2000, shingle: 1500,
   floorWood: 1700, floorTile: 1100, plaster: 2500, fabric: 600, woodGrain: 1400,
-  grass: 3000, concrete: 2400,
+  grass: 3000, concrete: 2400, deckBoard: 1400,
 };
 
 // ---------------------------------------------------------------------------
@@ -236,6 +236,28 @@ const GEN = {
     }
   },
 
+  deckBoard(x, s) {                                      // 합성데크 (폭 약 140mm 판재 + 틈, 은은한 결)
+    const n = 10, bh = s / n;
+    x.fillStyle = '#9a9a9a'; x.fillRect(0, 0, s, s);     // 판재 사이 틈
+    for (let i = 0; i < n; i++) {
+      const y = i * bh;
+      const v = 196 + ((Math.random() * 14 - 7) | 0);    // 판재별 미세 톤차 (대비 낮게 → 멀리서 반짝임 없음)
+      x.fillStyle = `rgb(${v},${v},${v})`;
+      x.fillRect(0, y + 1, s, bh - 2.5);
+      for (let k = 0; k < 5; k++) {                      // 결 — 가늘고 옅게
+        x.strokeStyle = `rgba(120,120,120,${0.04 + Math.random() * 0.05})`;
+        x.lineWidth = 1;
+        const gy = y + 3 + Math.random() * (bh - 6);
+        x.beginPath(); x.moveTo(0, gy);
+        x.bezierCurveTo(s * 0.33, gy + (Math.random() * 2 - 1), s * 0.66, gy + (Math.random() * 2 - 1), s, gy);
+        x.stroke();
+      }
+      // 판재 이음(엇갈림)
+      x.fillStyle = 'rgba(0,0,0,0.18)';
+      x.fillRect(((i * 0.37) % 1) * s, y + 1, 1.5, bh - 2.5);
+    }
+  },
+
   concrete(x, s) {                                       // 마당 콘크리트 (미세 입자 + 줄눈)
     x.fillStyle = '#d6d6d6'; x.fillRect(0, 0, s, s);
     for (let i = 0; i < 9000; i++) {
@@ -350,10 +372,19 @@ export function roofMaterial(color, wMM, dMM) {
 
 // 바닥 (방 종류에 따라 마루/타일)
 const TILE_ROOMS = ['bath', 'kitchen', 'utility', 'balcony', 'entrance', 'pantry'];
+const DECK_ROOMS = ['deck', 'porch', 'balcony'];
+const DECK_COLOR = '#8f7a64';   // 합성데크 (브라운 그레이 우드톤)
 export function floorMaterial(roomType, color, wMM, dMM) {
+  if (DECK_ROOMS.includes(roomType)) {
+    // 야외 데크·포치: 실제 합성데크 판재 질감. 요철(bump)을 약하게 해 멀리서 반짝이지 않게
+    return makeMat('deckBoard', DECK_COLOR, rep(wMM, 'deckBoard'), rep(dMM, 'deckBoard'), {
+      roughness: 0.85, bumpScale: 0.35, envMapIntensity: 0.4,
+    });
+  }
   const kind = TILE_ROOMS.includes(roomType) ? 'floorTile' : 'floorWood';
   return makeMat(kind, color, rep(wMM, kind), rep(dMM, kind), {
-    roughness: kind === 'floorTile' ? 0.5 : 0.7, bumpScale: 0.8,
+    // 요철은 약하게 — 강하면 가는 줄눈·결이 카메라 움직일 때 반짝거림
+    roughness: kind === 'floorTile' ? 0.5 : 0.7, bumpScale: 0.4,
     envMapIntensity: 0.6,   // 밝은 타일·마루가 하얗게 날아가지 않게
   });
 }

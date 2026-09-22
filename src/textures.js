@@ -15,6 +15,7 @@ const TILE = {
   brick: 1600, metalSiding: 1300, cementSiding: 1500, ceramicSiding: 1400,
   stucco: 2200, woodSiding: 1500, stone: 2000, shingle: 1500,
   floorWood: 1700, floorTile: 1100, plaster: 2500, fabric: 600, woodGrain: 1400,
+  grass: 3000, concrete: 2400,
 };
 
 // ---------------------------------------------------------------------------
@@ -215,6 +216,37 @@ const GEN = {
     }
   },
 
+  grass(x, s) {                                          // 잔디 마당 (얼룩진 풀 + 짧은 잎)
+    x.fillStyle = '#b4b4b4'; x.fillRect(0, 0, s, s);
+    for (let i = 0; i < 40; i++) {                       // 큰 얼룩 — 타일 반복 티가 덜 나게
+      const v = 150 + ((Math.random() * 70) | 0);
+      const r = s * (0.08 + Math.random() * 0.18);
+      const cx = Math.random() * s, cy = Math.random() * s;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(${v},${v},${v},0.2)`); g.addColorStop(1, `rgba(${v},${v},${v},0)`);
+      x.fillStyle = g;
+      for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) { x.save(); x.translate(ox, oy); x.fillRect(cx - r, cy - r, r * 2, r * 2); x.restore(); }
+    }
+    for (let i = 0; i < 9000; i++) {                     // 풀잎
+      const v = 110 + ((Math.random() * 130) | 0);
+      x.strokeStyle = `rgba(${v},${v},${v},0.55)`;
+      x.lineWidth = 1;
+      const px = Math.random() * s, py = Math.random() * s, len = 2 + Math.random() * 4;
+      x.beginPath(); x.moveTo(px, py); x.lineTo(px + (Math.random() * 2 - 1), py - len); x.stroke();
+    }
+  },
+
+  concrete(x, s) {                                       // 마당 콘크리트 (미세 입자 + 줄눈)
+    x.fillStyle = '#d6d6d6'; x.fillRect(0, 0, s, s);
+    for (let i = 0; i < 9000; i++) {
+      const v = (Math.random() * 70 - 35) | 0;
+      x.fillStyle = `rgba(${150 + v},${150 + v},${150 + v},${0.06 + Math.random() * 0.08})`;
+      x.fillRect(Math.random() * s, Math.random() * s, 1.5, 1.5);
+    }
+    x.fillStyle = 'rgba(0,0,0,0.18)';                    // 신축 줄눈
+    x.fillRect(0, 0, s, 2); x.fillRect(0, 0, 2, s);
+  },
+
   woodGrain(x, s) {                                      // 가구 원목 결
     x.fillStyle = '#cdcdcd'; x.fillRect(0, 0, s, s);
     for (let i = 0; i < 60; i++) {
@@ -285,6 +317,7 @@ function makeMat(kind, color, repX, repY, opts = {}) {
     metalness: opts.metalness ?? 0.0,
   });
   if (opts.side) m.side = opts.side;
+  if (opts.envMapIntensity != null) m.envMapIntensity = opts.envMapIntensity;
   return m;
 }
 
@@ -321,12 +354,25 @@ export function floorMaterial(roomType, color, wMM, dMM) {
   const kind = TILE_ROOMS.includes(roomType) ? 'floorTile' : 'floorWood';
   return makeMat(kind, color, rep(wMM, kind), rep(dMM, kind), {
     roughness: kind === 'floorTile' ? 0.5 : 0.7, bumpScale: 0.8,
+    envMapIntensity: 0.6,   // 밝은 타일·마루가 하얗게 날아가지 않게
   });
+}
+
+// 바깥 지면 (잔디) — sizeMM: 정사각 지면 한 변
+export function groundMaterial(sizeMM) {
+  // 지면은 환경광을 약하게 받아야 집 그림자가 또렷하게 떨어짐
+  return makeMat('grass', '#7a925c', rep(sizeMM, 'grass'), rep(sizeMM, 'grass'), { roughness: 1, bumpScale: 1.5, envMapIntensity: 0.35 });
+}
+
+// 집 둘레 마당 (콘크리트)
+export function padMaterial(wMM, dMM) {
+  return makeMat('concrete', '#bdb9b1', rep(wMM, 'concrete'), rep(dMM, 'concrete'), { roughness: 0.9, bumpScale: 0.6, envMapIntensity: 0.35 });
 }
 
 // 실내 벽 (은은한 미장)
 export function wallMaterial(color) {
-  return makeMat('plaster', color, 3, 3, { roughness: 0.95, bumpScale: 0.3 });
+  // 환경광을 줄여 하얀 벽이 날아가지 않고 햇빛 그림자·구석 음영이 보이게
+  return makeMat('plaster', color, 3, 3, { roughness: 0.95, bumpScale: 0.3, envMapIntensity: 0.45 });
 }
 
 // 가구 마감 (fabric/wood 는 텍스처, 그 외는 null → 호출부에서 단색 사용)

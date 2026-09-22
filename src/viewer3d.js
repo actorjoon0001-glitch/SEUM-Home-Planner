@@ -2,12 +2,19 @@
 // 2D 도면을 실시간 3D로 변환. 고객 상담 시 회전/줌으로 공간을 보여줍니다.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
 import * as TEX from './textures.js';
 TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 (2D UI 는 three 의존 제거됨)
 
 const WALL_T = 100; // 벽 두께 mm
+const SKY_TOP = '#a9c6e3', SKY_HORIZON = '#e8eef3';   // 하늘 그라데이션 (지평선색 = 안개색)
+const HQ_KEY = 'seum_3d_hq';                          // 고화질(구석 음영) 사용 여부 저장
 
 export class Viewer3D {
   constructor(container) {
@@ -16,18 +23,34 @@ export class Viewer3D {
     this.dirty = true;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#eef1f4');
+    this.scene.background = this._skyTexture();
 
-    this.camera = new THREE.PerspectiveCamera(50, 1, 100, 200000);
+    this.camera = new THREE.PerspectiveCamera(50, 1, 100, 400000);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // 톤매핑 — 밋밋한 회색 느낌 대신 자연스럽고 화사한 실내 톤
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.0;
     container.appendChild(this.renderer.domElement);
 
+    // 환경광(반사) — 실내 스튜디오 조명을 미리 구워 모든 재질에 반사·간접광으로 입힘.
+    //   금속 사이딩·유리·창틀이 단색 플라스틱이 아니라 실제 자재처럼 빛을 받게 됨.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(this.renderer), 0.04).texture;
+    pmrem.dispose();
+
+    // 고화질 모드: 구석 음영(GTAO) 후처리. 느린 기기에선 자동으로 꺼짐
+    this.hq = true;
+    try { this.hq = localStorage.getItem(HQ_KEY) !== '0'; } catch { /* noop */ }
+    this._setupComposer();
+
+    // 필요할 때만 그리기 — 카메라/도면이 바뀔 때만 렌더해 GPU·배터리 절약
+    this._needsRender = true;
+    this._lastRender = 0;
+
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.addEventListener('change', () => { this._needsRender = true; });
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI / 2.05;
     // 휠 줌: 기본 OrbitControls 줌은 마우스/트랙패드의 deltaY 크기에 비례해
@@ -74,22 +97,97 @@ export class Viewer3D {
   }
 
   _lights() {
-    // 하늘빛/바닥 반사광 — 실내를 부드럽게 채움 (톤매핑에 맞춰 강도 상향)
-    this.scene.add(new THREE.HemisphereLight('#fff8ee', '#b7bcc4', 1.15));
-    this.scene.add(new THREE.AmbientLight('#ffffff', 0.25));
-    const sun = new THREE.DirectionalLight('#fff2df', 2.3);   // 따뜻한 햇빛
+    // 하늘빛/잔디 반사광 — 환경광(RoomEnvironment)이 간접광을 대부분 맡으므로 약하게
+    this.scene.add(new THREE.HemisphereLight('#eaf2ff', '#8a9272', 0.45));
+    const sun = new THREE.DirectionalLight('#fff0dc', 2.6);   // 따뜻한 햇빛
     sun.position.set(8000, 14000, 6000);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.bias = -0.0004;
-    const s = 16000;
-    sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
-    sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
-    sun.shadow.camera.far = 60000;
+    // 그림자 해상도 — 지원되면 4096 (도면 크기에 맞춰 _fitShadow 가 범위를 좁혀 선명하게)
+    const big = (this.renderer.capabilities.maxTextureSize || 0) >= 8192;
+    sun.shadow.mapSize.set(big ? 4096 : 2048, big ? 4096 : 2048);
+    sun.shadow.bias = -0.0002;
+    sun.shadow.normalBias = 12;
+    sun.shadow.radius = 3;
     this.scene.add(sun);
-    const fill = new THREE.DirectionalLight('#e6eeff', 0.6);  // 반대편 채움광
-    fill.position.set(-6000, 8000, -4000);
+    this.scene.add(sun.target);
+    this.sun = sun;
+    const fill = new THREE.DirectionalLight('#dfe8ff', 0.35);  // 반대편 채움광(그늘이 새까매지지 않게)
+    fill.position.set(6000, 8000, -4000);   // 햇빛 반대편(뒤-오른쪽)
     this.scene.add(fill);
+  }
+
+  // 햇빛 그림자 범위를 현재 도면 크기에 맞춤 — 작은 집일수록 그림자가 또렷해짐
+  _fitShadow(b) {
+    const s = Math.max(b.w, b.h) / 2 + 4000;
+    const sun = this.sun;
+    // 앞-왼쪽 위(고도 약 42°)에서 비춤 — 기본 카메라(앞-오른쪽)와 방향을 엇갈려야
+    //   그림자가 벽 뒤로 숨지 않고 바닥·마당에 보이며, 면마다 밝기 차가 생겨 입체감이 남
+    sun.position.set(-s * 0.9, s * 1.35, s * 1.0);
+    sun.target.position.set(0, 0, 0);
+    const c = sun.shadow.camera;
+    c.left = -s; c.right = s; c.top = s; c.bottom = -s;
+    c.near = 100; c.far = s * 6;
+    c.updateProjectionMatrix();
+  }
+
+  // 하늘 — 위는 맑은 하늘색, 지평선은 옅은 안개색 (세로 그라데이션)
+  _skyTexture() {
+    const c = document.createElement('canvas');
+    c.width = 2; c.height = 256;
+    const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, SKY_TOP);
+    g.addColorStop(0.75, SKY_HORIZON);
+    g.addColorStop(1, SKY_HORIZON);
+    x.fillStyle = g; x.fillRect(0, 0, 2, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  // 후처리 체인: 장면 → 구석 음영(GTAO) → 톤매핑/색공간 출력
+  _setupComposer() {
+    try {
+      const comp = new EffectComposer(this.renderer);
+      comp.addPass(new RenderPass(this.scene, this.camera));
+      const ao = new GTAOPass(this.scene, this.camera, 1, 1);
+      // 단위가 mm 이므로 반경도 mm — 벽 모서리·가구 밑·천장 구석에 은은한 음영
+      ao.updateGtaoMaterial({ radius: 700, distanceExponent: 1.5, thickness: 3, scale: 1.5, samples: 16, distanceFallOff: 1 });
+      ao.blendIntensity = 1;
+      comp.addPass(ao);
+      comp.addPass(new OutputPass());
+      this.composer = comp;
+      this._ao = ao;
+    } catch (e) {
+      console.warn('[3D] 고화질 후처리 사용 불가 — 기본 렌더로 동작', e);
+      this.composer = null;
+    }
+  }
+
+  // 고화질(구석 음영) on/off — 버튼·자동 성능 판단에서 호출
+  setQuality(on) {
+    this.hq = !!on;
+    this._hqPinned = !!on;   // 사용자가 직접 켠 경우 자동으로 끄지 않음
+    try { localStorage.setItem(HQ_KEY, on ? '1' : '0'); } catch { /* noop */ }
+    this._slowFrames = 0;
+    this._needsRender = true;
+  }
+
+  _render() {
+    const now = performance.now();
+    const gap = now - this._lastRender;   // 연속 회전 중이면 = 한 프레임 걸린 시간(GPU 포함)
+    if (this.hq && this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
+    this._lastRender = now;
+    // 고화질로 돌리는 중 프레임이 계속 70ms(약 14fps) 넘게 걸리면(느린 PC) 자동으로 기본 화질로
+    if (this.hq && this.composer && !this._hqPinned && gap < 250) {
+      this._slowFrames = gap > 70 ? (this._slowFrames || 0) + 1 : 0;
+      if (this._slowFrames >= 20) {
+        console.info('[3D] 렌더가 느려 고화질(구석 음영)을 자동으로 끕니다.');
+        this.hq = false; this._slowFrames = 0;
+        if (this.onQualityChange) this.onQualityChange(false);
+      }
+    }
   }
 
   setActive(on) {
@@ -116,8 +214,10 @@ export class Viewer3D {
     this.renderer.setPixelRatio(pr);
     // updateStyle=true: 캔버스 CSS 크기를 컨테이너에 맞춤
     this.renderer.setSize(cw, ch, true);
+    if (this.composer) { this.composer.setPixelRatio(pr); this.composer.setSize(cw, ch); }
     this.camera.aspect = cw / ch;
     this.camera.updateProjectionMatrix();
+    this._needsRender = true;
   }
 
   // 도면 중심/크기 계산
@@ -141,11 +241,18 @@ export class Viewer3D {
 
   rebuild() {
     this.dirty = false;
-    // 기존 제거
+    this._needsRender = true;
+    // 기존 제거 — 지오메트리는 매번 새로 만들므로 GPU 메모리도 함께 해제 (편집할수록 느려지는 것 방지)
+    //   (재질·텍스처는 textures.js 캐시를 공유하므로 해제하지 않음)
+    this.modelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
     this.modelGroup.clear();
     const d = store.design;
     const b = this._bounds();
     const H = d.ceilingHeight || 2400;
+    const M = Math.max(b.w, b.h);
+    this._fitShadow(b);
+    // 먼 곳은 하늘색 안개로 — 지면 끝선이 안 보이고 공기감이 생김 (카메라 최대 거리보다 멀리서 시작)
+    this.scene.fog = new THREE.Fog(SKY_HORIZON, M * 3 + 30000, M * 8 + 140000);
 
     // 바닥 그라운드 — 부지(땅) 이미지가 있으면 위성/항공 지면, 없으면 기본 회색
     const site = d.site;
@@ -153,7 +260,7 @@ export class Viewer3D {
     if (site && site.image) {
       const wMM = (site.widthM || 20) * 1000;
       const hMM = wMM * (site.aspect || 1);            // aspect = 이미지 세로/가로
-      const tex = new THREE.TextureLoader().load(site.image);
+      const tex = new THREE.TextureLoader().load(site.image, () => { this._needsRender = true; });
       if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
       ground = new THREE.Mesh(new THREE.PlaneGeometry(wMM, hMM),
@@ -162,10 +269,17 @@ export class Viewer3D {
       ground.rotation.z = -(site.rot || 0) * Math.PI / 180;   // 지면 회전
       ground.position.set(site.dx || 0, -2, site.dy || 0);
     } else {
-      ground = new THREE.Mesh(new THREE.PlaneGeometry(b.w + 8000, b.h + 8000),
-        new THREE.MeshStandardMaterial({ color: '#dfe3e8' }));
+      // 부지 이미지가 없으면 잔디 마당 — 지평선까지 넓게 깔고 안개로 자연스럽게 사라지게
+      const G = M * 16 + 300000;
+      ground = new THREE.Mesh(new THREE.PlaneGeometry(G, G), TEX.groundMaterial(G));
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = -2;
+      // 집 둘레 옅은 콘크리트 마당 — 집이 잔디 위에 '떠' 보이지 않게 받쳐줌
+      const pad = new THREE.Mesh(new THREE.PlaneGeometry(b.w + 2400, b.h + 2400), TEX.padMaterial(b.w + 2400, b.h + 2400));
+      pad.rotation.x = -Math.PI / 2;
+      pad.position.y = -1;   // 도면 중심 = 원점
+      pad.receiveShadow = true;
+      this.modelGroup.add(pad);
     }
     ground.receiveShadow = true;
     this.modelGroup.add(ground);
@@ -372,7 +486,7 @@ export class Viewer3D {
     g.rotation.y = -Math.atan2(pl.uy, pl.ux);
 
     // 프레임 — 중간 회색(알루미늄 새시 느낌). 흰색이면 흰 벽에 묻히고, 검정이면 구멍처럼 보임
-    const frameMat = new THREE.MeshStandardMaterial({ color: '#7c828a', roughness: 0.55, metalness: 0.25 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: '#7c828a', roughness: 0.38, metalness: 0.55 });   // 알루미늄 새시
     const W = o.w, Hh = o.h, FT = 70; // 프레임 두께
     // 외곽 프레임 (위/아래/좌/우) — 벽 두께보다 살짝만 나오게 해서 파묻힘 방지
     const addFrame = (w, h, x, y) => {
@@ -400,11 +514,14 @@ export class Viewer3D {
         kn.position.set(leafW / 2 - 70, -FT / 2, zz); g.add(kn);
       }
     } else {
-      // 유리 — 살짝 불투명한 하늘빛 판(테두리만 보이지 않게 유리면이 확실히 채워지게)
+      // 유리 — 환경광을 반사하는 반투명 유리 (하늘·실내가 비쳐 보이고, 안쪽도 은은히 보임)
       const glass = new THREE.Mesh(
         new THREE.BoxGeometry(W - FT * 2, Hh - FT * 2, 16),
-        new THREE.MeshStandardMaterial({ color: '#bfe0f2', transparent: true, opacity: 0.85, roughness: 0.12, metalness: 0.15, emissive: '#7fb4d6', emissiveIntensity: 0.4 })
+        // (고화질 후처리는 선형 색공간에서 섞여 유리가 더 뿌옇게 보이므로 불투명도를 낮게 잡음)
+        new THREE.MeshPhysicalMaterial({ color: '#a9cadb', transparent: true, opacity: 0.24, roughness: 0.04, metalness: 0,
+          clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.6, depthWrite: false })
       );
+      glass.renderOrder = 2;
       g.add(glass);
       // 세로 분할 프레임(멀리언)
       const panes = Math.max(1, t.panes || 1);
@@ -866,8 +983,12 @@ export class Viewer3D {
     if (!this.active) return;
     this._resize();   // 매 활성 프레임에 컨테이너 크기와 동기화 (탭 전환 후 흰 화면 자가 복구)
     if (this.dirty) this.rebuild();
-    this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    this.controls.update();   // 감쇠(관성) 회전 중이면 'change' → _needsRender
+    // 변화가 있을 때만 렌더. 혹시 놓친 변경이 있어도 1초마다 한 번은 다시 그려 자가 복구
+    if (this._needsRender || performance.now() - this._lastRender > 1000) {
+      this._needsRender = false;
+      this._render();
+    }
   }
 
   // 현재 3D 화면을 PNG dataURL 로 캡처 (인쇄/저장용). 3D 미진입 시에도 한 번 렌더해서 캡처
@@ -876,11 +997,16 @@ export class Viewer3D {
     if (!wasActive) {
       // 숨겨진 상태면 임시 크기 부여 후 렌더
       this.renderer.setSize(1200, 800, false);
+      if (this.composer) this.composer.setSize(1200, 800);
       this.camera.aspect = 1200 / 800;
       this.camera.updateProjectionMatrix();
       this.rebuild();
     }
-    this.renderer.render(this.scene, this.camera);
+    // 캡처·인쇄는 성능과 무관하게 항상 고화질(구석 음영)로
+    const hq = this.hq, pinned = this._hqPinned;
+    this.hq = true; this._hqPinned = true;
+    this._render();
+    this.hq = hq; this._hqPinned = pinned; this._needsRender = true;
     const url = this.renderer.domElement.toDataURL('image/png');
     if (!wasActive) { this._appliedW = 0; this._resize(); }   // 캡처용 임시 크기 무효화 → 다음에 재적용
     return url;

@@ -227,6 +227,7 @@ const T = [
       //   시공 사진 기준: 차콜 처마 마감판·원목 처마 밑면, 회색 포치 기둥·난간, 포치 원목 루바 천장+다운라이트
       exterior: { material: 'metalV', color: '#b8773e', corner: '#2f3237' },
       roof: { type: 'gable', color: '#3a3f44', ridge: 'x', rise: 1100, fascia: '#34373c', soffit: 'wood', postColor: '#5b6167' },
+      foundationHeight: 450,   // 기초 높이 — 데크·포치도 같은 높이(하부 회색 판재 마감)
       rooms: [
         // 본채 9,000×7,000 (x 1500~10500). 치수는 평면도 치수선 그대로(벽 중심 기준, 외벽 280·내벽 120)
         //   가로: 280 | 2,200 | 120 | 4,600 | 120 | 1,400 | 280   세로(좌): 280 | 1,630 | 120 | 1,350 | 120 | 3,220 | 280
@@ -305,6 +306,7 @@ export function instantiateTemplate(id) {
     name: b.name,
     productType: b.productType || '',
     ceilingHeight: b.ceilingHeight,
+    ...(b.foundationHeight ? { foundationHeight: b.foundationHeight } : {}),   // 기초 높이
     exterior: { ...b.exterior },
     roof: { ...b.roof },
     rooms, openings, furniture,

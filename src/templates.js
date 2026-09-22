@@ -227,40 +227,45 @@ const T = [
       exterior: { material: 'metal', color: '#7c5a36' },
       roof: { type: 'gable', color: '#3a3f44', ridge: 'x', rise: 1100 },
       rooms: [
-        // 본채 9,000×7,000 (x 1500~10500) — 후면(북) 밴드: 욕실1 · 현관 · 주방/식당 · 욕실2 · 세면
-        { key: 'bath1', type: 'bath',     name: '욕실1',     x: 1500, y: 0,    w: 2540, d: 2000 },
-        { key: 'ent',   type: 'entrance', name: '현관',      x: 1500, y: 2000, w: 2540, d: 1440 },
-        { key: 'kit',   type: 'kitchen',  name: '주방·식당', x: 4040, y: 0,    w: 4720, d: 3440, open: ['s'] },
+        // 본채 9,000×7,000 (x 1500~10500). 치수는 평면도 치수선 그대로(벽 중심 기준, 외벽 280·내벽 120)
+        //   가로: 280 | 2,200 | 120 | 4,600 | 120 | 1,400 | 280   세로(좌): 280 | 1,630 | 120 | 1,350 | 120 | 3,220 | 280
+        //   세로(우): 280 | 2,180 | 120 | 800 | 120 | 3,220 | 280  하부: 280 | 2,600 | 120 | 3,000 | 120 | 2,600 | 280
+        // 주방을 먼저 그려야 2D에서 트인 면(점선)이 욕실 벽 위에 덮이지 않음
+        { key: 'kit',   type: 'kitchen',  name: '주방·식당', x: 4040, y: 0,    w: 4720, d: 3440, open: ['s', 'w', 'e'] },
+        { key: 'bath1', type: 'bath',     name: '욕실1',     x: 1500, y: 0,    w: 2540, d: 1970 },
+        { key: 'ent',   type: 'entrance', name: '현관',      x: 1500, y: 1970, w: 1540, d: 1470 },
+        { key: 'hallL', type: 'hall',     name: '복도',      x: 3040, y: 1970, w: 1000, d: 1470, open: ['e'] },
         { key: 'bath2', type: 'bath',     name: '욕실2',     x: 8760, y: 0,    w: 1740, d: 2520 },
-        { key: 'wash',  type: 'utility',  name: '세면',      x: 8760, y: 2520, w: 1740, d: 920, open: ['w'] },
-        // 전면(남) 밴드 — 방1 · 거실 · 방2
+        { key: 'hallR', type: 'hall',     name: '복도',      x: 8760, y: 2520, w: 780,  d: 920,  open: ['w', 'e'] },
+        { key: 'wash',  type: 'utility',  name: '세면',      x: 9540, y: 2520, w: 960,  d: 920,  open: ['w'] },
+        // 전면(남) 밴드 — 방1 · 거실(북측 트임, 좌우 아트월) · 방2
         { key: 'bed1',  type: 'bedroom',  name: '방1',       x: 1500, y: 3440, w: 2940, d: 3560 },
         { key: 'liv',   type: 'living',   name: '거실',      x: 4440, y: 3440, w: 3120, d: 3560, open: ['n'] },
         { key: 'bed2',  type: 'bedroom',  name: '방2',       x: 7560, y: 3440, w: 2940, d: 3560 },
-        // 포치 7평(9,000×2,500, 낮은 외쪽지붕) · 데크 4평(서측 1,500 폭, 주출입구)
+        // 포치 7평(9,000×2,500, 낮은 외쪽지붕) · 데크(서측 1,500 폭, 본채 윗면~포치 끝, 주출입구)
         { key: 'porch', type: 'porch',    name: '포치(7평)', x: 1500, y: 7000, w: 9000, d: 2500 },
-        { key: 'deck',  type: 'deck',     name: '데크(4평)', x: 0,    y: 700,  w: 1500, d: 8800 },
+        { key: 'deck',  type: 'deck',     name: '데크(4평)', x: 0,    y: 0,    w: 1500, d: 9500 },
       ],
       openings: [
-        // 후면 창
+        // 후면 창 — 상부 치수선 880 | 1,000 | 1,520 | 1,500 | 2,820 | 600 | 680
         { roomKey: 'bath1', side: 'n', pos: 1380, winType: 'double',    w: 1000, h: 900,  sill: 1200 },
         { roomKey: 'kit',   side: 'n', pos: 1610, winType: 'double',    w: 1500, h: 600,  sill: 1350 },
         { roomKey: 'bath2', side: 'n', pos: 760,  winType: 'double',    w: 600,  h: 500,  sill: 1500 },
-        // 현관 단열문(데크 쪽) · 3연동 중문 · 욕실 문
-        { roomKey: 'ent',   side: 'w', pos: 950,  winType: 'door',      w: 900,  h: 2100 },
-        { roomKey: 'ent',   side: 'e', pos: 720,  winType: 'slideDoor', w: 1350, h: 2100 },
-        { roomKey: 'bath1', side: 'e', pos: 1500, winType: 'swingDoor', w: 900,  h: 2000 },
-        { roomKey: 'bath2', side: 'w', pos: 2050, winType: 'swingDoor', w: 700,  h: 2000 },
+        // 현관 단열문(데크 쪽, 좌측 치수 2,380 | 900) · 3연동 중문(현관 동측 전체) · 욕실 문(각 욕실 남측)
+        { roomKey: 'ent',   side: 'w', pos: 860,  winType: 'door',      w: 900,  h: 2100 },
+        { roomKey: 'ent',   side: 'e', pos: 735,  winType: 'slideDoor', w: 1350, h: 2100 },
+        { roomKey: 'bath1', side: 's', pos: 2030, winType: 'swingDoor', w: 800,  h: 2000 },
+        { roomKey: 'bath2', side: 's', pos: 465,  winType: 'swingDoor', w: 700,  h: 2000 },
         // 방 문(3틀)
-        { roomKey: 'bed1',  side: 'n', pos: 2400, winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'bed2',  side: 'n', pos: 540,  winType: 'swingDoor', w: 900,  h: 2100 },
-        // 측면 이중창
-        { roomKey: 'bed1',  side: 'w', pos: 1950, winType: 'double',    w: 1500, h: 1000, sill: 1100 },
-        { roomKey: 'bed2',  side: 'e', pos: 1950, winType: 'double',    w: 1500, h: 1000, sill: 1100 },
-        // 포치 쪽 — 방 픽스창 · 거실 이중창(출입)
-        { roomKey: 'bed1',  side: 's', pos: 1580, winType: 'fixed',     w: 1500, h: 1000, sill: 1100 },
-        { roomKey: 'liv',   side: 's', pos: 1560, winType: 'double',    w: 2000, h: 2100, sill: 0 },
-        { roomKey: 'bed2',  side: 's', pos: 1360, winType: 'fixed',     w: 1500, h: 1000, sill: 1100 },
+        { roomKey: 'bed1',  side: 'n', pos: 2440, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed2',  side: 'n', pos: 560,  winType: 'swingDoor', w: 900,  h: 2100 },
+        // 측면 이중창 — 좌·우 치수선 하단 580 | 1,500
+        { roomKey: 'bed1',  side: 'w', pos: 2230, winType: 'double',    w: 1500, h: 1000, sill: 900 },
+        { roomKey: 'bed2',  side: 'e', pos: 2230, winType: 'double',    w: 1500, h: 1000, sill: 900 },
+        // 포치 쪽 — 하부 치수선 830 | 1,500 | 1,220 | 1,900 | 1,220 | 1,500 | 830
+        { roomKey: 'bed1',  side: 's', pos: 1580, winType: 'fixed',     w: 1500, h: 1000, sill: 900 },
+        { roomKey: 'liv',   side: 's', pos: 1560, winType: 'double',    w: 1900, h: 2100, sill: 0 },
+        { roomKey: 'bed2',  side: 's', pos: 1360, winType: 'fixed',     w: 1500, h: 1000, sill: 900 },
       ],
       furniture: [],
     },

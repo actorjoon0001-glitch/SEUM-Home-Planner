@@ -86,6 +86,14 @@ export class Viewer3D {
     cv.addEventListener('pointermove', (e) => this._edMove(e));
     window.addEventListener('pointerup', () => this._edUp());
     cv.addEventListener('wheel', (e) => this._wheelZoom(e), { passive: false });
+    // 라이브러리(제품·창호·방) 카드를 3D 화면에 끌어다 놓기 — 떨어뜨린 바닥 지점에 배치 (실제 배치는 2D 편집기 로직 공유)
+    cv.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; });
+    cv.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const raw = e.dataTransfer && e.dataTransfer.getData('text/plain');
+      const g = raw && this._groundHit(e);
+      if (g && this.onDropAt) this.onDropAt(raw, g.x, g.y);
+    });
 
     store.subscribe(() => { this.dirty = true; });
     window.addEventListener('resize', () => this._resize());
@@ -1187,6 +1195,22 @@ export class Viewer3D {
     uv.needsUpdate = true;
   }
 
+  // 가구 그룹 등록 — 3D에서 클릭·드래그로 잡을 수 있게 모든 부품에 가구 id 표시,
+  //   선택된 가구는 바닥에 빨간 테두리 판으로 강조
+  _addFurniture(g, f) {
+    g.traverse((o) => { o.userData.furnId = f.id; });
+    if (store.selectedFurniture === f.id) {
+      const bb = new THREE.Box3().setFromObject(g);
+      const w = bb.max.x - bb.min.x + 120, dd = bb.max.z - bb.min.z + 120;
+      const ring = new THREE.Mesh(new THREE.BoxGeometry(w, 20, dd),
+        new THREE.MeshStandardMaterial({ color: '#c8102e', transparent: true, opacity: 0.35, depthWrite: false }));
+      ring.position.set((bb.min.x + bb.max.x) / 2, 70, (bb.min.z + bb.max.z) / 2);
+      ring.userData.furnId = f.id;
+      this.modelGroup.add(ring);
+    }
+    this.modelGroup.add(g);
+  }
+
   _buildFurniture(f, b, ceilH = 2400) {
     const c = catalogOf(f.catalogId); if (!c) return;
     const [px, pz] = this._p(f.x, f.y, b);
@@ -1298,7 +1322,7 @@ export class Viewer3D {
         default: return false;
       }
     };
-    if (fixture()) { this.modelGroup.add(g); return; }
+    if (fixture()) { this._addFurniture(g, f); return; }
 
     switch (c.kind) {
       case 'sofa': {
@@ -1348,7 +1372,7 @@ export class Viewer3D {
       default: // box
         addBox(c.w, c.h, c.d, c.h / 2, c.color, 0, 0, woodBox ? 'wood' : undefined);
     }
-    this.modelGroup.add(g);
+    this._addFurniture(g, f);
   }
 
   _animate() {
@@ -1545,6 +1569,17 @@ export class Viewer3D {
     const b = this._bounds();
     return { x: t.x + b.cx, y: t.z + b.cz };
   }
+  _pickFurniture(e) {   // 화면 포인터 아래 가장 가까운 가구 id (없으면 null)
+    this.modelGroup.updateMatrixWorld();   // 방금 다시 만든(아직 렌더 전) 모델도 정확한 위치로
+    this._raycaster.setFromCamera(this._ndc(e), this.camera);
+    const hits = this._raycaster.intersectObjects(this.modelGroup.children, true);
+    for (const h of hits) {
+      const u = h.object.userData || {};
+      if (u.furnId) return u.furnId;
+      if (h.object.material && !h.object.material.transparent) return null;   // 벽 등 불투명한 것에 먼저 막히면 선택 안 함
+    }
+    return null;
+  }
   _pick(e) {        // 핸들/방 선택 (핸들 우선)
     this._raycaster.setFromCamera(this._ndc(e), this.camera);
     const hits = this._raycaster.intersectObjects(this.modelGroup.children, true);
@@ -1559,8 +1594,18 @@ export class Viewer3D {
       if (pick) { this._faceDrag = { key: pick.key, u0: pick.u, u1: pick.u }; this.controls.enabled = false; }
       return;
     }
-    if (!this.editMode) return;
     if (e.button !== 0) return;            // 좌클릭만 편집 — 휠(가운데)·우클릭은 카메라 이동/회전
+    // 가구(제품): 편집 모드가 아니어도 잡아서 끌면 이동 (빈 곳을 끌면 기존처럼 회전)
+    const fp = this._pickFurniture(e);
+    if (fp) {
+      const f = store.design.furniture.find((x) => x.id === fp); if (!f) return;
+      const g = this._groundHit(e); if (!g) return;
+      if (store.selectedFurniture !== f.id) { store.selectedFurniture = f.id; store.selectedRoom = store.selectedOpening = null; store.emit(); }
+      this.controls.enabled = false;
+      this._edrag = { mode: 'furn', f, dx: g.x - f.x, dy: g.y - f.y };
+      return;
+    }
+    if (!this.editMode) return;
     const pick = this._pick(e);
     if (!pick) return;                    // 빈 곳 → 궤도(회전) 그대로
     const room = store.design.rooms.find((r) => r.id === pick.roomId); if (!room) return;
@@ -1583,6 +1628,11 @@ export class Viewer3D {
     if (!this._edrag.snapped) { store.snapshot(); this._edrag.snapped = true; }
     const snap = (v) => Math.round(v / 100) * 100;
     const dr = this._edrag, room = dr.room;
+    if (dr.mode === 'furn') {           // 가구 이동 — 50mm 단위
+      const s50 = (v) => Math.round(v / 50) * 50;
+      store.liveUpdate(() => { dr.f.x = s50(g.x - dr.dx); dr.f.y = s50(g.y - dr.dy); });
+      return;
+    }
     if (dr.mode === 'move') {
       store.liveUpdate(() => { room.x = snap(g.x - dr.dx); room.y = snap(g.y - dr.dy); });
     } else {

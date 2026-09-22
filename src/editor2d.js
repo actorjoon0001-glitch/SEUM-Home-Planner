@@ -2070,7 +2070,11 @@ export class Editor2D {
     if (!raw) return;
     const [px, py] = this._pos(e);
     const [mx, my] = this.toMm(px, py);
+    this.dropAt(raw, mx, my);
+  }
 
+  // 라이브러리 항목을 도면 좌표(mm)에 배치 — 2D 드롭과 3D 화면 드롭이 함께 사용
+  dropAt(raw, mx, my) {
     // 창호 드롭: "win:<type>" → 가장 가까운 방의 가까운 벽에 부착
     if (raw.startsWith('win:')) {
       const winType = raw.slice(4);

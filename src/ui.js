@@ -1589,6 +1589,9 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('view-roof').onclick = () => applyOuter('showRoof', !viewer.showRoof);
 
   // 3D 고화질(구석 음영) 토글 — 느린 PC에서 자동으로 꺼지면 버튼도 따라 꺼짐
+  // 3D 화면에 라이브러리(제품·창호·방) 끌어다 놓기 → 2D 편집기와 같은 배치 로직
+  viewer.onDropAt = (raw, mx, my) => editor.dropAt(raw, mx, my);
+
   const hqBtn = $('view-hq');
   if (hqBtn && viewer.setQuality) {
     hqBtn.classList.toggle('on', !!viewer.hq);

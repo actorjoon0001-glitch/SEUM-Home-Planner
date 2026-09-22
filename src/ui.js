@@ -1449,6 +1449,14 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('view-ext').onclick = () => applyOuter('showExterior', !viewer.showExterior);
   $('view-roof').onclick = () => applyOuter('showRoof', !viewer.showRoof);
 
+  // 3D 고화질(구석 음영) 토글 — 느린 PC에서 자동으로 꺼지면 버튼도 따라 꺼짐
+  const hqBtn = $('view-hq');
+  if (hqBtn && viewer.setQuality) {
+    hqBtn.classList.toggle('on', !!viewer.hq);
+    viewer.onQualityChange = (on) => { hqBtn.classList.toggle('on', on); if (!on) flash('PC 성능에 맞춰 3D 고화질을 껐어요 (✨ 고화질 버튼으로 다시 켤 수 있어요)'); };
+    hqBtn.onclick = () => { viewer.setQuality(!viewer.hq); hqBtn.classList.toggle('on', viewer.hq); };
+  } else if (hqBtn) hqBtn.classList.add('hidden');
+
   // 3D 카메라 프리셋
   $('view-iso').onclick = () => viewer.view('iso');
   $('view-top').onclick = () => viewer.view('top');

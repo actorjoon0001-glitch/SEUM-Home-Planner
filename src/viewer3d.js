@@ -7,6 +7,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
 import * as TEX from './textures.js';
@@ -289,6 +290,7 @@ export class Viewer3D {
     this._buildInteriorWalls(d, b, H);          // 방 벽(겹친 벽은 한 겹으로 합침)
     for (const o of (d.openings || [])) this._buildOpening(o, b);
     for (const f of d.furniture) this._buildFurniture(f, b, H);
+    this._buildRailings(d, b);                  // 데크·포치 난간 (room.rail 지정 시)
 
     // 외장재 + 지붕 (토글)
     if (this.showExterior) this._buildExterior(d, b, H);
@@ -351,10 +353,13 @@ export class Viewer3D {
     const wallH = isAttic ? ATTIC_HEIGHT : ceilH;
     const [px, pz] = this._p(room.x, room.y, b);
 
-    // 바닥 (방 종류별 마루/타일 질감)
+    // 바닥 (방 종류별 마루/타일 질감) — 3D 는 2D 구분색(파스텔) 대신 실제 마감 색
+    //   마루: 밝은 오크 강화마루, 욕실·다용도: 밝은 회색 타일, 현관: 진회색 타일 (도면에서 floorColor 로 지정 가능)
+    const FLOOR_COLOR = { bath: '#d9dcdf', utility: '#d9dcdf', entrance: '#8d9298' };
+    const floorCol = room.floorColor || FLOOR_COLOR[room.type] || store.design.floorColor || '#cfb087';
     const floor = new THREE.Mesh(
       new THREE.BoxGeometry(room.w, 60, room.d),
-      TEX.floorMaterial(room.type, t.color, room.w, room.d)
+      TEX.floorMaterial(room.type, floorCol, room.w, room.d)
     );
     floor.position.set(px + room.w / 2, 30, pz + room.d / 2);
     floor.userData.roomId = room.id;   // 3D 편집: 방 선택용
@@ -363,6 +368,7 @@ export class Viewer3D {
     this.modelGroup.add(floor);
 
     if (isOpen) return; // 발코니는 벽 생략(난간 느낌)
+    this._buildArtWalls(room, b, wallH);
 
     // 벽은 방마다 그리지 않고 _buildInteriorWalls 에서 한 번에(겹친 벽 합침).
 
@@ -486,7 +492,8 @@ export class Viewer3D {
     g.rotation.y = -Math.atan2(pl.uy, pl.ux);
 
     // 프레임 — 중간 회색(알루미늄 새시 느낌). 흰색이면 흰 벽에 묻히고, 검정이면 구멍처럼 보임
-    const frameMat = new THREE.MeshStandardMaterial({ color: '#7c828a', roughness: 0.38, metalness: 0.55 });   // 알루미늄 새시
+    // 새시 — 속성 패널의 '창틀 색상'(o.color) 반영 (예전엔 무시되고 항상 회색이었음)
+    const frameMat = new THREE.MeshStandardMaterial({ color: o.color || '#7c828a', roughness: 0.38, metalness: 0.55 });
     const W = o.w, Hh = o.h, FT = 70; // 프레임 두께
     // 외곽 프레임 (위/아래/좌/우) — 벽 두께보다 살짝만 나오게 해서 파묻힘 방지
     const addFrame = (w, h, x, y) => {
@@ -531,12 +538,25 @@ export class Viewer3D {
         const mull = new THREE.Mesh(new THREE.BoxGeometry(mullW, Hh - FT * 2, WALL_T), frameMat);
         mull.position.set(x, 0, 0); g.add(mull);
       }
-      // 가로 중간 살(창살)
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(W - FT * 2, FT * 0.6, WALL_T * 0.8), frameMat);
-      rail.position.set(0, 0, 0); g.add(rail);
-      // 창턱(실) — 아래쪽 바깥으로 살짝 튀어나온 판
-      const sill = new THREE.Mesh(new THREE.BoxGeometry(W + 40, 40, WALL_T + 90), frameMat);
-      sill.position.set(0, -Hh / 2 + 20, 0); g.add(sill);
+      // 가로 중간 살(창살) — 유리 중문 등(noRail)은 생략
+      if (!t.noRail) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(W - FT * 2, FT * 0.6, WALL_T * 0.8), frameMat);
+        rail.position.set(0, 0, 0); g.add(rail);
+      }
+      // 창턱(실) — 아래쪽 바깥으로 살짝 튀어나온 판 (바닥까지 내려오는 문 형태는 생략)
+      if ((o.sill || 0) > 0) {
+        const sill = new THREE.Mesh(new THREE.BoxGeometry(W + 40, 40, WALL_T + 90), frameMat);
+        sill.position.set(0, -Hh / 2 + 20, 0); g.add(sill);
+      }
+      // 창 둘레 마감 몰딩 — 외벽 쪽에 두꺼운 테두리 (세움 시공: 창틀색과 같은 진한 프레임)
+      if (o.trim) {
+        const TR = 90, depth = WALL_T + 240;   // 외장(바깥면 120)보다 앞으로 나와야 겹쳐 깜빡이지 않음
+        for (const [w, h, x, y] of [[W + TR * 2, TR, 0, Hh / 2 + TR / 2], [W + TR * 2, TR, 0, -Hh / 2 - TR / 2], [TR, Hh, -W / 2 - TR / 2, 0], [TR, Hh, W / 2 + TR / 2, 0]]) {
+          if (y < 0 && !(o.sill > 0)) continue;   // 바닥까지 오는 문은 아래 몰딩 없음
+          const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, depth), frameMat);
+          m.position.set(x, y, 0); m.castShadow = true; g.add(m);
+        }
+      }
     }
     this.modelGroup.add(g);
   }
@@ -728,6 +748,7 @@ export class Viewer3D {
           }
         }
       });
+      this._buildCornerTrims(d, b, H, off + T / 2);
       return;
     }
 
@@ -765,6 +786,28 @@ export class Viewer3D {
       if (!open.includes('w') && !inAnyRoom(r.x - EPS, cz)) cladEdge(r, 'w', wallH);
       if (!open.includes('e') && !inAnyRoom(r.x + r.w + EPS, cz)) cladEdge(r, 'e', wallH);
     }
+    this._buildCornerTrims(d, b, ceilH, T);
+  }
+
+  // 외벽 모서리 포인트 — exterior.corner 색이 있으면 집 네 모서리를 ㄱ자로 감싸는 진한 패널(폭 420)
+  //   (세움 시공 사진: 우드톤 세로 사이딩 + 차콜 모서리). outFace: 외장 바깥면까지의 거리(벽선 기준)
+  _buildCornerTrims(d, b, H, outFace) {
+    const ex = d.exterior || {};
+    if (!ex.corner) return;
+    const def = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.metal;
+    const fb = this._roofBounds(d, b);
+    const CW = 420, T = 40;   // 모서리 패널 폭, 외장 바깥면에 덧대는 두께
+    const x0 = fb.minX - b.cx - outFace, x1 = fb.maxX - b.cx + outFace;
+    const z0 = fb.minY - b.cz - outFace, z1 = fb.maxY - b.cz + outFace;
+    const mat = () => TEX.exteriorMaterial(ex.material || 'metal', ex.corner, CW, H, def.roughness, def.metalness);
+    for (const [cx, cz, sx, sz] of [[x0, z0, 1, 1], [x1, z0, -1, 1], [x0, z1, 1, -1], [x1, z1, -1, -1]]) {
+      // x 방향 면(북·남 벽)에 붙는 판 + z 방향 면(동·서 벽)에 붙는 판
+      const a = new THREE.Mesh(new THREE.BoxGeometry(CW, H, T), mat());
+      a.position.set(cx + sx * (CW / 2 - T), H / 2, cz - sz * T / 2);
+      const c = new THREE.Mesh(new THREE.BoxGeometry(T, H, CW), mat());
+      c.position.set(cx - sx * T / 2, H / 2, cz + sz * (CW / 2 - T));
+      for (const m of [a, c]) { m.castShadow = true; m.receiveShadow = true; this.modelGroup.add(m); }
+    }
   }
 
   // 지붕: 형태별 생성 (평지붕/박공/비대칭박공/우진각/외쪽)
@@ -794,7 +837,7 @@ export class Viewer3D {
     const k = type === 'shed' ? rise / (2 * (spanW / 2 + 750)) : rise / (spanW / 2 + 750);
 
     const roofMat = TEX.roofMaterial(color, 1500, 1500);   // UV 를 mm/1500 단위로 직접 넣으므로 반복 1
-    const trimMat = new THREE.MeshStandardMaterial({ color: '#ebe8e1', roughness: 0.6 });   // 파사드·소핏·물받이
+    const { trimMat, soffitMat } = this._roofTrimMats(roof);   // 파사드·물받이 / 처마 밑면
     const capMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.8), roughness: 0.5, metalness: 0.3 });
     const grp = new THREE.Group();
     grp.position.set(fb.cx - b.cx, plateY, fb.cz - b.cz);
@@ -834,7 +877,7 @@ export class Viewer3D {
     if (type === 'flat') {
       // 평지붕: 얇은 슬래브 + 둘레 파라펫 느낌의 마감판
       const X = Sx + 300, Z = Sz + 300;
-      add(this._roofSlab([[-X, 0, -Z], [X, 0, -Z], [X, 0, Z], [-X, 0, Z]], [1, 0, 0], TH + 60, roofMat, trimMat));
+      add(this._roofSlab([[-X, 0, -Z], [X, 0, -Z], [X, 0, Z], [-X, 0, Z]], [1, 0, 0], TH + 60, roofMat, trimMat, soffitMat));
       grp.position.y = plateY + TH + 60;
     } else if (type === 'hip') {
       // 우진각(모임): 네 면이 모두 처마로 내려오고, 긴 쪽으로 용마루
@@ -844,15 +887,15 @@ export class Viewer3D {
       else        { r0 = [-(X - Z), top, 0]; r1 = [X - Z, top, 0]; }
       const A = [-X, ye, -Z], B = [X, ye, -Z], C = [X, ye, Z], D = [-X, ye, Z];
       if (Z >= X) {
-        add(this._roofSlab(L([A, D, r1, r0]), [0, 0, 1], TH, roofMat, trimMat));   // 서
-        add(this._roofSlab(L([C, B, r0, r1]), [0, 0, -1], TH, roofMat, trimMat));  // 동
-        add(this._roofSlab(L([B, A, r0]), [-1, 0, 0], TH, roofMat, trimMat));      // 북
-        add(this._roofSlab(L([D, C, r1]), [1, 0, 0], TH, roofMat, trimMat));       // 남
+        add(this._roofSlab(L([A, D, r1, r0]), [0, 0, 1], TH, roofMat, trimMat, soffitMat));   // 서
+        add(this._roofSlab(L([C, B, r0, r1]), [0, 0, -1], TH, roofMat, trimMat, soffitMat));  // 동
+        add(this._roofSlab(L([B, A, r0]), [-1, 0, 0], TH, roofMat, trimMat, soffitMat));      // 북
+        add(this._roofSlab(L([D, C, r1]), [1, 0, 0], TH, roofMat, trimMat, soffitMat));       // 남
       } else {
-        add(this._roofSlab(L([B, A, r0, r1]), [-1, 0, 0], TH, roofMat, trimMat));
-        add(this._roofSlab(L([D, C, r1, r0]), [1, 0, 0], TH, roofMat, trimMat));
-        add(this._roofSlab(L([A, D, r0]), [0, 0, 1], TH, roofMat, trimMat));
-        add(this._roofSlab(L([C, B, r1]), [0, 0, -1], TH, roofMat, trimMat));
+        add(this._roofSlab(L([B, A, r0, r1]), [-1, 0, 0], TH, roofMat, trimMat, soffitMat));
+        add(this._roofSlab(L([D, C, r1, r0]), [1, 0, 0], TH, roofMat, trimMat, soffitMat));
+        add(this._roofSlab(L([A, D, r0]), [0, 0, 1], TH, roofMat, trimMat, soffitMat));
+        add(this._roofSlab(L([C, B, r1]), [0, 0, -1], TH, roofMat, trimMat, soffitMat));
       }
       const rl = Math.hypot(r1[0] - r0[0], r1[2] - r0[2]);
       if (rl > 1) {
@@ -867,7 +910,7 @@ export class Viewer3D {
         // 외쪽: 서쪽(-x)이 낮고 동쪽(+x)이 높은 한 면
         const hHigh = k * 2 * Sx;
         const x0 = -Sx - E, y0 = -k * E, x1 = Sx + 300, y1 = hHigh + k * 300;
-        add(this._roofSlab(L([[x0, y0, -Z], [x0, y0, Z], [x1, y1, Z], [x1, y1, -Z]]), [0, 0, 1], TH, roofMat, trimMat));
+        add(this._roofSlab(L([[x0, y0, -Z], [x0, y0, Z], [x1, y1, Z], [x1, y1, -Z]]), [0, 0, 1], TH, roofMat, trimMat, soffitMat));
         gableFill([[-Sx, 0], [Sx, 0], [Sx, hHigh]]);
         // 높은 쪽 외벽(동쪽) — plate 위 삼각 공간을 벽으로 막음
         const hw = add(new THREE.Mesh(new THREE.BoxGeometry(120, hHigh, 2 * Sz), fillMat(2 * Sz, hHigh)));
@@ -878,8 +921,8 @@ export class Viewer3D {
         const hR = k * Sx;                                   // 용마루 높이 (plate 기준, 지붕판 밑면)
         const kL = hR / (ridgeX + Sx), kR = hR / (Sx - ridgeX);   // 좌·우 경사 (비대칭이면 다름)
         const xl = -Sx - E, yl = -kL * E, xr = Sx + E, yr = -kR * E;
-        add(this._roofSlab(L([[xl, yl, -Z], [xl, yl, Z], [ridgeX, hR, Z], [ridgeX, hR, -Z]]), [0, 0, 1], TH, roofMat, trimMat));
-        add(this._roofSlab(L([[xr, yr, Z], [xr, yr, -Z], [ridgeX, hR, -Z], [ridgeX, hR, Z]]), [0, 0, -1], TH, roofMat, trimMat));
+        add(this._roofSlab(L([[xl, yl, -Z], [xl, yl, Z], [ridgeX, hR, Z], [ridgeX, hR, -Z]]), [0, 0, 1], TH, roofMat, trimMat, soffitMat));
+        add(this._roofSlab(L([[xr, yr, Z], [xr, yr, -Z], [ridgeX, hR, -Z], [ridgeX, hR, Z]]), [0, 0, -1], TH, roofMat, trimMat, soffitMat));
         gableFill([[-Sx, 0], [Sx, 0], [ridgeX, hR]]);
         const cap = add(new THREE.Mesh(new THREE.BoxGeometry(260, 110, 2 * Z + 40), capMat));
         cap.position.set(ridgeX, hR + TH + 40, 0);
@@ -911,9 +954,10 @@ export class Viewer3D {
   _buildPorchRoofs(d, b, ceilH, fb, color) {
     const porches = d.rooms.filter((r) => r.type === 'porch');
     if (!porches.length) return;
+    const roof = d.roof || {};
     const roofMat = TEX.roofMaterial(color, 1500, 1500);
-    const trimMat = new THREE.MeshStandardMaterial({ color: '#ebe8e1', roughness: 0.6 });
-    const postMat = new THREE.MeshStandardMaterial({ color: '#2a2c2f', roughness: 0.5, metalness: 0.4 });
+    const { trimMat, soffitMat } = this._roofTrimMats(roof, true);   // 포치 천장: 기본 원목 루바
+    const postMat = new THREE.MeshStandardMaterial({ color: roof.postColor || '#2a2c2f', roughness: 0.5, metalness: 0.4 });
     // 높은 쪽(본채 벽)·낮은 쪽 높이, 내밀기 — 본채 처마 밑으로 들어가도록 벽 윗면보다 낮게
     const TH = 100, hHigh = ceilH - 150, hLow = ceilH - 350, O = 300;
     const EPS = 30;
@@ -935,9 +979,41 @@ export class Viewer3D {
       else if (side === 'e') top = [[x0, lo, z0], [px + r.w, hi, z0], [px + r.w, hi, z1], [x0, lo, z1]];
       else top = [[x0, hi, z0], [x1, hi, z0], [x1, hi, z1], [x0, hi, z1]];
       const eave = (side === 'n' || side === 's') ? [1, 0, 0] : [0, 0, 1];
-      const slab = this._roofSlab(top, eave, TH, roofMat, trimMat);
+      const slab = this._roofSlab(top, eave, TH, roofMat, trimMat, soffitMat);
       slab.castShadow = true; slab.receiveShadow = true;
       this.modelGroup.add(slab);
+      // 천장 조명 — 매립 다운라이트 + 벽쪽 LED 간접조명 띠 (r.lights 가 켜진 포치만)
+      if (r.lights) {
+        // 천장(지붕판 밑면) 높이: 본채 쪽 hHigh → 바깥 hLow 로 선형
+        const ceilAt = (x, z) => {
+          if (!side) return hHigh;
+          const t = side === 'n' ? (z - pz) / r.d : side === 's' ? (pz + r.d - z) / r.d
+            : side === 'w' ? (x - px) / r.w : (px + r.w - x) / r.w;
+          return hHigh + (hLow - hHigh) * Math.min(1, Math.max(0, t));
+        };
+        const lampMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff4dc', emissiveIntensity: 2.2 });
+        const along = (side === 'n' || side === 's') ? r.w : r.d, across = (side === 'n' || side === 's') ? r.d : r.w;
+        const nA = Math.max(2, Math.round(along / 1800));
+        for (let i = 0; i < nA; i++) for (const f of [0.35, 0.8]) {
+          const u = (i + 0.5) / nA * along, v = f * across;
+          let x, z;
+          if (side === 'n') { x = px + u; z = pz + v; } else if (side === 's') { x = px + u; z = pz + r.d - v; }
+          else if (side === 'w') { x = px + v; z = pz + u; } else { x = px + r.w - v; z = pz + u; }
+          const lamp = new THREE.Mesh(new THREE.CylinderGeometry(75, 75, 12, 20), lampMat);
+          lamp.position.set(x, ceilAt(x, z) - 6, z);
+          this.modelGroup.add(lamp);
+        }
+        // LED 띠 — 본채 벽을 따라 천장 바로 아래 (따뜻한 노란빛)
+        if (side) {
+          const ledMat = new THREE.MeshStandardMaterial({ color: '#ffd978', emissive: '#ffbe3c', emissiveIntensity: 2.5 });
+          const len = along;
+          const led = new THREE.Mesh(new THREE.BoxGeometry(side === 'n' || side === 's' ? len : 40, 30, side === 'n' || side === 's' ? 40 : len), ledMat);
+          const lx = side === 'w' ? px + 40 : side === 'e' ? px + r.w - 40 : px + r.w / 2;
+          const lz = side === 'n' ? pz + 40 : side === 's' ? pz + r.d - 40 : pz + r.d / 2;
+          led.position.set(lx, hHigh - 20, lz);
+          this.modelGroup.add(led);
+        }
+      }
       // 기둥 — 본채 반대쪽 변(들)을 따라 약 3m 간격, 100×100
       const postAt = (x, z, h) => {
         const m = new THREE.Mesh(new THREE.BoxGeometry(100, h, 100), postMat);
@@ -957,9 +1033,76 @@ export class Viewer3D {
     }
   }
 
+  // 지붕 마감 재질 — roof.fascia: 처마 끝 마감판·물받이 색, roof.soffit: 처마 밑면('wood' = 원목 루바 또는 색)
+  //   기본은 흰색(예전과 동일). woodDefault: 포치 천장처럼 지정이 없으면 원목 루바로
+  _roofTrimMats(roof, woodDefault = false) {
+    const trimMat = new THREE.MeshStandardMaterial({ color: roof.fascia || '#ebe8e1', roughness: 0.55, metalness: roof.fascia ? 0.35 : 0 });
+    const s = roof.soffit || (woodDefault ? 'wood' : null);
+    const soffitMat = s === 'wood' ? TEX.soffitWoodMaterial(roof.soffitColor || '#f2c48a')   // 밝은 소나무 루바
+      : s ? new THREE.MeshStandardMaterial({ color: s, roughness: 0.7 }) : trimMat;
+    return { trimMat, soffitMat };
+  }
+
+  // 난간 — 데크·포치의 room.rail: ['s','e'] 처럼 지정한 변을 따라 (높이 1,000, 세로 살 110 간격)
+  //   살·기둥·손잡이를 한 덩어리 지오메트리로 합쳐 가볍게 (메시 수 폭증 방지)
+  _buildRailings(d, b) {
+    const H = 1000, FLOOR = 60;
+    for (const r of d.rooms) {
+      const sides = Array.isArray(r.rail) ? r.rail : [];
+      if (!sides.length) continue;
+      const [px, pz] = this._p(r.x, r.y, b);
+      const parts = [];
+      const box = (w, h, dd, x, y, z) => { const g = new THREE.BoxGeometry(w, h, dd); g.translate(x, y, z); parts.push(g); };
+      const inset = 40;
+      for (const s of sides) {
+        let ax, az, bx, bz;
+        if (s === 'n') { ax = px; az = pz + inset; bx = px + r.w; bz = az; }
+        else if (s === 's') { ax = px; az = pz + r.d - inset; bx = px + r.w; bz = az; }
+        else if (s === 'w') { ax = px + inset; az = pz; bx = ax; bz = pz + r.d; }
+        else if (s === 'e') { ax = px + r.w - inset; az = pz; bx = ax; bz = pz + r.d; } else continue;
+        const len = Math.hypot(bx - ax, bz - az), horiz = az === bz;
+        const at = (t) => [ax + (bx - ax) * t, az + (bz - az) * t];
+        // 손잡이(윗 난간) + 아래 가로대
+        const [mx, mz] = at(0.5);
+        box(horiz ? len : 60, 50, horiz ? 60 : len, mx, FLOOR + H - 25, mz);
+        box(horiz ? len : 40, 40, horiz ? 40 : len, mx, FLOOR + 120, mz);
+        // 기둥 약 1.5m 간격
+        const nP = Math.max(1, Math.round(len / 1500));
+        for (let i = 0; i <= nP; i++) { const [x, z] = at(i / nP); box(60, H, 60, x, FLOOR + H / 2, z); }
+        // 세로 살
+        const nB = Math.floor(len / 110);
+        for (let i = 1; i < nB; i++) { const [x, z] = at(i / nB); box(25, H - 170, 25, x, FLOOR + 140 + (H - 170) / 2 - 20, z); }
+      }
+      if (!parts.length) continue;
+      const geo = mergeGeometries(parts);
+      parts.forEach((g) => g.dispose());
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: r.railColor || '#6f757b', roughness: 0.5, metalness: 0.4 }));
+      m.castShadow = true; m.receiveShadow = true;
+      this.modelGroup.add(m);
+    }
+  }
+
+  // 실내 아트월 — room.artWall: ['e','w'] 처럼 지정한 벽 안쪽에 세로 루버(템바보드) 패널
+  _buildArtWalls(room, b, wallH) {
+    const sides = Array.isArray(room.artWall) ? room.artWall : [];
+    if (!sides.length) return;
+    const [px, pz] = this._p(room.x, room.y, b);
+    const T = 24, gap = WALL_T / 2 + T / 2 + 2, h = wallH - 40;
+    for (const s of sides) {
+      const horiz = s === 'n' || s === 's';
+      const len = (horiz ? room.w : room.d) - WALL_T;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : T, h, horiz ? T : len), TEX.slatMaterial(room.artColor || '#d8c3a5', len, h));
+      const x = s === 'w' ? px + gap : s === 'e' ? px + room.w - gap : px + room.w / 2;
+      const z = s === 'n' ? pz + gap : s === 's' ? pz + room.d - gap : pz + room.d / 2;
+      m.position.set(x, 60 + h / 2, z);
+      m.receiveShadow = true;
+      this.modelGroup.add(m);
+    }
+  }
+
   // 두께 있는 지붕판 1장 — top: 윗면 다각형(볼록, 월드 좌표 [x,y,z]), eaveDir: 처마선 방향(기와 줄 방향),
   //   th: 두께(수직). 윗면 = 기와/슁글, 밑면·옆면 = 마감판(소핏·파사드). 기와 줄이 처마와 나란하도록 UV 계산.
-  _roofSlab(top, eaveDir, th, topMat, sideMat) {
+  _roofSlab(top, eaveDir, th, topMat, sideMat, bottomMat = sideMat) {
     const V = top.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
     // 윗면 법선이 위를 향하도록 정점 순서 정리
     const nrm = new THREE.Vector3().subVectors(V[1], V[0]).cross(new THREE.Vector3().subVectors(V[2], V[0]));
@@ -977,8 +1120,9 @@ export class Viewer3D {
     // 윗면 (부채꼴 삼각형)
     for (let i = 1; i < n - 1; i++) for (const p of [V[0], V[i], V[i + 1]]) push(p, p.dot(e) / T, p.dot(up) / T);
     const topCount = pos.length / 3;
-    // 밑면 (반대 방향)
-    for (let i = 1; i < n - 1; i++) for (const p of [Bv[0], Bv[i + 1], Bv[i]]) push(p, p.x / T, p.z / T);
+    // 밑면 (반대 방향) — 처마 밑면(소핏)·포치 천장. 루바 판재가 처마선과 나란하도록 UV
+    for (let i = 1; i < n - 1; i++) for (const p of [Bv[0], Bv[i + 1], Bv[i]]) push(p, p.dot(e) / T, p.dot(up) / T);
+    const botCount = pos.length / 3 - topCount;
     // 옆면 (처마 끝 마감판)
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
@@ -988,9 +1132,10 @@ export class Viewer3D {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.addGroup(0, topCount, 0);
-    geo.addGroup(topCount, pos.length / 3 - topCount, 1);
+    geo.addGroup(topCount, botCount, 2);
+    geo.addGroup(topCount + botCount, pos.length / 3 - topCount - botCount, 1);
     geo.computeVertexNormals();
-    return new THREE.Mesh(geo, [topMat, sideMat]);
+    return new THREE.Mesh(geo, [topMat, sideMat, bottomMat]);
   }
 
   // 평면(XY) 도형의 UV 를 0..1 로 — 외장재 텍스처 반복(len×h 기준)이 맞게 들어가도록

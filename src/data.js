@@ -45,6 +45,7 @@ export const PRODUCT_TYPES = ['주택', '체류형 쉼터', '농막'];
 // ---------------------------------------------------------------------------
 export const EXTERIOR_MATERIALS = {
   metal:    { label: '메탈사이딩',   color: '#8d96a0', roughness: 0.35, metalness: 0.75 },
+  metalV:   { label: '세로 메탈사이딩', color: '#b8773e', roughness: 0.45, metalness: 0.45 },   // 세로 골 강판(우드 프린트 등)
   cement:   { label: '시멘트사이딩', color: '#b8b2a7', roughness: 0.85, metalness: 0.05 },
   ceramic:  { label: '세라믹사이딩', color: '#d8d2c6', roughness: 0.5,  metalness: 0.1 },
   stucco:   { label: '스타코',       color: '#ece7dd', roughness: 0.95, metalness: 0.0 },
@@ -105,6 +106,7 @@ export const WINDOW_TYPES = {
   swingDoor: { label: '여닫이문',       w: 900,  h: 2100, sill: 0,   panes: 1, slide: false, glass: false },
   doubleDoor:{ label: '양개문',         w: 1500, h: 2100, sill: 0,   panes: 2, slide: false, glass: false, double: true },
   slideDoor: { label: '슬라이딩도어',   w: 1600, h: 2100, sill: 0,   panes: 2, slide: true,  glass: false },
+  glassSlide:{ label: '3연동 유리중문', w: 1350, h: 2100, sill: 0,   panes: 3, slide: true,  glass: true, noRail: true },
   pocketDoor:{ label: '포켓도어',       w: 900,  h: 2100, sill: 0,   panes: 1, slide: true,  glass: false, pocket: true },
   pivotDoor: { label: '피벗도어',       w: 1100, h: 2300, sill: 0,   panes: 1, slide: false, glass: false, pivot: true },
   folding:   { label: '폴딩도어',       w: 3600, h: 2200, sill: 0,   panes: 4, slide: true,  glass: true, fold: true },

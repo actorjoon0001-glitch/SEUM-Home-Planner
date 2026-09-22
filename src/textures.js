@@ -15,7 +15,7 @@ const TILE = {
   brick: 1600, metalSiding: 1300, cementSiding: 1500, ceramicSiding: 1400,
   stucco: 2200, woodSiding: 1500, stone: 2000, shingle: 1500,
   floorWood: 1700, floorTile: 1100, plaster: 2500, fabric: 600, woodGrain: 1400,
-  grass: 3000, concrete: 2400, deckBoard: 1400,
+  grass: 3000, concrete: 2400, deckBoard: 1400, metalSidingV: 1300, slat: 900,
 };
 
 // ---------------------------------------------------------------------------
@@ -236,6 +236,42 @@ const GEN = {
     }
   },
 
+  metalSidingV(x, s) {                                   // 세로 골 메탈사이딩 (골 간격 약 80mm + 우드 프린트 결)
+    x.fillStyle = '#cfcfcf'; x.fillRect(0, 0, s, s);
+    for (let k = 0; k < 40; k++) {                       // 프린트 나뭇결(세로, 옅게)
+      x.strokeStyle = `rgba(110,110,110,${0.05 + Math.random() * 0.08})`;
+      x.lineWidth = 0.8 + Math.random() * 1.2;
+      const gx = Math.random() * s;
+      x.beginPath(); x.moveTo(gx, 0);
+      x.bezierCurveTo(gx + 4, s * 0.33, gx - 4, s * 0.66, gx + 1, s);
+      x.stroke();
+    }
+    const n = 16, rw = s / n;                            // 골(리브)
+    for (let i = 0; i < n; i++) {
+      const gx = i * rw;
+      const g = x.createLinearGradient(gx, 0, gx + rw, 0);
+      g.addColorStop(0, 'rgba(0,0,0,0.28)'); g.addColorStop(0.18, 'rgba(255,255,255,0.22)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.05)'); g.addColorStop(0.85, 'rgba(0,0,0,0.08)'); g.addColorStop(1, 'rgba(0,0,0,0.3)');
+      x.fillStyle = g; x.fillRect(gx, 0, rw, s);
+    }
+  },
+
+  slat(x, s) {                                           // 실내 아트월 템바보드 (세로 루버, 틈 어둡게)
+    const n = 12, sw = s / n;
+    x.fillStyle = '#6e6e6e'; x.fillRect(0, 0, s, s);     // 루버 사이 그림자 홈
+    for (let i = 0; i < n; i++) {
+      const gx = i * sw, v = 205 + ((Math.random() * 12 - 6) | 0);
+      x.fillStyle = `rgb(${v},${v},${v})`;
+      x.fillRect(gx + 2, 0, sw - 4, s);
+      for (let k = 0; k < 4; k++) {                      // 결
+        x.strokeStyle = `rgba(120,120,120,${0.06 + Math.random() * 0.08})`; x.lineWidth = 0.8;
+        const lx = gx + 3 + Math.random() * (sw - 6);
+        x.beginPath(); x.moveTo(lx, 0); x.lineTo(lx + (Math.random() * 2 - 1), s); x.stroke();
+      }
+      x.fillStyle = 'rgba(255,255,255,0.18)'; x.fillRect(gx + 2, 0, 1.5, s);
+    }
+  },
+
   deckBoard(x, s) {                                      // 합성데크 (폭 약 140mm 판재 + 틈, 은은한 결)
     const n = 10, bh = s / n;
     x.fillStyle = '#9a9a9a'; x.fillRect(0, 0, s, s);     // 판재 사이 틈
@@ -349,7 +385,7 @@ const rep = (dimMM, kind) => dimMM / TILE[kind];
 // 공개 API
 // ---------------------------------------------------------------------------
 const EXT_KIND = {
-  metal: 'metalSiding', cement: 'cementSiding', ceramic: 'ceramicSiding',
+  metal: 'metalSiding', metalV: 'metalSidingV', cement: 'cementSiding', ceramic: 'ceramicSiding',
   stucco: 'stucco', brick: 'brick', wood: 'woodSiding', stone: 'stone',
 };
 
@@ -371,9 +407,9 @@ export function roofMaterial(color, wMM, dMM) {
 }
 
 // 바닥 (방 종류에 따라 마루/타일)
-const TILE_ROOMS = ['bath', 'kitchen', 'utility', 'balcony', 'entrance', 'pantry'];
+const TILE_ROOMS = ['bath', 'utility', 'balcony', 'entrance'];   // 주방은 요즘 시공처럼 마루
 const DECK_ROOMS = ['deck', 'porch', 'balcony'];
-const DECK_COLOR = '#8f7a64';   // 합성데크 (브라운 그레이 우드톤)
+const DECK_COLOR = '#7c716a';   // 합성데크 (그레이 브라운 — 세움 본점 시공 사진 톤)
 export function floorMaterial(roomType, color, wMM, dMM) {
   if (DECK_ROOMS.includes(roomType)) {
     // 야외 데크·포치: 실제 합성데크 판재 질감. 요철(bump)을 약하게 해 멀리서 반짝이지 않게
@@ -398,6 +434,18 @@ export function groundMaterial(sizeMM) {
 // 집 둘레 마당 (콘크리트)
 export function padMaterial(wMM, dMM) {
   return makeMat('concrete', '#bdb9b1', rep(wMM, 'concrete'), rep(dMM, 'concrete'), { roughness: 0.9, bumpScale: 0.6, envMapIntensity: 0.35 });
+}
+
+// 아트월 템바보드 (세로 루버) — 폭 lenMM × 높이 hMM
+export function slatMaterial(color, lenMM, hMM) {
+  return makeMat('slat', color, rep(lenMM, 'slat'), Math.max(1, rep(hMM, 'slat') / 3), { roughness: 0.7, bumpScale: 0.8, envMapIntensity: 0.5 });
+}
+
+// 처마 밑면·포치 천장 루바 (원목 판재) — UV 를 mm/1700 단위로 넣어 쓰므로 반복 1
+export function soffitWoodMaterial(color) {
+  // 판재 폭을 좁게(약 100mm) — 세로 반복 2.2배
+  //   아래를 향한 면이라 햇빛을 못 받으므로 환경광 반사를 높여 밝은 소나무 톤 유지
+  return makeMat('floorWood', color, 1, 2.2, { roughness: 0.75, bumpScale: 0.3, envMapIntensity: 1.5 });
 }
 
 // 실내 벽 (은은한 미장)

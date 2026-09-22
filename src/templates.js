@@ -223,9 +223,10 @@ const T = [
       name: '세움 본점 19평 (9,000×7,000)',
       productType: '주택',
       ceilingHeight: 2400,
-      // 벽체 280t 메탈사이딩(우드색)+타이벡 / 지붕 T260 징크판넬 박공(용마루 가로), 전체높이 3,700
-      exterior: { material: 'metal', color: '#7c5a36' },
-      roof: { type: 'gable', color: '#3a3f44', ridge: 'x', rise: 1100 },
+      // 벽체 280t 세로 메탈사이딩(우드 프린트)+차콜 모서리 / 지붕 T260 징크판넬 박공(용마루 가로), 전체높이 3,700
+      //   시공 사진 기준: 차콜 처마 마감판·원목 처마 밑면, 회색 포치 기둥·난간, 포치 원목 루바 천장+다운라이트
+      exterior: { material: 'metalV', color: '#b8773e', corner: '#2f3237' },
+      roof: { type: 'gable', color: '#3a3f44', ridge: 'x', rise: 1100, fascia: '#34373c', soffit: 'wood', postColor: '#5b6167' },
       rooms: [
         // 본채 9,000×7,000 (x 1500~10500). 치수는 평면도 치수선 그대로(벽 중심 기준, 외벽 280·내벽 120)
         //   가로: 280 | 2,200 | 120 | 4,600 | 120 | 1,400 | 280   세로(좌): 280 | 1,630 | 120 | 1,350 | 120 | 3,220 | 280
@@ -240,32 +241,32 @@ const T = [
         { key: 'wash',  type: 'utility',  name: '세면',      x: 9540, y: 2520, w: 960,  d: 920,  open: ['w'] },
         // 전면(남) 밴드 — 방1 · 거실(북측 트임, 좌우 아트월) · 방2
         { key: 'bed1',  type: 'bedroom',  name: '방1',       x: 1500, y: 3440, w: 2940, d: 3560 },
-        { key: 'liv',   type: 'living',   name: '거실',      x: 4440, y: 3440, w: 3120, d: 3560, open: ['n'] },
+        { key: 'liv',   type: 'living',   name: '거실',      x: 4440, y: 3440, w: 3120, d: 3560, open: ['n'], artWall: ['e', 'w'] },
         { key: 'bed2',  type: 'bedroom',  name: '방2',       x: 7560, y: 3440, w: 2940, d: 3560 },
         // 포치 7평(9,000×2,500, 낮은 외쪽지붕) · 데크(서측 1,500 폭, 본채 윗면~포치 끝, 주출입구)
-        { key: 'porch', type: 'porch',    name: '포치(7평)', x: 1500, y: 7000, w: 9000, d: 2500 },
-        { key: 'deck',  type: 'deck',     name: '데크(4평)', x: 0,    y: 0,    w: 1500, d: 9500 },
+        { key: 'porch', type: 'porch',    name: '포치(7평)', x: 1500, y: 7000, w: 9000, d: 2500, rail: ['s', 'e'], railColor: '#5b6167', lights: true },
+        { key: 'deck',  type: 'deck',     name: '데크(4평)', x: 0,    y: 0,    w: 1500, d: 9500, rail: ['w'], railColor: '#5b6167' },
       ],
       openings: [
         // 후면 창 — 상부 치수선 880 | 1,000 | 1,520 | 1,500 | 2,820 | 600 | 680
-        { roomKey: 'bath1', side: 'n', pos: 1380, winType: 'double',    w: 1000, h: 900,  sill: 1200 },
-        { roomKey: 'kit',   side: 'n', pos: 1610, winType: 'double',    w: 1500, h: 600,  sill: 1350 },
+        { roomKey: 'bath1', side: 'n', pos: 1380, winType: 'double',    w: 1000, h: 900,  sill: 1200, color: '#2b2e33', trim: true },
+        { roomKey: 'kit',   side: 'n', pos: 1610, winType: 'double',    w: 1500, h: 600,  sill: 1350, color: '#2b2e33', trim: true },
         { roomKey: 'bath2', side: 'n', pos: 760,  winType: 'double',    w: 600,  h: 500,  sill: 1500 },
         // 현관 단열문(데크 쪽, 좌측 치수 2,380 | 900) · 3연동 중문(현관 동측 전체) · 욕실 문(각 욕실 남측)
-        { roomKey: 'ent',   side: 'w', pos: 860,  winType: 'door',      w: 900,  h: 2100 },
-        { roomKey: 'ent',   side: 'e', pos: 735,  winType: 'slideDoor', w: 1350, h: 2100 },
-        { roomKey: 'bath1', side: 's', pos: 2030, winType: 'swingDoor', w: 800,  h: 2000 },
-        { roomKey: 'bath2', side: 's', pos: 465,  winType: 'swingDoor', w: 700,  h: 2000 },
+        { roomKey: 'ent',   side: 'w', pos: 860,  winType: 'door',      w: 900,  h: 2100, color: '#34373c' },
+        { roomKey: 'ent',   side: 'e', pos: 735,  winType: 'glassSlide', w: 1350, h: 2100, color: '#1d1f22' },
+        { roomKey: 'bath1', side: 's', pos: 2030, winType: 'swingDoor', w: 800,  h: 2000, color: '#e8e4dc' },
+        { roomKey: 'bath2', side: 's', pos: 465,  winType: 'swingDoor', w: 700,  h: 2000, color: '#e8e4dc' },
         // 방 문(3틀)
-        { roomKey: 'bed1',  side: 'n', pos: 2440, winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'bed2',  side: 'n', pos: 560,  winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed1',  side: 'n', pos: 2440, winType: 'swingDoor', w: 900,  h: 2100, color: '#e8e4dc' },
+        { roomKey: 'bed2',  side: 'n', pos: 560,  winType: 'swingDoor', w: 900,  h: 2100, color: '#e8e4dc' },
         // 측면 이중창 — 좌·우 치수선 하단 580 | 1,500
-        { roomKey: 'bed1',  side: 'w', pos: 2230, winType: 'double',    w: 1500, h: 1000, sill: 900 },
-        { roomKey: 'bed2',  side: 'e', pos: 2230, winType: 'double',    w: 1500, h: 1000, sill: 900 },
+        { roomKey: 'bed1',  side: 'w', pos: 2230, winType: 'double',    w: 1500, h: 1000, sill: 900, color: '#2b2e33', trim: true },
+        { roomKey: 'bed2',  side: 'e', pos: 2230, winType: 'double',    w: 1500, h: 1000, sill: 900, color: '#2b2e33', trim: true },
         // 포치 쪽 — 하부 치수선 830 | 1,500 | 1,220 | 1,900 | 1,220 | 1,500 | 830
-        { roomKey: 'bed1',  side: 's', pos: 1580, winType: 'fixed',     w: 1500, h: 1000, sill: 900 },
-        { roomKey: 'liv',   side: 's', pos: 1560, winType: 'double',    w: 1900, h: 2100, sill: 0 },
-        { roomKey: 'bed2',  side: 's', pos: 1360, winType: 'fixed',     w: 1500, h: 1000, sill: 900 },
+        { roomKey: 'bed1',  side: 's', pos: 1580, winType: 'fixed',     w: 1500, h: 1000, sill: 900, color: '#2b2e33', trim: true },
+        { roomKey: 'liv',   side: 's', pos: 1560, winType: 'double',    w: 1900, h: 2100, sill: 0, color: '#2b2e33', trim: true },
+        { roomKey: 'bed2',  side: 's', pos: 1360, winType: 'fixed',     w: 1500, h: 1000, sill: 900, color: '#2b2e33', trim: true },
       ],
       furniture: [],
     },
@@ -288,12 +289,16 @@ export function instantiateTemplate(id) {
     keyToId[r.key] = nid;
     const room = { id: nid, type: r.type, name: r.name, x: r.x, y: r.y, w: r.w, d: r.d };
     if (Array.isArray(r.open) && r.open.length) room.open = r.open.slice(); // 개방형 면(벽 생략)
+    // 선택 마감 옵션 — 난간(rail)·포치 조명(lights)·아트월(artWall)·색상 지정
+    for (const k of ['rail', 'artWall']) if (Array.isArray(r[k]) && r[k].length) room[k] = r[k].slice();
+    for (const k of ['lights', 'railColor', 'artColor', 'floorColor', 'deckDir']) if (r[k] != null) room[k] = r[k];
     return room;
   });
   const openings = (b.openings || []).map((o) => ({
     id: 'o' + Math.random().toString(36).slice(2, 9),
     roomId: keyToId[o.roomKey], side: o.side, pos: o.pos, winType: o.winType,
-    w: o.w, h: o.h, sill: o.sill, color: '#4a5560',   // 템플릿에 명시하면 실제 치수 사용
+    w: o.w, h: o.h, sill: o.sill, color: o.color || '#4a5560',   // 템플릿에 명시하면 실제 치수·창틀색 사용
+    ...(o.trim ? { trim: true } : {}),                            // 창 둘레 두꺼운 마감 몰딩
   })).map((o) => fillWin(o));
   const furniture = (b.furniture || []).map((f) => ({ id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 }));
   return normalize({

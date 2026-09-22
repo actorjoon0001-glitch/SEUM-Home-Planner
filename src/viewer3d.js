@@ -1212,13 +1212,14 @@ export class Viewer3D {
   }
 
   _buildFurniture(f, b, ceilH = 2400) {
-    const c = catalogOf(f.catalogId); if (!c) return;
+    const c0 = catalogOf(f.catalogId); if (!c0) return;
+    const c = f.color ? { ...c0, color: f.color } : c0;   // 제품별 색상 변경(f.color) — 주 색상만 바꾸고 부속(다리·손잡이 등)은 유지
     const [px, pz] = this._p(f.x, f.y, b);
     const g = new THREE.Group();
     g.position.set(px, 60, pz);
     g.rotation.y = -(f.rotation || 0) * Math.PI / 180;
-    // 개별 크기 조절(2D에서 바꾼 W/D) 반영 — 카탈로그 대비 비율로 스케일
-    g.scale.set((f.w || c.w) / c.w, 1, (f.d || c.d) / c.d);
+    // 개별 크기 조절(W/D/H) 반영 — 카탈로그 대비 비율로 스케일 (실링팬은 천장 높이에 붙으므로 높이 제외)
+    g.scale.set((f.w || c.w) / c.w, c.id === 'ceilfan' ? 1 : (f.h || c.h) / c.h, (f.d || c.d) / c.d);
     const mat = (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 });
     // finish: 'fabric'|'wood' → 질감 텍스처, 그 외(undefined) → 단색
     const finMat = (col, w, dd, finish) => {
@@ -1351,6 +1352,32 @@ export class Viewer3D {
       case 'chair': {
         addBox(c.w, 60, c.d, c.h * 0.45, c.color, 0, 0, 'fabric');
         addBox(c.w, c.h * 0.5, 60, c.h * 0.72, c.color, -c.d / 2 + 30, 0, 'fabric');
+        break;
+      }
+      case 'diningSet': {
+        // 식탁 + 긴 변 양쪽 의자 (의자는 식탁을 향함). 전체 크기(W×D)에 의자 공간 포함
+        const tw = c.w - 200, td = c.d - 700, th = c.h;
+        addBox(tw, 40, td, th - 20, c.color, 0, 0, 'wood');                      // 상판
+        const legC = '#5d4a33', ox = tw / 2 - 70, oz = td / 2 - 70;
+        for (const [lx, lz] of [[ox, oz], [-ox, oz], [ox, -oz], [-ox, -oz]]) addBox(50, th - 40, 50, (th - 40) / 2, legC, lz, lx);
+        const per = Math.max(1, Math.round((c.seats || 4) / 2)), cw = 440, cd = 460, chC = c.chairColor || '#d6d0c6';
+        for (const side of [-1, 1]) {
+          for (let i = 0; i < per; i++) {
+            const x = -tw / 2 + (tw / per) * (i + 0.5), z = side * (td / 2 + 170);
+            addBox(cw, 50, cd, 450, chC, z, x, 'fabric');                          // 좌석
+            addBox(cw, 420, 50, 450 + 235, chC, z + side * (cd / 2 - 25), x, 'fabric'); // 등받이(식탁 반대쪽)
+            for (const [ex, ez] of [[cw / 2 - 30, cd / 2 - 30], [-cw / 2 + 30, cd / 2 - 30], [cw / 2 - 30, -cd / 2 + 30], [-cw / 2 + 30, -cd / 2 + 30]]) addBox(25, 425, 25, 212, '#6b6f75', z + ez, x + ex);
+          }
+        }
+        break;
+      }
+      case 'tvstand': {
+        // 낮은 거실장 — 짧은 다리 + 몸통 + 서랍 3칸 구분선
+        const legH = 80, bh = c.h - legH;
+        addBox(c.w, bh, c.d, legH + bh / 2, c.color);
+        for (const lx of [-c.w / 2 + 60, c.w / 2 - 60]) for (const lz of [-c.d / 2 + 50, c.d / 2 - 50]) addBox(30, legH, 30, legH / 2, '#b9a27a', lz, lx);
+        for (let i = 1; i < 3; i++) addBox(6, bh - 40, 4, legH + bh / 2, '#9aa0a8', c.d / 2 + 1, -c.w / 2 + (c.w / 3) * i);   // 서랍 칸
+        addBox(c.w - 40, 8, 4, legH + bh - 30, '#9aa0a8', c.d / 2 + 1);          // 손잡이 홈
         break;
       }
       case 'tv': {

@@ -574,6 +574,20 @@ export class Editor2D {
         rrect(x - cs / 2, hd + cs * 0.1, cs, cs * 0.8, 3); ctx.fill(); ctx.stroke();    // 아래쪽 의자
       }
       rrect(-hw, -hd, w, d, Math.min(8, d * 0.1)); ctx.fillStyle = light; ctx.fill(); ctx.stroke();  // 상판
+    } else if (kind === 'diningSet') {                        // 식탁 세트: 가운데 상판 + 위·아래 의자 (전체 크기 안에)
+      const per = Math.max(1, Math.round((c.seats || 4) / 2));
+      const tw = w * (1 - 200 / c.w), td = d * (1 - 700 / c.d);
+      const cw = Math.min(tw / per * 0.7, 440 * this.scale), cd = 420 * this.scale;
+      ctx.fillStyle = '#ededf0';
+      for (let i = 0; i < per; i++) {
+        const x = -tw / 2 + tw * (i + 0.5) / per;
+        rrect(x - cw / 2, -hd, cw, cd, 3); ctx.fill(); ctx.stroke();            // 위쪽 의자
+        rrect(x - cw / 2, hd - cd, cw, cd, 3); ctx.fill(); ctx.stroke();        // 아래쪽 의자
+      }
+      rrect(-tw / 2, -td / 2, tw, td, Math.min(8, td * 0.1)); ctx.fillStyle = light; ctx.fill(); ctx.stroke();  // 상판
+    } else if (kind === 'tvstand') {                          // TV다이: 긴 수납장 + 서랍 3칸
+      box();
+      for (let i = 1; i < 3; i++) { const x = -hw + w * i / 3; ctx.beginPath(); ctx.moveTo(x, -hd); ctx.lineTo(x, hd); ctx.stroke(); }
     } else if (id === 'chair') {                              // 의자: 좌석 + 등받이(뒤)
       rrect(-hw, -hd + d * 0.18, w, d * 0.82, 3); ctx.fillStyle = light; ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#e7e7e9'; ctx.fillRect(-hw, -hd, w, d * 0.2); ctx.strokeRect(-hw, -hd, w, d * 0.2);

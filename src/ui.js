@@ -947,6 +947,36 @@ function showRoof() { applyOuter('showRoof', true); }
 // ---------------------------------------------------------------------------
 // 좌측 '마감재' 패널 — 재질 썸네일 라이브러리 (외장재/지붕) · 검색 지원
 // ---------------------------------------------------------------------------
+// 지붕 형태 썸네일 — 정면에서 본 집 실루엣(벽 + 지붕 모양)에 지붕색 줄무늬. 형태별로 한눈에 구분
+function roofShapeThumb(type, color, size = 88) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d'), s = size;
+  x.fillStyle = '#eef2f6'; x.fillRect(0, 0, s, s);                       // 하늘
+  x.fillStyle = '#cfd6c4'; x.fillRect(0, s * 0.86, s, s * 0.14);         // 잔디
+  const L = s * 0.2, R = s * 0.8, top = s * 0.52, base = s * 0.86;       // 벽
+  x.fillStyle = '#f4f1ea'; x.fillRect(L, top, R - L, base - top);
+  x.strokeStyle = '#9aa0a8'; x.lineWidth = 1; x.strokeRect(L + 0.5, top + 0.5, R - L - 1, base - top - 1);
+  x.fillStyle = '#8ca3b5'; x.fillRect(s * 0.44, s * 0.64, s * 0.12, s * 0.22);   // 문
+  // 지붕 다각형 (처마는 벽보다 조금 밖으로)
+  const eL = s * 0.12, eR = s * 0.88, eaveY = top + s * 0.02;
+  const pts = {
+    flat: [[eL, eaveY], [eR, eaveY], [eR, top - s * 0.07], [eL, top - s * 0.07]],
+    gable: [[eL, eaveY], [eR, eaveY], [s * 0.5, s * 0.2]],
+    asymGable: [[eL, eaveY], [eR, eaveY], [s * 0.36, s * 0.18]],
+    hip: [[eL, eaveY], [eR, eaveY], [s * 0.66, s * 0.26], [s * 0.34, s * 0.26]],
+    shed: [[eL, eaveY], [eR, eaveY], [eR, s * 0.22]],
+  }[type] || [[eL, eaveY], [eR, eaveY], [s * 0.5, s * 0.2]];
+  x.beginPath(); pts.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py))); x.closePath();
+  x.fillStyle = color; x.fill();
+  // 기와 줄(가로 줄무늬)로 재질감
+  x.save(); x.clip();
+  x.strokeStyle = 'rgba(255,255,255,0.14)'; x.lineWidth = 1;
+  for (let y = eaveY; y > 0; y -= s * 0.05) { x.beginPath(); x.moveTo(0, y); x.lineTo(s, y); x.stroke(); }
+  x.restore();
+  x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 1.5; x.stroke();
+  return c.toDataURL();
+}
+
 function buildFinish() {
   const wrap = document.getElementById('finish-body');
   if (!wrap) return;
@@ -957,7 +987,7 @@ function buildFinish() {
   // 썸네일 캐시 (패턴 생성 비용 절감) — 가로/세로 시공 방향별로 따로
   const cache = {};
   const extThumb = (k, dir) => { const key = 'e:' + k + ':' + (dir || 'h'); return cache[key] || (cache[key] = swatchDataURL(extKind(k, dir), EXTERIOR_MATERIALS[k].color)); };
-  const roofThumb = (c) => cache['r:' + c] || (cache['r:' + c] = swatchDataURL('shingle', c));
+  const roofThumb = (type, c) => cache['r:' + type + c] || (cache['r:' + type + c] = roofShapeThumb(type, c));
 
   let query = '';
   wrap.innerHTML = `
@@ -1010,7 +1040,7 @@ function buildFinish() {
     const roofEl = wrap.querySelector('#fin-roof');
     roofEl.innerHTML = Object.entries(ROOF_TYPES).filter(([, t]) => match(t.label)).map(([k, t]) =>
       `<button class="mat-card ${k === roof.type ? 'on' : ''}" data-roof="${k}">
-        <img class="mat-thumb" src="${roofThumb(roof.color || '#3a3f44')}" alt=""><span class="mat-name">${t.label}</span></button>`).join('')
+        <img class="mat-thumb" src="${roofThumb(k, roof.color || '#3a3f44')}" alt=""><span class="mat-name">${t.label}</span></button>`).join('')
       || `<p class="panel-sub small">검색 결과가 없습니다.</p>`;
     roofEl.querySelectorAll('.mat-card').forEach((b) => b.onclick = () => {
       store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.type = b.dataset.roof; }); showRoof();

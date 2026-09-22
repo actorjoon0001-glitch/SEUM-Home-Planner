@@ -280,19 +280,33 @@ export class Viewer3D {
     ground.receiveShadow = true;
     this.modelGroup.add(ground);
 
-    if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
-    for (const room of d.rooms) this._buildRoom(room, b, H);
-    this._buildInteriorWalls(d, b, H);          // 방 벽(겹친 벽은 한 겹으로 합침)
-    for (const o of (d.openings || [])) this._buildOpening(o, b);
-    for (const f of d.furniture) this._buildFurniture(f, b, H);
-    this._buildRailings(d, b);                  // 데크·포치 난간 (room.rail 지정 시)
+    // 기초 — 집 전체(벽·바닥·데크·포치·지붕)를 기초 높이만큼 올리고, 그 아래를 콘크리트 기초/데크 하부로 채움.
+    //   건물 요소는 houseGroup 에 모아 한 번에 올림 (아래 build 함수들은 this.modelGroup 에 add 하므로 잠시 바꿔 끼움)
+    const F = Math.max(0, +d.foundationHeight || 0);
+    this._foundationH = F;
+    if (F > 0) this._buildFoundation(d, b, F);
+    const root = this.modelGroup;
+    const house = new THREE.Group();
+    house.position.y = F;
+    root.add(house);
+    this.modelGroup = house;
+    try {
+      if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
+      for (const room of d.rooms) this._buildRoom(room, b, H);
+      this._buildInteriorWalls(d, b, H);          // 방 벽(겹친 벽은 한 겹으로 합침)
+      for (const o of (d.openings || [])) this._buildOpening(o, b);
+      for (const f of d.furniture) this._buildFurniture(f, b, H);
+      this._buildRailings(d, b);                  // 데크·포치 난간 (room.rail 지정 시)
 
-    // 외장재 + 지붕 (토글)
-    if (this.showExterior) this._buildExterior(d, b, H);
-    if (this.showRoof) this._buildRoof(d, b, H);
+      // 외장재 + 지붕 (토글)
+      if (this.showExterior) this._buildExterior(d, b, H);
+      if (this.showRoof) this._buildRoof(d, b, H);
 
-    // 편집 모드: 선택된 방에 모서리 핸들 표시
-    if (this.editMode && store.selectedRoom) this._buildEditHandles(d, b);
+      // 편집 모드: 선택된 방에 모서리 핸들 표시
+      if (this.editMode && store.selectedRoom) this._buildEditHandles(d, b);
+    } finally {
+      this.modelGroup = root;
+    }
 
     if (this._firstFrame === undefined) { this._firstFrame = false; this.resetCamera(b); }
     else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
@@ -725,7 +739,7 @@ export class Viewer3D {
           // 개구부는 '원래 외벽선(a→c)'에서 찾고(창·문 위치는 여기 있음), 마감 박스만
           //   바깥으로 off 만큼 평행이동해 그린다 → 겹침 없이 창/문 구멍 유지.
           this._buildCarvedEdge(a, c, H, T, T, b,
-            (segLen, h) => TEX.exteriorMaterial(fMat, fCol, segLen, h, fDef.roughness, fDef.metalness),
+            (segLen, h) => TEX.exteriorMaterial(fMat, fCol, segLen, h, fDef.roughness, fDef.metalness, ex.dir),
             { shift: [nx * off, nz * off], tol: off + 350, userData: { extFace: key } });
           // 같은 면 안의 포인트 자재 띠 — 기본 마감보다 살짝 앞으로(양각) 덧댐
           const bands = (fo && Array.isArray(fo.bands)) ? fo.bands : [];
@@ -738,7 +752,7 @@ export class Viewer3D {
             const C2 = [a[0] + (c[0] - a[0]) * u1, a[1] + (c[1] - a[1]) * u1];
             const bMat = bd.material || baseMat, bDef = EXTERIOR_MATERIALS[bMat] || mDef, bCol = bd.color || bDef.color;
             this._buildCarvedEdge(A2, C2, H, 50, 0, b,
-              (segLen, h) => TEX.exteriorMaterial(bMat, bCol, segLen, h, bDef.roughness, bDef.metalness),
+              (segLen, h) => TEX.exteriorMaterial(bMat, bCol, segLen, h, bDef.roughness, bDef.metalness, ex.dir),
               { shift: [nx * boff, nz * boff], tol: boff + 350, userData: { extFace: key } });
           }
         }
@@ -751,7 +765,7 @@ export class Viewer3D {
     const rooms = d.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type));
     const inAnyRoom = (x, y) => rooms.some((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.d);
 
-    const mat = (len, h) => TEX.exteriorMaterial(ex.material, col, len, h, mDef.roughness, mDef.metalness);
+    const mat = (len, h) => TEX.exteriorMaterial(ex.material, col, len, h, mDef.roughness, mDef.metalness, ex.dir);
     // 한 외벽에 외장 마감을 입힘 — 창/문 개구부 자리는 비워(뚫어) 둠
     const cladEdge = (r, side, wallH) => {
       const [px, pz] = this._p(r.x, r.y, b);
@@ -784,6 +798,30 @@ export class Viewer3D {
     this._buildCornerTrims(d, b, ceilH, T);
   }
 
+  // 기초 — 실내(벽 있는) 공간 아래는 콘크리트 기초, 데크·포치 아래는 회색 세로 판재 하부 마감(스커트)
+  //   F: 기초 높이(mm). 지면(-2)부터 F 까지 채움.
+  _buildFoundation(d, b, F) {
+    const add = (m) => { m.castShadow = true; m.receiveShadow = true; this.modelGroup.add(m); };
+    const H = F + 2;
+    // 콘크리트 기초: 벽 바깥면에서 20mm 안쪽으로 (외장재가 기초 위에 살짝 걸쳐 보이게)
+    const fb = this._roofBounds(d, b);
+    const hasOutline = outlineShapes(d.outline).length > 0;
+    const off = (this.showExterior ? (hasOutline ? (d.wallThickness || 150) / 2 + 120 : 120) : (hasOutline ? (d.wallThickness || 150) / 2 : WALL_T / 2)) - 20;
+    const w = fb.w + off * 2, dd = fb.h + off * 2;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w, H, dd), TEX.concreteMaterial(w, H));
+    base.position.set(fb.cx - b.cx, H / 2 - 2, fb.cz - b.cz);
+    add(base);
+    // 데크·포치·발코니 하부 스커트
+    for (const r of d.rooms) {
+      if (!OPEN_ROOM_TYPES.includes(r.type)) continue;
+      const [px, pz] = this._p(r.x, r.y, b);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(r.w, H, r.d),
+        TEX.exteriorMaterial('wood', '#8e959c', Math.max(r.w, r.d), H, 0.8, 0));
+      m.position.set(px + r.w / 2, H / 2 - 2, pz + r.d / 2);
+      add(m);
+    }
+  }
+
   // 외벽 모서리 포인트 — exterior.corner 색이 있으면 집 네 모서리를 ㄱ자로 감싸는 진한 패널(폭 420)
   //   (세움 시공 사진: 우드톤 세로 사이딩 + 차콜 모서리). outFace: 외장 바깥면까지의 거리(벽선 기준)
   _buildCornerTrims(d, b, H, outFace) {
@@ -794,7 +832,7 @@ export class Viewer3D {
     const CW = 420, T = 40;   // 모서리 패널 폭, 외장 바깥면에 덧대는 두께
     const x0 = fb.minX - b.cx - outFace, x1 = fb.maxX - b.cx + outFace;
     const z0 = fb.minY - b.cz - outFace, z1 = fb.maxY - b.cz + outFace;
-    const mat = () => TEX.exteriorMaterial(ex.material || 'metal', ex.corner, CW, H, def.roughness, def.metalness);
+    const mat = () => TEX.exteriorMaterial(ex.material || 'metal', ex.corner, CW, H, def.roughness, def.metalness, ex.dir);
     for (const [cx, cz, sx, sz] of [[x0, z0, 1, 1], [x1, z0, -1, 1], [x0, z1, 1, -1], [x1, z1, -1, -1]]) {
       // x 방향 면(북·남 벽)에 붙는 판 + z 방향 면(동·서 벽)에 붙는 판
       const a = new THREE.Mesh(new THREE.BoxGeometry(CW, H, T), mat());
@@ -822,12 +860,20 @@ export class Viewer3D {
     const spanW = ridgeX ? fb.h : fb.w, spanL = ridgeX ? fb.w : fb.h;
 
     // 치수(mm) — 외벽 바깥면 기준
-    const off = (this.showExterior ? (d.wallThickness || 150) / 2 + 120 : (d.wallThickness || 150) / 2);
+    // 외벽선 → 지금 보이는 벽 바깥면까지 거리. 박공 벽면이 벽면과 정확히 같은 면에 오도록
+    //   (외곽선 도면은 벽두께/2 + 외장 120, 방만 있는 도면은 외장 120 / 외장 끄면 벽 반두께)
+    const hasOutline = outlineShapes(d.outline).length > 0;
+    const off = this.showExterior
+      ? (hasOutline ? (d.wallThickness || 150) / 2 + 120 : 120)
+      : (hasOutline ? (d.wallThickness || 150) / 2 : WALL_T / 2);
     const Sx = spanW / 2 + off, Sz = spanL / 2 + off;   // 외벽 바깥면까지 반폭 (Sx: 경사 방향, Sz: 용마루 방향)
     const E = 600;          // 처마 내밀기 (경사 아래쪽)
     const R = 400;          // 박공 쪽 내밀기
     const TH = 180;         // 지붕판 두께
-    const plateY = ceilH + 120;                      // 벽(외장) 윗면 = 지붕이 얹히는 높이
+    // 지붕이 얹히는 높이 = 지금 보이는 벽의 윗면. 외장재가 켜져 있으면 외장 윗면(+120),
+    //   꺼져 있으면 내벽 윗면 — 예전엔 항상 +120 이라 외장을 끄면 벽과 지붕 사이가 벌어졌음
+    //   (외곽선 도면의 외장만 벽보다 120 높게 올라감 — 방만 있는 도면의 외장은 벽 높이와 같음)
+    const plateY = (this.showExterior && outlineShapes(d.outline).length) ? ceilH + 120 : ceilH;
     // 기존 도면과 같은 경사 유지: 예전엔 (반폭+750) 에 rise 만큼 올라갔음
     const k = type === 'shed' ? rise / (2 * (spanW / 2 + 750)) : rise / (spanW / 2 + 750);
 
@@ -845,7 +891,7 @@ export class Viewer3D {
     const ex = d.exterior || {};
     const exDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
     const fillMat = (len, h) => this.showExterior
-      ? TEX.exteriorMaterial(ex.material || 'cement', ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness)
+      ? TEX.exteriorMaterial(ex.material || 'cement', ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness, ex.dir)
       : this._wallMat();
     // 박공 끝(z = ±Sz) 에 다각형 벽면 — pts: [x, y] (y 는 plate 기준)
     const gableFill = (pts) => {
@@ -1493,7 +1539,7 @@ export class Viewer3D {
   }
   _groundHit(e) {   // 화면 포인터 → 지면(y=0) 평면상의 도면 좌표(mm)
     this._raycaster.setFromCamera(this._ndc(e), this.camera);
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(this._foundationH || 0));   // 기초 위 바닥 높이
     const t = new THREE.Vector3();
     if (!this._raycaster.ray.intersectPlane(plane, t)) return null;
     const b = this._bounds();

@@ -8,7 +8,7 @@ import {
 import { listTemplates, instantiateTemplate } from './templates.js';
 import { cloud } from './cloud.js';
 import { dxfToUnderlay } from './dxf.js';
-import { swatchDataURL, EXT_KIND } from './textures.js';
+import { swatchDataURL, extKind, ROTATABLE } from './textures.js';
 import { initAiChat } from './aichat.js';
 import { initFacePaint } from './facepaint.js';
 import { openPhotoRender } from './photoRender.js';
@@ -809,6 +809,7 @@ function renderProperties(editor) {
       <button id="p-addfloor" class="wide-btn">＋ 위층 추가 (현재 층 복제)</button>
       ${store.floorList().length > 1 ? `<button id="p-delfloor" class="wide-btn danger-outline">현재 층(${esc(store.floorList()[store.activeFloorIndex()].name)}) 삭제</button>` : ''}
       <label class="fld"><span>층 높이 (mm)</span><input id="p-ceil" type="number" step="50" value="${d.ceilingHeight}"></label>
+      <label class="fld" title="집을 콘크리트 기초 위에 올림 — 3D에서 기초 높이만큼 집·데크·포치가 올라가고 아래에 기초/데크 하부 마감이 생김 (0 = 기초 없음)"><span>기초 높이 (mm)</span><input id="p-found" type="number" min="0" max="1500" step="50" value="${d.foundationHeight || 0}"></label>
 
       <p class="ph mt">상세 설정</p>
       <div class="seg" id="area-seg">
@@ -827,6 +828,7 @@ function renderProperties(editor) {
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
+  document.getElementById('p-found').onchange = (e) => store.commit((dd) => { dd.foundationHeight = Math.max(0, Math.min(1500, Math.round(+e.target.value || 0))); });
   document.getElementById('p-slab').onchange = (e) => store.commit((dd) => dd.slabThickness = Math.max(0, +e.target.value || 0));
   const afterFloorChange = () => { if (_editor) _editor.applyInitialView(); if (_viewer) _viewer.dirty = true; };
   document.getElementById('p-floor').onchange = (e) => { store.switchFloor(+e.target.value); afterFloorChange(); };
@@ -949,12 +951,12 @@ function buildFinish() {
   const wrap = document.getElementById('finish-body');
   if (!wrap) return;
   const EXT = [
-    ['metal', '메탈사이딩'], ['cement', '시멘트사이딩'], ['ceramic', '세라믹사이딩'],
+    ['metal', '메탈사이딩'], ['metalV', '골강판(세로 골)'], ['cement', '시멘트사이딩'], ['ceramic', '세라믹사이딩'],
     ['stucco', '스타코'], ['brick', '벽돌'], ['wood', '목재 사이딩'], ['stone', '석재'],
   ];
-  // 썸네일 캐시 (패턴 생성 비용 절감)
+  // 썸네일 캐시 (패턴 생성 비용 절감) — 가로/세로 시공 방향별로 따로
   const cache = {};
-  const extThumb = (k) => cache['e:' + k] || (cache['e:' + k] = swatchDataURL(EXT_KIND[k], EXTERIOR_MATERIALS[k].color));
+  const extThumb = (k, dir) => { const key = 'e:' + k + ':' + (dir || 'h'); return cache[key] || (cache[key] = swatchDataURL(extKind(k, dir), EXTERIOR_MATERIALS[k].color)); };
   const roofThumb = (c) => cache['r:' + c] || (cache['r:' + c] = swatchDataURL('shingle', c));
 
   let query = '';
@@ -962,6 +964,13 @@ function buildFinish() {
     <div class="fin-search"><input id="fin-q" type="text" placeholder="🔍 마감재 검색 (예: 벽돌, 목재)"></div>
     <div class="tool-group-label">외장재 (벽 마감)</div>
     <div class="mat-grid" id="fin-ext"></div>
+    <div id="fin-dir-wrap">
+      <div class="tool-group-label" style="margin-top:12px">사이딩 시공 방향</div>
+      <div class="seg" id="fin-dir">
+        <button type="button" class="seg-btn" data-dir="h" title="판재 줄이 가로로 (기본)">가로 줄 ☰</button>
+        <button type="button" class="seg-btn" data-dir="v" title="판재 줄이 세로로 — 세로 시공">세로 줄 ▥</button>
+      </div>
+    </div>
     <div class="tool-group-label" style="margin-top:12px">외장 색상</div>
     <div class="swatches" id="fin-ex-sw"></div>
     <div class="tool-group-label" style="margin-top:14px">지붕</div>
@@ -984,11 +993,18 @@ function buildFinish() {
     const extEl = wrap.querySelector('#fin-ext');
     extEl.innerHTML = EXT.filter(([, l]) => match(l)).map(([k, l]) =>
       `<button class="mat-card ${k === ex.material ? 'on' : ''}" data-mat="${k}">
-        <img class="mat-thumb" src="${extThumb(k)}" alt=""><span class="mat-name">${l}</span></button>`).join('')
+        <img class="mat-thumb" src="${extThumb(k, ex.dir)}" alt=""><span class="mat-name">${l}</span></button>`).join('')
       || `<p class="panel-sub small">검색 결과가 없습니다.</p>`;
     extEl.querySelectorAll('.mat-card').forEach((b) => b.onclick = () => {
       store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.material = b.dataset.mat; dd.exterior.color = EXTERIOR_MATERIALS[b.dataset.mat].color; });
       showExterior();
+    });
+    // 시공 방향(가로/세로) — 가로 줄 사이딩(메탈·시멘트·세라믹)일 때만 표시
+    const dirWrap = wrap.querySelector('#fin-dir-wrap');
+    dirWrap.classList.toggle('hidden', !ROTATABLE.includes(ex.material || 'metal'));
+    wrap.querySelectorAll('#fin-dir .seg-btn').forEach((b) => {
+      b.classList.toggle('active', (ex.dir === 'v' ? 'v' : 'h') === b.dataset.dir);
+      b.onclick = () => { store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.dir = b.dataset.dir; }); showExterior(); };
     });
 
     const roofEl = wrap.querySelector('#fin-roof');

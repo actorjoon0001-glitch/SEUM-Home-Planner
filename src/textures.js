@@ -313,6 +313,13 @@ const GEN = {
 
 // 패턴 종류 → 생성기 호출 옵션
 function draw(kind, ctx, size) {
+  // 'xxx@v' = 같은 패턴을 90° 돌려 세로 시공으로 (가로 줄 사이딩 → 세로 줄)
+  if (kind.endsWith('@v')) {
+    const tmp = newCanvas(size);
+    draw(kind.slice(0, -2), tmp.getContext('2d'), size);
+    ctx.save(); ctx.translate(size, 0); ctx.rotate(Math.PI / 2); ctx.drawImage(tmp, 0, 0); ctx.restore();
+    return;
+  }
   switch (kind) {
     case 'metalSiding':   return GEN.siding(ctx, size, { ph: 22, sheen: 0.18 });
     case 'cementSiding':  return GEN.siding(ctx, size, { ph: 34, grain: true });
@@ -368,7 +375,7 @@ function makeMat(kind, color, repX, repY, opts = {}) {
   return m;
 }
 
-const rep = (dimMM, kind) => dimMM / TILE[kind];
+const rep = (dimMM, kind) => dimMM / TILE[kind.replace('@v', '')];   // 세로 시공도 같은 크기
 
 // ---------------------------------------------------------------------------
 // 공개 API
@@ -379,8 +386,16 @@ const EXT_KIND = {
 };
 
 // 외장재 (벽 1장 길이 lenMM × 높이 hMM)
-export function exteriorMaterial(matId, color, lenMM, hMM, roughness, metalness) {
-  const kind = EXT_KIND[matId] || 'cementSiding';
+// 가로 줄 사이딩 중 세로 시공(dir='v')을 고를 수 있는 자재
+const ROTATABLE = ['metal', 'cement', 'ceramic'];
+export function extKind(matId, dir) {
+  const k = EXT_KIND[matId] || 'cementSiding';
+  return dir === 'v' && ROTATABLE.includes(matId) ? k + '@v' : k;
+}
+export { ROTATABLE };
+
+export function exteriorMaterial(matId, color, lenMM, hMM, roughness, metalness, dir) {
+  const kind = extKind(matId, dir);
   return makeMat(kind, color, rep(lenMM, kind), rep(hMM, kind), {
     roughness, metalness,
     bumpScale: (matId === 'brick' || matId === 'stone') ? 3 : 1.5,
@@ -418,6 +433,11 @@ export function floorMaterial(roomType, color, wMM, dMM) {
 export function groundMaterial(sizeMM) {
   // 지면은 환경광을 약하게 받아야 집 그림자가 또렷하게 떨어짐
   return makeMat('grass', '#7a925c', rep(sizeMM, 'grass'), rep(sizeMM, 'grass'), { roughness: 1, bumpScale: 1.5, envMapIntensity: 0.35 });
+}
+
+// 콘크리트 기초 (노출 콘크리트 느낌 — 미장 입자 질감에 회색)
+export function concreteMaterial(lenMM, hMM) {
+  return makeMat('stucco', '#a9a7a2', rep(lenMM, 'stucco'), Math.max(0.5, rep(hMM, 'stucco')), { roughness: 0.95, bumpScale: 0.8, envMapIntensity: 0.5 });
 }
 
 // 아트월 템바보드 (세로 루버) — 폭 lenMM × 높이 hMM

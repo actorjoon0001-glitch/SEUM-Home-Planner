@@ -269,7 +269,27 @@ const T = [
         { roomKey: 'liv',   side: 's', pos: 1560, winType: 'double',    w: 1900, h: 2100, sill: 0, color: '#2b2e33', trim: true },
         { roomKey: 'bed2',  side: 's', pos: 1360, winType: 'fixed',     w: 1500, h: 1000, sill: 900, color: '#2b2e33', trim: true },
       ],
-      furniture: [],
+      // 가구 배치 — 시공 사진 기준 (주방: 싱크대·하부장·인덕션·후드·키큰장·냉장고·상부장, 거실: 소파·TV다이·TV·러그·실링팬, 방: 침대)
+      furniture: [
+        // 주방 북쪽 벽 (벽 안쪽면 y=140) — 창(4,900~6,400) 아래 싱크대
+        { catalogId: 'sink',       x: 5300, y: 440, rotation: 0 },
+        { catalogId: 'kbase6',     x: 6800, y: 440, rotation: 0 },
+        { catalogId: 'induction',  x: 6800, y: 440, rotation: 0, elev: 850 },
+        { catalogId: 'hood',       x: 6800, y: 390, rotation: 0 },
+        { catalogId: 'ktall',      x: 7400, y: 440, rotation: 0 },
+        { catalogId: 'fridge',     x: 8210, y: 540, rotation: 0 },
+        { catalogId: 'kwall6',     x: 4400, y: 315, rotation: 0 },
+        { catalogId: 'diningSet4', x: 7300, y: 2500, rotation: 0 },   // 방 이름 라벨을 가리지 않게 오른쪽 아래
+        // 거실 — 동쪽 아트월에 TV다이·TV, 서쪽에 소파
+        { catalogId: 'tvstand',    x: 7290, y: 5200, rotation: 90 },
+        { catalogId: 'tv',         x: 7400, y: 5200, rotation: 90, elev: 150 },
+        { catalogId: 'sofa3',      x: 4975, y: 5200, rotation: 270 },
+        { catalogId: 'rug',        x: 6000, y: 5200, rotation: 90 },
+        { catalogId: 'ceilfan',    x: 6000, y: 5200, rotation: 0 },
+        // 방
+        { catalogId: 'bedQ',       x: 2500, y: 4610, rotation: 0 },
+        { catalogId: 'bedQ',       x: 9500, y: 4610, rotation: 0 },
+      ],
     },
   },
 ];
@@ -301,7 +321,12 @@ export function instantiateTemplate(id) {
     w: o.w, h: o.h, sill: o.sill, color: o.color || '#4a5560',   // 템플릿에 명시하면 실제 치수·창틀색 사용
     ...(o.trim ? { trim: true } : {}),                            // 창 둘레 두꺼운 마감 몰딩
   })).map((o) => fillWin(o));
-  const furniture = (b.furniture || []).map((f) => ({ id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 }));
+  // 가구: 위치·회전 + (있으면) 설치 높이·색·크기
+  const furniture = (b.furniture || []).map((f) => {
+    const o = { id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 };
+    for (const k of ['elev', 'color', 'w', 'd', 'h']) if (f[k] != null) o[k] = f[k];
+    return o;
+  });
   return normalize({
     name: b.name,
     productType: b.productType || '',

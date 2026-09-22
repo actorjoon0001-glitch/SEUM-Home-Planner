@@ -585,6 +585,15 @@ export class Editor2D {
         rrect(x - cw / 2, hd - cd, cw, cd, 3); ctx.fill(); ctx.stroke();        // 아래쪽 의자
       }
       rrect(-tw / 2, -td / 2, tw, td, Math.min(8, td * 0.1)); ctx.fillStyle = light; ctx.fill(); ctx.stroke();  // 상판
+    } else if (kind === 'kwall' || kind === 'hood') {         // 상부장·후드: 벽에 매달린 것 → 점선 (도면 관례)
+      ctx.setLineDash([4, 3]); ctx.strokeRect(-hw, -hd, w, d);
+      if (kind === 'hood') { ctx.beginPath(); ctx.moveTo(-hw, -hd); ctx.lineTo(hw, hd); ctx.moveTo(hw, -hd); ctx.lineTo(-hw, hd); ctx.stroke(); }
+      ctx.setLineDash([]);
+    } else if (kind === 'kbase' || kind === 'ktall') {        // 하부장·키큰장: 사각 + 문짝 구분선 (키큰장은 대각선)
+      box();
+      const n = Math.max(1, Math.round((w / this.scale) / 450));
+      for (let i = 1; i < n; i++) { const x = -hw + w * i / n; ctx.beginPath(); ctx.moveTo(x, -hd); ctx.lineTo(x, hd); ctx.stroke(); }
+      if (kind === 'ktall') { ctx.beginPath(); ctx.moveTo(-hw, -hd); ctx.lineTo(hw, hd); ctx.stroke(); }
     } else if (kind === 'tvstand') {                          // TV다이: 긴 수납장 + 서랍 3칸
       box();
       for (let i = 1; i < 3; i++) { const x = -hw + w * i / 3; ctx.beginPath(); ctx.moveTo(x, -hd); ctx.lineTo(x, hd); ctx.stroke(); }

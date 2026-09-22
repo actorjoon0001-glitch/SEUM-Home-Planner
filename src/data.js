@@ -141,8 +141,19 @@ export const FURNITURE_CATALOG = [
   { id: 'fridge',  cat: '가전', name: '냉장고',       kind: 'box',      w: 900,  d: 800,  h: 1850, color: '#d9dde0' },
   { id: 'tv',      cat: '가전', name: 'TV',           kind: 'tv',       w: 1300, d: 80,   h: 750,  color: '#202225' },
   { id: 'washer',  cat: '가전', name: '세탁기',       kind: 'box',      w: 650,  d: 700,  h: 950,  color: '#e3e6e8' },
-  { id: 'sink',    cat: '가전', name: '싱크대',       kind: 'box',      w: 2400, d: 600,  h: 850,  color: '#d7d2c8' },
-  { id: 'cooktop', cat: '가전', name: '아일랜드',     kind: 'box',      w: 1500, d: 800,  h: 900,  color: '#c7c2b8' },
+
+  // 주방 가구 — 하부장·상부장(벽걸이, elev=설치 높이)·키큰장·싱크대·후드
+  { id: 'sink',    cat: '주방', name: '싱크대 2400',   kind: 'box',      w: 2400, d: 600,  h: 850,  color: '#f3f3f1' },
+  { id: 'sink18',  cat: '주방', name: '싱크대 1800',   kind: 'box',      w: 1800, d: 600,  h: 850,  color: '#f3f3f1' },
+  { id: 'kbase6',  cat: '주방', name: '하부장 600',    kind: 'kbase',    w: 600,  d: 600,  h: 850,  color: '#f3f3f1' },
+  { id: 'kbase9',  cat: '주방', name: '하부장 900',    kind: 'kbase',    w: 900,  d: 600,  h: 850,  color: '#f3f3f1' },
+  { id: 'kbase12', cat: '주방', name: '하부장 1200',   kind: 'kbase',    w: 1200, d: 600,  h: 850,  color: '#f3f3f1' },
+  { id: 'kwall6',  cat: '주방', name: '상부장 600',    kind: 'kwall',    w: 600,  d: 350,  h: 700,  elev: 1450, color: '#f3f3f1' },
+  { id: 'kwall9',  cat: '주방', name: '상부장 900',    kind: 'kwall',    w: 900,  d: 350,  h: 700,  elev: 1450, color: '#f3f3f1' },
+  { id: 'kwall12', cat: '주방', name: '상부장 1200',   kind: 'kwall',    w: 1200, d: 350,  h: 700,  elev: 1450, color: '#f3f3f1' },
+  { id: 'ktall',   cat: '주방', name: '키큰장(가전장)', kind: 'ktall',   w: 600,  d: 600,  h: 2200, color: '#f3f3f1' },
+  { id: 'hood',    cat: '주방', name: '레인지후드',    kind: 'hood',     w: 600,  d: 500,  h: 450,  elev: 1600, color: '#d6d9dc' },
+  { id: 'cooktop', cat: '주방', name: '아일랜드',     kind: 'box',      w: 1500, d: 800,  h: 900,  color: '#c7c2b8' },
 
   // AV · 스크린골프 (가전)
   { id: 'beam',    cat: '가전', name: '빔프로젝터',   kind: 'box',      w: 360,  d: 320,  h: 150,  color: '#2b2f33' },
@@ -168,7 +179,7 @@ export const FURNITURE_CATALOG = [
   { id: 'ceilfan', cat: '소품', name: '실링팬',       kind: 'box',      w: 1100, d: 1100, h: 300,  color: '#cbb89a' },
 ];
 
-export const CATEGORIES = ['가구', '가전', '욕실', '소품'];
+export const CATEGORIES = ['가구', '주방', '가전', '욕실', '소품'];
 
 // 빈 도면 (새 도면 시작 시 — 아무 방도 없는 상태)
 export function createEmptyDesign() {

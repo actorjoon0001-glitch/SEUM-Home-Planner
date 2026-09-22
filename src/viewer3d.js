@@ -980,7 +980,7 @@ export class Viewer3D {
 
   _animate() {
     requestAnimationFrame(() => this._animate());
-    if (!this.active) return;
+    if (!this.active || this._photoBusy) return;
     this._resize();   // 매 활성 프레임에 컨테이너 크기와 동기화 (탭 전환 후 흰 화면 자가 복구)
     if (this.dirty) this.rebuild();
     this.controls.update();   // 감쇠(관성) 회전 중이면 'change' → _needsRender
@@ -1010,6 +1010,67 @@ export class Viewer3D {
     const url = this.renderer.domElement.toDataURL('image/png');
     if (!wasActive) { this._appliedW = 0; this._resize(); }   // 캡처용 임시 크기 무효화 → 다음에 재적용
     return url;
+  }
+
+  // 📸 사진급 렌더 — 패스 트레이싱(빛이 벽·바닥에 여러 번 튕기는 것까지 계산)으로
+  //   건축 CG 같은 한 장을 만든다. 지금 보고 있는 카메라 구도 그대로 별도 캔버스에 점점 선명하게 그림.
+  //   라이브러리는 버튼을 누를 때만 불러오므로 평소 로딩 속도엔 영향 없음.
+  async createPhotoRender(width, height) {
+    const { WebGLPathTracer, GradientEquirectTexture } = await import('three-gpu-pathtracer');
+    // three r162+ 에서 생긴 Scene 회전 속성을 패스 트레이서가 읽음 → 0.160 에는 없으므로 기본값(회전 없음) 보충
+    for (const k of ['backgroundRotation', 'environmentRotation']) {
+      if (!(k in THREE.Scene.prototype)) Object.defineProperty(THREE.Scene.prototype, k, { value: new THREE.Euler(), writable: true, configurable: true });
+    }
+    if (this.dirty) this.rebuild();
+
+    const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(width, height, false);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = this.renderer.toneMappingExposure;
+
+    const pt = new WebGLPathTracer(renderer);
+    pt.tiles.set(2, 2);            // 한 번에 1/4씩 그려 화면이 멈추지 않게
+    pt.bounces = 6;                // 빛 반사 횟수 — 실내 간접광까지
+    pt.filterGlossyFactor = 0.5;   // 반사 노이즈(반짝이 점) 억제
+    pt.renderDelay = 0; pt.fadeDuration = 0; pt.minSamples = 1;
+    pt.rasterizeScene = false;     // 처음부터 계산 결과만 표시
+
+    // 하늘: 실시간용 스튜디오 환경광 대신, 하늘 그라데이션 자체가 빛을 내는 실제 야외 조건
+    const sky = new GradientEquirectTexture(256);
+    sky.topColor.set(SKY_TOP);
+    sky.bottomColor.set(SKY_HORIZON);
+    sky.exponent = 2;
+    sky.update();
+
+    const cam = this.camera.clone();
+    cam.aspect = width / height;
+    cam.updateProjectionMatrix();
+
+    // 장면을 잠깐 야외 조건으로 바꿔 패스 트레이서에 넘기고 바로 원상복구 (동기 처리라 화면 깜빡임 없음)
+    const scene = this.scene;
+    const saved = { env: scene.environment, bg: scene.background, envI: scene.environmentIntensity };
+    scene.environment = sky; scene.background = sky; scene.environmentIntensity = 1.4;
+    try { pt.setScene(scene, cam); }
+    finally { scene.environment = saved.env; scene.background = saved.bg; scene.environmentIntensity = saved.envI; }
+
+    this._photoBusy = true;        // 렌더 중엔 실시간 화면을 쉬어 GPU를 몰아줌
+    let raf = 0, stopped = false;
+    const loop = () => { if (stopped) return; pt.renderSample(); raf = requestAnimationFrame(loop); };
+    loop();
+    const self = this;
+    return {
+      canvas: renderer.domElement,
+      get samples() { return pt.samples; },
+      stop() { stopped = true; cancelAnimationFrame(raf); },
+      toDataURL() { return renderer.domElement.toDataURL('image/png'); },
+      dispose() {
+        this.stop();
+        try { pt.dispose(); } catch { /* noop */ }
+        sky.dispose(); renderer.dispose(); renderer.forceContextLoss();
+        self._photoBusy = false; self._needsRender = true;
+      },
+    };
   }
 
   // 외부에서 카메라 프리셋

@@ -11,6 +11,7 @@ import { dxfToUnderlay } from './dxf.js';
 import { swatchDataURL, EXT_KIND } from './textures.js';
 import { initAiChat } from './aichat.js';
 import { initFacePaint } from './facepaint.js';
+import { openPhotoRender } from './photoRender.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
@@ -1456,6 +1457,12 @@ function buildToolbar({ editor, viewer, onModeChange }) {
     viewer.onQualityChange = (on) => { hqBtn.classList.toggle('on', on); if (!on) flash('PC 성능에 맞춰 3D 고화질을 껐어요 (✨ 고화질 버튼으로 다시 켤 수 있어요)'); };
     hqBtn.onclick = () => { viewer.setQuality(!viewer.hq); hqBtn.classList.toggle('on', viewer.hq); };
   } else if (hqBtn) hqBtn.classList.add('hidden');
+
+  // 📸 사진급 렌더 — 지금 3D 구도 그대로 패스 트레이싱 렌더 창 열기
+  const photoBtn = $('view-photo');
+  if (photoBtn && viewer.createPhotoRender) {
+    photoBtn.onclick = () => openPhotoRender(viewer, () => (store.design.name || '').trim());
+  } else if (photoBtn) photoBtn.classList.add('hidden');
 
   // 3D 카메라 프리셋
   $('view-iso').onclick = () => viewer.view('iso');

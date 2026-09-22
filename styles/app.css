@@ -477,3 +477,21 @@ body {
 .ck { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--ink); margin: 8px 0; line-height: 1.4; cursor: pointer; }
 .ck input { margin-top: 2px; }
 .m-body code { background: #f1f2f4; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+/* 📸 사진급 렌더 */
+.vp.vp-photo { font-weight: 600; }
+.photo-dlg { width: 960px; max-width: 94vw; }
+.photo-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.photo-opts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.photo-opts label { display: flex; align-items: center; gap: 6px; }
+.photo-opts select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
+.photo-stage { background: #eef1f4; border-radius: 8px; min-height: 260px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.photo-stage canvas { width: 100%; height: auto; display: block; }
+.photo-hint { color: var(--muted); font-size: 14px; text-align: center; line-height: 1.6; padding: 24px; }
+.photo-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.photo-fill { height: 100%; width: 0; background: var(--seum-red); transition: width .25s; }
+.photo-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.photo-actions { display: flex; gap: 8px; }
+.photo-btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--seum-red); background: var(--seum-red); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.photo-btn.ghost { background: #fff; color: var(--seum-red); }
+.photo-btn:disabled { opacity: .45; cursor: default; }

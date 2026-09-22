@@ -11,7 +11,10 @@
   {
     "imports": {
       "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.9.1/build/index.module.js",
+      "three-gpu-pathtracer": "https://unpkg.com/three-gpu-pathtracer@0.0.23/build/index.module.js"
     }
   }
   </script>
@@ -172,6 +175,7 @@
           <button id="view-ext" class="vp">외장재</button>
           <button id="view-roof" class="vp">지붕</button>
           <button id="tb-roof" class="vp">천장 보기</button>
+          <button id="view-photo" class="vp vp-photo" title="사진급 렌더 — 빛을 실제처럼 계산해 조감도·투시도 한 장을 만듭니다 (10~60초)">📸 사진급 렌더</button>
           <button id="view-hq" class="vp" title="고화질 3D — 벽 모서리·가구 밑 구석 음영 (느린 PC는 자동으로 꺼짐)">✨ 고화질</button>
         </div>
         <div class="stage-hint">드래그: 회전 · 휠: 줌 · 우클릭 드래그: 이동</div>

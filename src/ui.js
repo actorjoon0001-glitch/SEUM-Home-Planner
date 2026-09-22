@@ -22,7 +22,7 @@ export function buildUI({ editor, viewer, onModeChange }) {
   buildDashboard({ editor, onModeChange });
   buildLeftRail();
   buildWindows();
-  buildLibrary();
+  buildLibrary({ editor, viewer });
   buildRoomPalette();
   buildFinish();
   buildWallTools(editor);
@@ -629,11 +629,59 @@ function addRoom(type) {
   });
 }
 
-function buildLibrary() {
+// 제품을 놓을 기본 위치(mm): 선택한 방 가운데 → (2D) 지금 보이는 화면 가운데 → 가장 큰 방 가운데 → 원점 부근
+function defaultPlacePoint(editor, viewer) {
+  const d = store.design;
+  const sel = (d.rooms || []).find((r) => r.id === store.selectedRoom);
+  if (sel) return [sel.x + sel.w / 2, sel.y + sel.d / 2];
+  const in3d = !!(viewer && viewer.active);
+  if (!in3d && editor && editor.cssW) {
+    const [mx, my] = editor.toMm(editor.cssW / 2, editor.cssH / 2);
+    return [editor.snap(mx), editor.snap(my)];
+  }
+  if ((d.rooms || []).length) {
+    const r = [...d.rooms].sort((a, b) => b.w * b.d - a.w * a.d)[0];
+    return [r.x + r.w / 2, r.y + r.d / 2];
+  }
+  return [4000, 4000];
+}
+
+// 제품(가구·가전)을 (mx,my)에 추가하고 바로 선택 → 우측 속성 패널에서 회전·복제·삭제 가능
+function placeFurniture(item, mx, my) {
+  const id = 'f' + Date.now().toString(36);
+  store.commit((dd) => {
+    dd.furniture.push({ id, catalogId: item.id, x: Math.round(mx), y: Math.round(my), rotation: 0 });
+    store.selectedFurniture = id; store.selectedRoom = null; store.selectedOpening = null;
+  });
+  flash(`${item.name} 추가됨 — 드래그로 옮기고, 속성 패널에서 회전·복제할 수 있어요`);
+}
+
+// 3D 화면에도 제품을 끌어다 놓을 수 있게 (바닥 평면에 닿은 지점의 도면 좌표로 배치)
+function wireDrop3D(viewer) {
+  const cv = viewer && viewer.renderer && viewer.renderer.domElement;
+  if (!cv || cv.dataset.seumDrop) return;
+  cv.dataset.seumDrop = '1';
+  cv.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  cv.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
+    if (raw.startsWith('win:') || raw.startsWith('room:')) { flash('창호·공간은 2D 도면 화면에서 놓아주세요'); return; }
+    const item = FURNITURE_CATALOG.find((f) => f.id === raw);
+    if (!item) return;
+    const g = viewer.groundPoint ? viewer.groundPoint(e) : null;
+    const snap = (v) => Math.round(v / 50) * 50;
+    if (g) placeFurniture(item, snap(g.x), snap(g.y));
+    else { const [mx, my] = defaultPlacePoint(null, viewer); placeFurniture(item, mx, my); }
+  });
+}
+
+function buildLibrary({ editor, viewer } = {}) {
   const tabs = document.getElementById('lib-tabs');
   const grid = document.getElementById('lib-grid');
   tabs.innerHTML = '';
   let active = CATEGORIES[0];
+  wireDrop3D(viewer);
 
   const TABS = [...CATEGORIES];
 
@@ -643,7 +691,7 @@ function buildLibrary() {
       const card = document.createElement('div');
       card.className = 'lib-card';
       card.draggable = true;
-      card.title = `${item.name} (${item.w}×${item.d}mm) — 도면으로 끌어다 놓으세요`;
+      card.title = `${item.name} (${item.w}×${item.d}mm) — 클릭하면 도면에 추가, 끌어다 놓으면 그 자리에 배치`;
       card.innerHTML = `
         <div class="lib-thumb" style="--c:${item.color}">${thumbSvg(item)}</div>
         <div class="lib-name">${item.name}</div>
@@ -652,16 +700,10 @@ function buildLibrary() {
         e.dataTransfer.setData('text/plain', item.id);
         e.dataTransfer.effectAllowed = 'copy';
       });
-      card.addEventListener('dblclick', () => {
-        // 더블클릭 → 화면 중앙에 추가
-        const d = store.design;
-        let cx = 4000, cy = 4000;
-        if (d.rooms.length) {
-          const r = d.rooms[0]; cx = r.x + r.w / 2; cy = r.y + r.d / 2;
-        }
-        store.commit((dd) => {
-          dd.furniture.push({ id: 'f' + Date.now().toString(36), catalogId: item.id, x: cx, y: cy, rotation: 0 });
-        });
+      // 클릭 → 선택한 방(없으면 보이는 화면) 가운데에 추가. 드래그가 시작되면 click 은 발생하지 않음
+      card.addEventListener('click', () => {
+        const [mx, my] = defaultPlacePoint(editor, viewer);
+        placeFurniture(item, mx, my);
       });
       grid.appendChild(card);
     }
@@ -738,7 +780,7 @@ function windowCard(item) {
   const card = document.createElement('div');
   card.className = 'lib-card';
   card.draggable = true;
-  card.title = `${item.label} (${item.w}×${item.h}mm) — 벽으로 끌어다 놓거나, 더블클릭으로 벽 없이 바로 올리기`;
+  card.title = `${item.label} (${item.w}×${item.h}mm) — 벽으로 끌어다 놓거나, 클릭해서 벽 없이 바로 올리기`;
   card.innerHTML = `
     <div class="lib-thumb">${winThumb(item, isDoor)}</div>
     <div class="lib-name">${item.label}</div>
@@ -747,9 +789,10 @@ function windowCard(item) {
     e.dataTransfer.setData('text/plain', 'win:' + item.id);
     e.dataTransfer.effectAllowed = 'copy';
   });
-  card.addEventListener('dblclick', () => {
-    // 더블클릭 → 벽 없이 화면에 바로 올림(자유 배치). 이후 드래그로 이동, W로 크기조절
+  card.addEventListener('click', () => {
+    // 클릭 → 벽 없이 화면에 바로 올림(자유 배치). 이후 드래그로 이동, W로 크기조절
     if (_editor && _editor._addFreeOpening) _editor._addFreeOpening(item.id);
+    else flash('창호는 2D 도면 화면에서 놓아주세요');
   });
   return card;
 }

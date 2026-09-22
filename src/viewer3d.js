@@ -1533,6 +1533,8 @@ export class Viewer3D {
       this.modelGroup.add(h);
     }
   }
+  // 화면 이벤트 좌표 → 바닥 평면 위 도면 좌표(mm). 제품 드롭 등 외부에서 사용 (없으면 null)
+  groundPoint(e) { try { return this._groundHit(e); } catch { return null; } }
   _ndc(e) {
     const r = this.renderer.domElement.getBoundingClientRect();
     return { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 };

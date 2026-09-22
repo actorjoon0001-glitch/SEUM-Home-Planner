@@ -137,6 +137,9 @@ export const cloud = {
     return out;
   },
 
+  // 목록에서 숨길 행 — 휴지통(trashed) 도면, 앱 설정 행(__settings)
+  _visible(rows) { return (rows || []).filter((r) => !(r.data && (r.data.trashed || r.data.__settings))); },
+
   async listMine() {
     await this.init();
     if (!this.user) return [];
@@ -144,7 +147,59 @@ export const cloud = {
       .select('id,name,data,is_shared,is_template,updated_at,owner')
       .eq('owner', this.user.id).order('updated_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return this._visible(data);
+  },
+
+  // --- 휴지통 (관리자 전용) ---
+  // 삭제 대신 도면 데이터에 trashed 표시만 남겨 숨김 → 휴지통에서 복원/영구 삭제.
+  //   DB 스키마 변경 없이 동작 (관리자는 RLS 'admin - all designs' 로 모든 행 수정 가능)
+  async setTrashed(row, on) {
+    await this.init();
+    if (!this.isAdmin()) throw new Error('관리자만 삭제·복원할 수 있습니다.');
+    const data = { ...(row.data || {}) };
+    if (on) { data.trashed = true; data.trashedAt = new Date().toISOString(); data.trashedBy = this.user.email || ''; }
+    else { delete data.trashed; delete data.trashedAt; delete data.trashedBy; }
+    const { error } = await client.from('designs').update({ data }).eq('id', row.id);
+    if (error) throw error;
+  },
+
+  // 휴지통 목록 — 관리자: 모든 직원의 휴지통 도면
+  async listTrash() {
+    await this.init();
+    if (!this.isAdmin()) return [];
+    const { data, error } = await client.from('designs')
+      .select('id,name,data,is_shared,is_template,updated_at,owner')
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).filter((r) => r.data && r.data.trashed && !r.data.__settings);
+  },
+
+  // --- 앱 설정 (내장 전시장 도면 숨김 목록 등) ---
+  //   is_shared 행 1개에 저장 → 모든 직원이 읽을 수 있고, 관리자만 수정
+  async getSettings() {
+    await this.init();
+    if (!client) return { row: null, data: {} };
+    const { data, error } = await client.from('designs')
+      .select('id,data,owner').eq('data->>__settings', 'true').limit(1);
+    if (error) return { row: null, data: {} };
+    const row = (data && data[0]) || null;
+    return { row, data: (row && row.data) || {} };
+  },
+  async saveSettings(patch) {
+    await this.init();
+    if (!this.isAdmin()) throw new Error('관리자만 변경할 수 있습니다.');
+    const { row, data } = await this.getSettings();
+    const next = { ...data, ...patch, __settings: true };
+    if (row) {
+      const { error } = await client.from('designs').update({ data: next }).eq('id', row.id);
+      if (error) throw error;
+    } else {
+      const { error } = await client.from('designs').insert({
+        name: '__seum_settings__', data: next, is_shared: true, is_template: false, owner: this.user.id,
+      });
+      if (error) throw error;
+    }
+    return next;
   },
 
   // 현재 로그인 계정이 관리자인지 (전체 도면 열람 권한)
@@ -161,7 +216,7 @@ export const cloud = {
       .select('id,name,data,is_shared,is_template,updated_at,owner')
       .order('updated_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return this._visible(data);
   },
 
   // 영업사원 간 공유된 도면 (본인 것 제외)
@@ -171,7 +226,7 @@ export const cloud = {
       .select('id,name,data,is_shared,is_template,updated_at,owner')
       .eq('is_shared', true).order('updated_at', { ascending: false });
     if (error) throw error;
-    return (data || []).filter((d) => !this.user || d.owner !== this.user.id);
+    return this._visible(data).filter((d) => !this.user || d.owner !== this.user.id);
   },
 
   // 공용 단지/평형 템플릿 (DB에 등록된 것)
@@ -180,7 +235,7 @@ export const cloud = {
     const { data, error } = await client.from('designs')
       .select('id,name,data,updated_at').eq('is_template', true).order('name');
     if (error) throw error;
-    return data || [];
+    return this._visible(data);
   },
 
   async getDesign(id) {

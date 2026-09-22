@@ -275,12 +275,7 @@ export class Viewer3D {
       ground = new THREE.Mesh(new THREE.PlaneGeometry(G, G), TEX.groundMaterial(G));
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = -2;
-      // 집 둘레 옅은 콘크리트 마당 — 집이 잔디 위에 '떠' 보이지 않게 받쳐줌
-      const pad = new THREE.Mesh(new THREE.PlaneGeometry(b.w + 2400, b.h + 2400), TEX.padMaterial(b.w + 2400, b.h + 2400));
-      pad.rotation.x = -Math.PI / 2;
-      pad.position.y = -1;   // 도면 중심 = 원점
-      pad.receiveShadow = true;
-      this.modelGroup.add(pad);
+      // (집 둘레 콘크리트 마당은 제거 — 잔디와 1mm 차이로 겹쳐 멀리서 보면 깜빡였음)
     }
     ground.receiveShadow = true;
     this.modelGroup.add(ground);

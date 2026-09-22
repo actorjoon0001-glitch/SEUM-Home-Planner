@@ -15,7 +15,7 @@ const TILE = {
   brick: 1600, metalSiding: 1300, cementSiding: 1500, ceramicSiding: 1400,
   stucco: 2200, woodSiding: 1500, stone: 2000, shingle: 1500,
   floorWood: 1700, floorTile: 1100, plaster: 2500, fabric: 600, woodGrain: 1400,
-  grass: 3000, concrete: 2400, deckBoard: 1400, metalSidingV: 1300, slat: 900,
+  grass: 3000, deckBoard: 1400, metalSidingV: 1300, slat: 900,
 };
 
 // ---------------------------------------------------------------------------
@@ -294,17 +294,6 @@ const GEN = {
     }
   },
 
-  concrete(x, s) {                                       // 마당 콘크리트 (미세 입자 + 줄눈)
-    x.fillStyle = '#d6d6d6'; x.fillRect(0, 0, s, s);
-    for (let i = 0; i < 9000; i++) {
-      const v = (Math.random() * 70 - 35) | 0;
-      x.fillStyle = `rgba(${150 + v},${150 + v},${150 + v},${0.06 + Math.random() * 0.08})`;
-      x.fillRect(Math.random() * s, Math.random() * s, 1.5, 1.5);
-    }
-    x.fillStyle = 'rgba(0,0,0,0.18)';                    // 신축 줄눈
-    x.fillRect(0, 0, s, 2); x.fillRect(0, 0, 2, s);
-  },
-
   woodGrain(x, s) {                                      // 가구 원목 결
     x.fillStyle = '#cdcdcd'; x.fillRect(0, 0, s, s);
     for (let i = 0; i < 60; i++) {
@@ -429,11 +418,6 @@ export function floorMaterial(roomType, color, wMM, dMM) {
 export function groundMaterial(sizeMM) {
   // 지면은 환경광을 약하게 받아야 집 그림자가 또렷하게 떨어짐
   return makeMat('grass', '#7a925c', rep(sizeMM, 'grass'), rep(sizeMM, 'grass'), { roughness: 1, bumpScale: 1.5, envMapIntensity: 0.35 });
-}
-
-// 집 둘레 마당 (콘크리트)
-export function padMaterial(wMM, dMM) {
-  return makeMat('concrete', '#bdb9b1', rep(wMM, 'concrete'), rep(dMM, 'concrete'), { roughness: 0.9, bumpScale: 0.6, envMapIntensity: 0.35 });
 }
 
 // 아트월 템바보드 (세로 루버) — 폭 lenMM × 높이 hMM

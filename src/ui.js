@@ -687,6 +687,8 @@ function thumbSvg(item) {
     bed: '<rect x="3" y="6" width="26" height="20" rx="2"/><rect x="6" y="9" width="9" height="7" rx="1.5" fill="#fff" opacity=".6"/><rect x="17" y="9" width="9" height="7" rx="1.5" fill="#fff" opacity=".6"/>',
     table: '<rect x="5" y="10" width="22" height="12" rx="2"/><rect x="6" y="22" width="2" height="6"/><rect x="24" y="22" width="2" height="6"/>',
     chair: '<rect x="9" y="14" width="14" height="12" rx="2"/><rect x="9" y="6" width="14" height="8" rx="2"/>',
+    diningSet: '<rect x="7" y="11" width="18" height="10" rx="1.5"/><rect x="8" y="4" width="6" height="5" rx="1"/><rect x="18" y="4" width="6" height="5" rx="1"/><rect x="8" y="23" width="6" height="5" rx="1"/><rect x="18" y="23" width="6" height="5" rx="1"/>',
+    tvstand: '<rect x="3" y="14" width="26" height="10" rx="1.5"/><rect x="10" y="5" width="12" height="7" rx="1" opacity=".5"/><rect x="5" y="24" width="2" height="3"/><rect x="25" y="24" width="2" height="3"/>',
     tv: '<rect x="3" y="7" width="26" height="15" rx="1.5"/><rect x="13" y="22" width="6" height="4"/>',
     rug: '<rect x="3" y="8" width="26" height="16" rx="1.5"/><rect x="6" y="11" width="20" height="10" rx="1" fill="#fff" opacity=".4"/>',
     plant: '<ellipse cx="16" cy="10" rx="8" ry="7"/><rect x="12" y="16" width="8" height="10" rx="1"/>',
@@ -1343,6 +1345,13 @@ function bindRoomForm(room) {
   bindLayerControls('room', room.id);
 }
 
+// 제품 색상 빠른 선택 — 화이트·그레이·블랙 / 원목(밝은→진한) / 패브릭(베이지·그린·블루·핑크)
+const FURN_PALETTE = [
+  '#ffffff', '#f1efe9', '#d6d0c6', '#9aa0a8', '#5b6167', '#2b2e33',
+  '#e2cfae', '#c9a878', '#a98e6b', '#7c5a3a', '#4e3a28',
+  '#cdbfae', '#b9b2a6', '#8f9a7a', '#6a8aa0', '#2f4a66', '#d9b8b8',
+];
+
 function furnForm(f) {
   const c = catalogOf(f.catalogId) || {};
   return `
@@ -1351,6 +1360,15 @@ function furnForm(f) {
     <div class="grid2">
       <label class="fld"><span>가로 W (mm)</span><input id="f-w" type="number" step="50" value="${Math.round(f.w || c.w)}"></label>
       <label class="fld"><span>세로 D (mm)</span><input id="f-d" type="number" step="50" value="${Math.round(f.d || c.d)}"></label>
+    </div>
+    <div class="grid2">
+      <label class="fld"><span>높이 H (mm)</span><input id="f-h" type="number" step="50" value="${Math.round(f.h || c.h || 0)}"></label>
+      <label class="fld"><span>색상</span><input id="f-color" type="color" value="${f.color || c.color || '#cccccc'}"></label>
+    </div>
+    <div class="swatches f-sw" id="f-sw">${FURN_PALETTE.map((col) => `<button class="sw ${col === (f.color || c.color) ? 'on' : ''}" style="background:${col}" data-c="${col}" title="${col}"></button>`).join('')}</div>
+    <div class="btn-row" style="margin-top:4px">
+      <button class="mini" id="f-size-reset" title="카탈로그 기본 크기로">기본 크기</button>
+      <button class="mini" id="f-color-reset" title="제품 기본 색으로">기본 색</button>
     </div>
     <label class="fld"><span>회전 (°)</span><input id="f-rot" type="number" step="15" value="${f.rotation || 0}"></label>
     <div class="grid2">
@@ -1372,6 +1390,11 @@ function bindFurnForm(f) {
   const upd = (m) => store.commit(() => m());
   document.getElementById('f-w').onchange = (e) => upd(() => f.w = Math.max(100, +e.target.value || 100));
   document.getElementById('f-d').onchange = (e) => upd(() => f.d = Math.max(100, +e.target.value || 100));
+  document.getElementById('f-h').onchange = (e) => upd(() => f.h = Math.max(20, +e.target.value || 20));
+  document.getElementById('f-color').oninput = (e) => upd(() => f.color = e.target.value);
+  document.querySelectorAll('#f-sw .sw').forEach((b) => b.onclick = () => upd(() => f.color = b.dataset.c));
+  document.getElementById('f-size-reset').onclick = () => upd(() => { delete f.w; delete f.d; delete f.h; });
+  document.getElementById('f-color-reset').onclick = () => upd(() => { delete f.color; });
   document.getElementById('f-rot').onchange = (e) => upd(() => f.rotation = ((+e.target.value % 360) + 360) % 360);
   document.getElementById('f-cross').onchange = (e) => upd(() => f.cross = e.target.checked);
   document.getElementById('f-showname').onchange = (e) => upd(() => f.showName = e.target.checked);

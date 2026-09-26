@@ -854,15 +854,39 @@ export class Viewer3D {
   // 지붕: 형태별 생성 (평지붕/박공/비대칭박공/우진각/외쪽)
   //   실제 시공처럼 — 두께 있는 지붕판 + 벽 밖으로 내민 처마 + 처마 끝 마감판(파사드)·처마 밑면(소핏)
   //   + 물받이 + 박공 삼각 벽면(외장재) + 용마루 캡. 용마루는 기존과 같이 Z(도면 세로) 방향.
+  // 건물(외곽선 경로)별로 지붕을 따로 그린다 — 경로마다 roof 를 지정하면 그 형태로,
+  //   없으면 공통 d.roof 로. 외곽선이 없으면 벽 있는 방 전체에 지붕 1개.
+  //   예) 6평동=평지붕, 4평동=박공 처럼 건물마다 다른 지붕 지원.
   _buildRoof(d, b, ceilH) {
-    const roof = d.roof || { type: 'gable', color: '#3a3f44' };
+    const shapes = outlineShapes(d.outline);
+    const paths = (d.outline && Array.isArray(d.outline.paths)) ? d.outline.paths : [];
+    const closed = shapes.filter((s) => s.closed);
+    if (closed.length >= 1) {
+      shapes.forEach((sh, i) => {
+        if (!sh.closed) return;
+        const spec = (paths[i] && paths[i].roof) || d.roof || {};
+        this._buildOneRoof(d, b, ceilH, this._ptsBounds(sh.pts, b), spec);
+      });
+    } else {
+      this._buildOneRoof(d, b, ceilH, this._roofBounds(d, b), d.roof || {});
+    }
+    this._buildPorchRoofs(d, b, ceilH, this._roofBounds(d, b), (d.roof && d.roof.color) || '#3a3f44');
+  }
+
+  // 점 배열의 경계 상자 (지붕 한 채가 덮을 범위)
+  _ptsBounds(pts, b) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of pts) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; }
+    if (!isFinite(minX)) return this._roofBounds({ rooms: [] }, b);
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cz: (minY + maxY) / 2 };
+  }
+
+  // 지붕 한 채 그리기 — fb(범위), roofSpec({type,color,rise,ridge})
+  _buildOneRoof(d, b, ceilH, fb, roofSpec) {
+    const roof = roofSpec || d.roof || { type: 'gable', color: '#3a3f44' };
     const type = ROOF_TYPES[roof.type] ? roof.type : 'gable';
     const rise = roof.rise > 0 ? roof.rise : ROOF_TYPES[type].rise;   // 도면별 지붕 높이(경사) 지정 가능
     const color = roof.color || '#3a3f44';
-
-    // 지붕이 덮을 범위 = 실내(벽 있는) 공간만. 데크·포치 같은 개방 공간은 본 지붕에서 제외
-    //   (포치는 아래 _buildPorchRoofs 에서 낮은 별도 지붕)
-    const fb = this._roofBounds(d, b);
     // 용마루 방향: 'z'(도면 세로, 기본) | 'x'(도면 가로). 'x' 면 지붕을 z 기준으로 만든 뒤 90° 돌림
     const ridgeX = roof.ridge === 'x';
     const spanW = ridgeX ? fb.h : fb.w, spanL = ridgeX ? fb.w : fb.h;
@@ -979,7 +1003,6 @@ export class Viewer3D {
       }
     }
     this.modelGroup.add(grp);
-    this._buildPorchRoofs(d, b, ceilH, fb, color);
   }
 
   // 본 지붕이 덮을 범위 — 외곽선이 있으면 외곽선, 없으면 벽 있는 방(데크·포치 제외)의 범위

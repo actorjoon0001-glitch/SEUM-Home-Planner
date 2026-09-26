@@ -494,6 +494,7 @@ body {
 .photo-actions { display: flex; gap: 8px; }
 .photo-btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--seum-red); background: var(--seum-red); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 .photo-btn.ghost { background: #fff; color: var(--seum-red); }
+.photo-btn.ai { background: linear-gradient(135deg, #7b3fe4, #b64bd6); border-color: #7b3fe4; }
 .photo-btn:disabled { opacity: .45; cursor: default; }
 
 /* 휴지통 (관리자) — 복원 / 영구 삭제 */

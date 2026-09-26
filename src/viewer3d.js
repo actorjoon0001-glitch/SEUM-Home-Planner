@@ -1488,11 +1488,60 @@ export class Viewer3D {
     return url;
   }
 
+  // 사진급 렌더용 HDR 환경(하늘 그라데이션 + '밝은 태양')을 equirect 텍스처로 생성.
+  //   태양 값을 1보다 크게(HDR) 넣어야 패스 트레이서가 진짜 방향성 그림자·하이라이트를 만든다.
+  //   preset: 'day'(맑은 대낮) / 'sunset'(노을) / 'overcast'(흐린 날)
+  _photoEnv(preset) {
+    const PRESETS = {
+      day:      { top: [0.26, 0.44, 0.72], hor: [0.82, 0.88, 0.94], sunAz: 0.7, sunEl: 0.85, sunInt: 16, sun: [1.0, 0.96, 0.88], sky: 1.0, gnd: [0.16, 0.20, 0.13] },
+      sunset:   { top: [0.10, 0.14, 0.30], hor: [0.98, 0.55, 0.26], sunAz: 1.35, sunEl: 0.15, sunInt: 13, sun: [1.0, 0.60, 0.32], sky: 0.9, gnd: [0.15, 0.12, 0.10] },
+      overcast: { top: [0.60, 0.64, 0.69], hor: [0.80, 0.82, 0.85], sunAz: 0.7, sunEl: 0.9, sunInt: 1.4, sun: [0.92, 0.94, 0.97], sky: 0.95, gnd: [0.15, 0.17, 0.15] },
+    };
+    const p = PRESETS[preset] || PRESETS.day;
+    const W = 1024, H = 512, data = new Float32Array(W * H * 4);
+    const sx = Math.cos(p.sunEl) * Math.sin(p.sunAz), sy = Math.sin(p.sunEl), sz = Math.cos(p.sunEl) * Math.cos(p.sunAz);
+    const core = 0.024, outer = 0.10;   // 태양 원반 반경(라디안)
+    for (let j = 0; j < H; j++) {
+      const lat = (0.5 - (j + 0.5) / H) * Math.PI;
+      for (let i = 0; i < W; i++) {
+        const lon = ((i + 0.5) / W) * 2 * Math.PI - Math.PI;
+        const cl = Math.cos(lat), dx = cl * Math.sin(lon), dy = Math.sin(lat), dz = cl * Math.cos(lon);
+        let r, g, b;
+        if (dy >= 0) {                       // 하늘: 지평선→천정 그라데이션
+          const t = Math.pow(dy, 0.55);
+          r = (p.hor[0] + (p.top[0] - p.hor[0]) * t) * p.sky;
+          g = (p.hor[1] + (p.top[1] - p.hor[1]) * t) * p.sky;
+          b = (p.hor[2] + (p.top[2] - p.hor[2]) * t) * p.sky;
+        } else {                             // 지평선 아래: 바닥(잔디) 반사색으로 부드럽게
+          const t = Math.min(1, -dy * 1.6);
+          r = (p.hor[0] * (1 - t) + p.gnd[0] * t) * 0.7;
+          g = (p.hor[1] * (1 - t) + p.gnd[1] * t) * 0.7;
+          b = (p.hor[2] * (1 - t) + p.gnd[2] * t) * 0.7;
+        }
+        const cosd = dx * sx + dy * sy + dz * sz;         // 태양과의 각도
+        const d = Math.acos(Math.max(-1, Math.min(1, cosd)));
+        if (d < outer) {
+          const s = d < core ? 1 : Math.pow(1 - (d - core) / (outer - core), 2);
+          r += p.sun[0] * p.sunInt * s; g += p.sun[1] * p.sunInt * s; b += p.sun[2] * p.sunInt * s;
+        }
+        const k = (j * W + i) * 4; data[k] = r; data[k + 1] = g; data[k + 2] = b; data[k + 3] = 1;
+      }
+    }
+    const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.FloatType);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // 미리보기용: 지금 3D 구도를 PNG dataURL 로 (사진급 렌더 창에서 '이 구도로 렌더됩니다' 미리보기)
+  previewDataURL() { return this.toImage(); }
+
   // 📸 사진급 렌더 — 패스 트레이싱(빛이 벽·바닥에 여러 번 튕기는 것까지 계산)으로
   //   건축 CG 같은 한 장을 만든다. 지금 보고 있는 카메라 구도 그대로 별도 캔버스에 점점 선명하게 그림.
   //   라이브러리는 버튼을 누를 때만 불러오므로 평소 로딩 속도엔 영향 없음.
-  async createPhotoRender(width, height) {
-    const { WebGLPathTracer, GradientEquirectTexture } = await import('three-gpu-pathtracer');
+  //   opts.background: 'day' | 'sunset' | 'overcast' (배경·조명 프리셋)
+  async createPhotoRender(width, height, opts = {}) {
+    const { WebGLPathTracer } = await import('three-gpu-pathtracer');
     // three r162+ 에서 생긴 Scene 회전 속성을 패스 트레이서가 읽음 → 0.160 에는 없으므로 기본값(회전 없음) 보충
     for (const k of ['backgroundRotation', 'environmentRotation']) {
       if (!(k in THREE.Scene.prototype)) Object.defineProperty(THREE.Scene.prototype, k, { value: new THREE.Euler(), writable: true, configurable: true });
@@ -1512,12 +1561,8 @@ export class Viewer3D {
     pt.renderDelay = 0; pt.fadeDuration = 0; pt.minSamples = 1;
     pt.rasterizeScene = false;     // 처음부터 계산 결과만 표시
 
-    // 하늘: 실시간용 스튜디오 환경광 대신, 하늘 그라데이션 자체가 빛을 내는 실제 야외 조건
-    const sky = new GradientEquirectTexture(256);
-    sky.topColor.set(SKY_TOP);
-    sky.bottomColor.set(SKY_HORIZON);
-    sky.exponent = 2;
-    sky.update();
+    // 하늘+태양(HDR): 하늘 그라데이션에 밝은 태양을 심어 진짜 방향성 그림자·하이라이트가 생기게
+    const sky = this._photoEnv(opts.background || 'day');
 
     const cam = this.camera.clone();
     cam.aspect = width / height;
@@ -1526,7 +1571,7 @@ export class Viewer3D {
     // 장면을 잠깐 야외 조건으로 바꿔 패스 트레이서에 넘기고 바로 원상복구 (동기 처리라 화면 깜빡임 없음)
     const scene = this.scene;
     const saved = { env: scene.environment, bg: scene.background, envI: scene.environmentIntensity };
-    scene.environment = sky; scene.background = sky; scene.environmentIntensity = 1.4;
+    scene.environment = sky; scene.background = sky; scene.environmentIntensity = 1.0;
     try { pt.setScene(scene, cam); }
     finally { scene.environment = saved.env; scene.background = saved.bg; scene.environmentIntensity = saved.envI; }
 

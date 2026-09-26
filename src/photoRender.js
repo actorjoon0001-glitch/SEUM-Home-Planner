@@ -8,6 +8,7 @@ const QUALITY = {
   best: { label: '최고 (1분 이상)', samples: 900 },
 };
 const SIZES = { 1600: '1600px (보고용)', 2400: '2400px (인쇄·카탈로그)' };
+const BACKGROUNDS = { day: '맑은 대낮 ☀️', sunset: '노을 🌇', overcast: '흐린 날 ☁️' };
 
 let dlg = null;
 
@@ -20,6 +21,7 @@ function build() {
       <div class="photo-opts">
         <label>품질 <select data-f="q">${Object.entries(QUALITY).map(([k, v]) => `<option value="${k}"${k === 'normal' ? ' selected' : ''}>${v.label}</option>`).join('')}</select></label>
         <label>크기 <select data-f="w">${Object.entries(SIZES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+        <label>배경 <select data-f="bg">${Object.entries(BACKGROUNDS).map(([k, v]) => `<option value="${k}"${k === 'day' ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
         <button type="button" class="photo-btn" data-act="start">렌더 시작</button>
       </div>
       <div class="photo-stage"><p class="photo-hint">지금 3D 화면의 구도 그대로 렌더합니다.<br>원하는 각도로 돌려놓고 <b>렌더 시작</b>을 누르세요.</p></div>
@@ -45,6 +47,15 @@ export function openPhotoRender(viewer, getName) {
   const btnStart = $('[data-act=start]'), btnStop = $('[data-act=stop]'), btnSave = $('[data-act=save]');
   let job = null, timer = 0, t0 = 0, target = 0;
 
+  // 미리보기 — 지금 3D 구도를 그대로 보여줘 '이 각도로 렌더된다'를 확인 (배경/조명은 렌더 시 적용)
+  const showPreview = () => {
+    let url = null;
+    try { url = viewer.previewDataURL && viewer.previewDataURL(); } catch (e) { url = null; }
+    stage.innerHTML = url
+      ? `<img src="${url}" alt="미리보기" style="width:100%;height:100%;object-fit:contain;display:block;background:#eef1f4">`
+      : '<p class="photo-hint">지금 3D 화면의 구도 그대로 렌더합니다.<br>원하는 각도로 돌려놓고 <b>렌더 시작</b>을 누르세요.</p>';
+  };
+
   const finish = (msg) => {
     clearInterval(timer); timer = 0;
     if (job) job.stop();
@@ -65,7 +76,7 @@ export function openPhotoRender(viewer, getName) {
     status.textContent = '장면 준비 중… (처음 한 번은 라이브러리를 불러와 몇 초 걸려요)';
     fill.style.width = '0%';
     try {
-      job = await viewer.createPhotoRender(w, h);
+      job = await viewer.createPhotoRender(w, h, { background: $('[data-f=bg]').value });
     } catch (e) {
       console.error('[사진급 렌더] 실패', e);
       status.textContent = '렌더를 시작하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.';
@@ -104,5 +115,6 @@ export function openPhotoRender(viewer, getName) {
     fill.style.width = '0%'; status.textContent = '';
     btnStart.textContent = '렌더 시작'; btnSave.disabled = true;
   };
+  showPreview();      // 창을 열 때 지금 구도를 미리보기로 표시
   d.showModal();
 }

@@ -1314,13 +1314,19 @@ function roomForm(room) {
         <button class="mini${room.deckDir === 'v' ? ' active' : ''}" data-dir="v">▮ 세로</button>
       </div>
     </div>` : ''}
+    <div class="fld"><span>회전 (선택한 공간만 90°)</span>
+      <div class="btn-row">
+        <button class="mini" id="r-rotl" title="반시계 90°">⟲ 90°</button>
+        <button class="mini" id="r-rotr" title="시계 90°">⟳ 90°</button>
+      </div>
+    </div>
     ${floorOpacityHTML()}
     ${layerControlsHTML()}
     <div class="btn-row">
       <button class="mini" id="r-dup">복제</button>
       <button class="mini danger" id="r-del">삭제</button>
     </div>
-    <p class="hint">도면에서 모서리·변의 핸들을 끌어 넓히거나 좁힐 수 있습니다.</p>`;
+    <p class="hint">도면에서 모서리·변의 핸들을 끌어 넓히거나 좁힐 수 있습니다. 회전은 가로·세로를 맞바꿔 방향을 돌립니다(창·문·내부 가구 함께 회전).</p>`;
 }
 
 function bindRoomForm(room) {
@@ -1344,9 +1350,59 @@ function bindRoomForm(room) {
   document.getElementById('r-del').onclick = () => store.commit((d) => {
     d.rooms = d.rooms.filter((r) => r.id !== room.id); store.selectedRoom = null;
   });
+  document.getElementById('r-rotl').onclick = () => store.commit((d) => rotateRoom(room, d, -1));
+  document.getElementById('r-rotr').onclick = () => store.commit((d) => rotateRoom(room, d, +1));
   document.querySelectorAll('#r-deckdir button').forEach((b) => b.onclick = () => upd('deckDir', b.dataset.dir));
   bindFloorOpacity();
   bindLayerControls('room', room.id);
+}
+
+// 선택한 공간 하나만 90° 회전 — 가로·세로를 맞바꾸고 중심을 유지.
+//   그 방에 붙은 창/문(개구부), 트인 면(open), 방 안에 놓인 가구도 함께 돌린다.
+//   dir=+1 시계, -1 반시계 (화면 좌표: y 아래 방향).
+function rotateRoom(room, d, dir) {
+  const cx = room.x + room.w / 2, cy = room.y + room.d / 2;
+  const oldW = room.w, oldD = room.d;
+  const rot = (x, y) => dir > 0
+    ? [cx + (y - cy), cy - (x - cx)]   // 시계
+    : [cx - (y - cy), cy + (x - cx)];  // 반시계
+  // 회전 후 좌표를 가장 가까운 변에 배정 → { side, pos }
+  const classify = (nx, ny) => {
+    const dN = Math.abs(ny - room.y), dS = Math.abs(ny - (room.y + room.d));
+    const dW = Math.abs(nx - room.x), dE = Math.abs(nx - (room.x + room.w));
+    const m = Math.min(dN, dS, dW, dE);
+    if (m === dN) return { side: 'n', pos: Math.round(nx - room.x) };
+    if (m === dS) return { side: 's', pos: Math.round(nx - room.x) };
+    if (m === dW) return { side: 'w', pos: Math.round(ny - room.y) };
+    return { side: 'e', pos: Math.round(ny - room.y) };
+  };
+  // 회전 전 월드 좌표 먼저 계산 (방 치수를 바꾸기 전에)
+  const ops = (d.openings || []).filter((o) => o.roomId === room.id && !o.free && !o.onOutline);
+  const preOps = ops.map((o) => {
+    let px, py;
+    if (o.side === 'n') { px = room.x + o.pos; py = room.y; }
+    else if (o.side === 's') { px = room.x + o.pos; py = room.y + room.d; }
+    else if (o.side === 'w') { px = room.x; py = room.y + o.pos; }
+    else { px = room.x + room.w; py = room.y + o.pos; }
+    return { o, p: rot(px, py) };
+  });
+  const openMid = { n: [cx, room.y], s: [cx, room.y + oldD], w: [room.x, cy], e: [room.x + oldW, cy] };
+  const preOpen = (Array.isArray(room.open) ? room.open : []).map((s) => rot(openMid[s][0], openMid[s][1]));
+  const furns = (d.furniture || []).filter((f) => f.x > room.x && f.x < room.x + oldW && f.y > room.y && f.y < room.y + oldD);
+  const preF = furns.map((f) => ({ f, p: rot(f.x, f.y) }));
+  // 방: 가로·세로 스왑 + 중심 유지
+  room.w = oldD; room.d = oldW;
+  room.x = Math.round(cx - room.w / 2); room.y = Math.round(cy - room.d / 2);
+  // 개구부 재배치
+  for (const { o, p } of preOps) { const c = classify(p[0], p[1]); o.side = c.side; o.pos = c.pos; }
+  // 트인 면 재배치
+  if (preOpen.length) room.open = preOpen.map((p) => classify(p[0], p[1]).side);
+  // 방 안 가구 회전
+  for (const { f, p } of preF) {
+    f.x = Math.round(p[0]); f.y = Math.round(p[1]);
+    f.rotation = (((f.rotation || 0) + (dir > 0 ? 90 : -90)) % 360 + 360) % 360;
+  }
+  store.selectedRoom = room.id;
 }
 
 // 제품 색상 빠른 선택 — 화이트·그레이·블랙 / 원목(밝은→진한) / 패브릭(베이지·그린·블루·핑크)

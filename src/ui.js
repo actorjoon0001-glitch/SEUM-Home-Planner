@@ -996,6 +996,7 @@ function buildFinish() {
   const roofThumb = (type, c) => cache['r:' + type + c] || (cache['r:' + type + c] = roofShapeThumb(type, c));
 
   let query = '';
+  let roofTarget = 'all';   // 지붕 적용 대상: 'all'(전체 공통) 또는 외곽선 경로(건물) index
   wrap.innerHTML = `
     <div class="fin-search"><input id="fin-q" type="text" placeholder="🔍 마감재 검색 (예: 벽돌, 목재)"></div>
     <div class="tool-group-label">외장재 (벽 마감)</div>
@@ -1010,6 +1011,7 @@ function buildFinish() {
     <div class="tool-group-label" style="margin-top:12px">외장 색상</div>
     <div class="swatches" id="fin-ex-sw"></div>
     <div class="tool-group-label" style="margin-top:14px">지붕</div>
+    <div id="fin-roof-target" class="seg hidden" style="flex-wrap:wrap;margin-bottom:8px"></div>
     <div class="mat-grid" id="fin-roof"></div>
     <div class="tool-group-label" style="margin-top:12px">용마루 방향</div>
     <div class="seg" id="fin-ridge">
@@ -1043,13 +1045,36 @@ function buildFinish() {
       b.onclick = () => { store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.dir = b.dataset.dir; }); showExterior(); };
     });
 
+    // 지붕 적용 대상 (건물별) — 외곽선 경로가 2개 이상일 때만 '전체/건물 N' 선택 노출
+    const shapes = outlineShapes(d.outline).filter((s) => s.closed);
+    const paths = (d.outline && d.outline.paths) || [];
+    const multi = shapes.length >= 2;
+    if (!multi && roofTarget !== 'all') roofTarget = 'all';
+    if (multi && roofTarget !== 'all' && !(roofTarget < shapes.length)) roofTarget = 'all';
+    const tgtEl = wrap.querySelector('#fin-roof-target');
+    tgtEl.classList.toggle('hidden', !multi);
+    if (multi) {
+      tgtEl.innerHTML = [`<button type="button" class="seg-btn ${roofTarget === 'all' ? 'active' : ''}" data-t="all">전체 공통</button>`]
+        .concat(shapes.map((s, i) => `<button type="button" class="seg-btn ${roofTarget === i ? 'active' : ''}" data-t="${i}">건물 ${i + 1}</button>`)).join('');
+      tgtEl.querySelectorAll('.seg-btn').forEach((btn) => btn.onclick = () => { roofTarget = btn.dataset.t === 'all' ? 'all' : +btn.dataset.t; renderCards(); });
+    }
+    // 현재 대상의 지붕 사양(표시용) + 쓰기 헬퍼(경로별 roof 에 저장, 없으면 공통값에서 시작)
+    const effRoof = (roofTarget === 'all') ? (d.roof || {}) : ((paths[roofTarget] && paths[roofTarget].roof) || d.roof || {});
+    const writeRoof = (mut) => store.commit((dd) => {
+      if (roofTarget === 'all') { dd.roof = dd.roof || {}; mut(dd.roof); return; }
+      const pp = (dd.outline && dd.outline.paths) ? dd.outline.paths[roofTarget] : null;
+      if (!pp) { dd.roof = dd.roof || {}; mut(dd.roof); return; }
+      pp.roof = pp.roof || { ...(dd.roof || {}) };
+      mut(pp.roof);
+    });
+
     const roofEl = wrap.querySelector('#fin-roof');
     roofEl.innerHTML = Object.entries(ROOF_TYPES).filter(([, t]) => match(t.label)).map(([k, t]) =>
-      `<button class="mat-card ${k === roof.type ? 'on' : ''}" data-roof="${k}">
-        <img class="mat-thumb" src="${roofThumb(k, roof.color || '#3a3f44')}" alt=""><span class="mat-name">${t.label}</span></button>`).join('')
+      `<button class="mat-card ${k === effRoof.type ? 'on' : ''}" data-roof="${k}">
+        <img class="mat-thumb" src="${roofThumb(k, effRoof.color || '#3a3f44')}" alt=""><span class="mat-name">${t.label}</span></button>`).join('')
       || `<p class="panel-sub small">검색 결과가 없습니다.</p>`;
     roofEl.querySelectorAll('.mat-card').forEach((b) => b.onclick = () => {
-      store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.type = b.dataset.roof; }); showRoof();
+      writeRoof((r) => { r.type = b.dataset.roof; }); showRoof();
     });
 
     const exSw = wrap.querySelector('#fin-ex-sw');
@@ -1058,13 +1083,13 @@ function buildFinish() {
       store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.color = b.dataset.c; }); showExterior();
     });
     wrap.querySelectorAll('#fin-ridge .seg-btn').forEach((b) => {
-      b.classList.toggle('active', (roof.ridge === 'x' ? 'x' : 'z') === b.dataset.ridge);
-      b.onclick = () => { store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.ridge = b.dataset.ridge; }); showRoof(); };
+      b.classList.toggle('active', (effRoof.ridge === 'x' ? 'x' : 'z') === b.dataset.ridge);
+      b.onclick = () => { writeRoof((r) => { r.ridge = b.dataset.ridge; }); showRoof(); };
     });
     const rfSw = wrap.querySelector('#fin-rf-sw');
-    rfSw.innerHTML = ROOF_PALETTE.map((c) => `<button class="sw ${c === roof.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
+    rfSw.innerHTML = ROOF_PALETTE.map((c) => `<button class="sw ${c === effRoof.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
     rfSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
-      store.commit((dd) => { dd.roof = dd.roof || {}; dd.roof.color = b.dataset.c; }); showRoof();
+      writeRoof((r) => { r.color = b.dataset.c; }); showRoof();
     });
   }
   renderCards();

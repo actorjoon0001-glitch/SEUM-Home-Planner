@@ -158,6 +158,60 @@ const T = [
     },
   },
   {
+    // 세움 쌍둥이 10평 (6평동 + 중앙 데크 + 4평동) — 브리즈웨이(중앙 데크 연결)형
+    //  · 6평동: 6.2×3.2M 농막(S-1500) 개방형 원룸(거실·침실)
+    //  · 4평동: 거실·주방 + 욕실 + 현관 (외곽 4,100×3,200 ≈ 13.1㎡)
+    //  · 중앙 데크 2,600×3,200: 두 동을 잇는 통로형 데크(지붕이 덮음). 판매평수 10평(데크 별도)
+    //  · 외장 세로 메탈사이딩(우드 VS-04-010 / 블랙 VS-04-003), 지붕 T260 징크 처마 200
+    id: 'twin-10',
+    title: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
+    category: '농막',
+    showroom: '본점',
+    tags: ['쌍둥이', '10평', '6평', '4평', '데크', '브리즈웨이', '농막'],
+    base: {
+      name: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
+      productType: '농막',
+      ceilingHeight: 2400,
+      exterior: { material: 'metal', color: '#3a3d42' },
+      roof: { type: 'gable', color: '#2e3b30' },
+      rooms: [
+        // 6평 동(좌) — 6,200×3,200 개방형 거실·침실
+        { key: 'A_liv',  type: 'living',   name: '거실·침실(6평동)', x: 0,     y: 0,    w: 6200, d: 3200 },
+        // 중앙 데크(브리즈웨이) 2,600×3,200 — 개방형(벽 없음), 지붕이 덮는 통로
+        { key: 'deck',   type: 'deck',     name: '데크',             x: 6200,  y: 0,    w: 2600, d: 3200 },
+        // 4평 동(우) — 4,100×3,200 : 거실·주방 / 욕실 / 현관
+        { key: 'B_liv',  type: 'living',   name: '거실·주방(4평동)', x: 8800,  y: 0,    w: 2900, d: 3200 },
+        { key: 'B_bath', type: 'bath',     name: '욕실',             x: 11700, y: 0,    w: 1200, d: 1600 },
+        { key: 'B_ent',  type: 'entrance', name: '현관',             x: 11700, y: 1600, w: 1200, d: 1600 },
+      ],
+      openings: [
+        // 6평 동
+        { roomKey: 'A_liv',  side: 's', pos: 3100, winType: 'folding',   w: 3200, h: 2100 },        // 남측 폴딩도어(메인)
+        { roomKey: 'A_liv',  side: 'e', pos: 1600, winType: 'swingDoor', w: 900,  h: 2100 },        // 데크측 출입문
+        { roomKey: 'A_liv',  side: 'w', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 900 },
+        { roomKey: 'A_liv',  side: 'n', pos: 3100, winType: 'fixed',     w: 2000, h: 600,  sill: 1400 },
+        // 4평 동
+        { roomKey: 'B_liv',  side: 'w', pos: 1600, winType: 'swingDoor', w: 900,  h: 2100 },        // 데크측 출입문
+        { roomKey: 'B_liv',  side: 's', pos: 1450, winType: 'sliding',   w: 2000, h: 2100, sill: 0 },
+        { roomKey: 'B_liv',  side: 'n', pos: 1450, winType: 'fixed',     w: 1500, h: 700,  sill: 1100 },
+        { roomKey: 'B_bath', side: 'n', pos: 600,  winType: 'casement',  w: 600,  h: 1200, sill: 1100 },
+        { roomKey: 'B_ent',  side: 'e', pos: 800,  winType: 'swingDoor', w: 900,  h: 2100 },
+      ],
+      furniture: [
+        // 6평 동
+        { catalogId: 'bedQ',   x: 1400, y: 1100, rotation: 0 },
+        { catalogId: 'sofa2',  x: 4200, y: 800,  rotation: 0 },
+        { catalogId: 'tv',     x: 5900, y: 1600, rotation: 90 },
+        // 4평 동
+        { catalogId: 'sofa2',  x: 9700, y: 2400, rotation: 0 },
+        { catalogId: 'sink',   x: 9200, y: 400,  rotation: 0 },
+        { catalogId: 'fridge', x: 11300, y: 400, rotation: 0 },
+        { catalogId: 'toilet', x: 12000, y: 500, rotation: 0 },
+        { catalogId: 'basin',  x: 12650, y: 350, rotation: 0 },
+      ],
+    },
+  },
+  {
     // ㈜세움 디자인하우징 실시공도면 1층 평면도 (충북 제천 봉양, 이윤자님, 계약 25.04.26)
     // 외곽 9,000×6,000(벽 280t) + 썬룸 9,000×2,500 + 데크 1,500×8,500(우측)
     // ※ 사진 판독 기반 v2 — 시공 전달 전 치수 검증 필요
@@ -269,7 +323,27 @@ const T = [
         { roomKey: 'liv',   side: 's', pos: 1560, winType: 'double',    w: 1900, h: 2100, sill: 0, color: '#2b2e33', trim: true },
         { roomKey: 'bed2',  side: 's', pos: 1360, winType: 'fixed',     w: 1500, h: 1000, sill: 900, color: '#2b2e33', trim: true },
       ],
-      furniture: [],
+      // 가구 배치 — 시공 사진 기준 (주방: 싱크대·하부장·인덕션·후드·키큰장·냉장고·상부장, 거실: 소파·TV다이·TV·러그·실링팬, 방: 침대)
+      furniture: [
+        // 주방 북쪽 벽 (벽 안쪽면 y=140) — 창(4,900~6,400) 아래 싱크대
+        { catalogId: 'sink',       x: 5300, y: 440, rotation: 0 },
+        { catalogId: 'kbase6',     x: 6800, y: 440, rotation: 0 },
+        { catalogId: 'induction',  x: 6800, y: 440, rotation: 0, elev: 850 },
+        { catalogId: 'hood',       x: 6800, y: 390, rotation: 0 },
+        { catalogId: 'ktall',      x: 7400, y: 440, rotation: 0 },
+        { catalogId: 'fridge',     x: 8210, y: 540, rotation: 0 },
+        { catalogId: 'kwall6',     x: 4400, y: 315, rotation: 0 },
+        { catalogId: 'diningSet4', x: 7300, y: 2500, rotation: 0 },   // 방 이름 라벨을 가리지 않게 오른쪽 아래
+        // 거실 — 동쪽 아트월에 TV다이·TV, 서쪽에 소파
+        { catalogId: 'tvstand',    x: 7290, y: 5200, rotation: 90 },
+        { catalogId: 'tv',         x: 7400, y: 5200, rotation: 90, elev: 150 },
+        { catalogId: 'sofa3',      x: 4975, y: 5200, rotation: 270 },
+        { catalogId: 'rug',        x: 6000, y: 5200, rotation: 90 },
+        { catalogId: 'ceilfan',    x: 6000, y: 5200, rotation: 0 },
+        // 방
+        { catalogId: 'bedQ',       x: 2500, y: 4610, rotation: 0 },
+        { catalogId: 'bedQ',       x: 9500, y: 4610, rotation: 0 },
+      ],
     },
   },
 ];
@@ -301,7 +375,12 @@ export function instantiateTemplate(id) {
     w: o.w, h: o.h, sill: o.sill, color: o.color || '#4a5560',   // 템플릿에 명시하면 실제 치수·창틀색 사용
     ...(o.trim ? { trim: true } : {}),                            // 창 둘레 두꺼운 마감 몰딩
   })).map((o) => fillWin(o));
-  const furniture = (b.furniture || []).map((f) => ({ id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 }));
+  // 가구: 위치·회전 + (있으면) 설치 높이·색·크기
+  const furniture = (b.furniture || []).map((f) => {
+    const o = { id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 };
+    for (const k of ['elev', 'color', 'w', 'd', 'h']) if (f[k] != null) o[k] = f[k];
+    return o;
+  });
   return normalize({
     name: b.name,
     productType: b.productType || '',

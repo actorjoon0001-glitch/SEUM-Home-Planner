@@ -1216,7 +1216,8 @@ export class Viewer3D {
     const c = f.color ? { ...c0, color: f.color } : c0;   // 제품별 색상 변경(f.color) — 주 색상만 바꾸고 부속(다리·손잡이 등)은 유지
     const [px, pz] = this._p(f.x, f.y, b);
     const g = new THREE.Group();
-    g.position.set(px, 60, pz);
+    // 벽걸이 제품(상부장·후드)은 설치 높이(elev)만큼 띄움 — 제품별로 바꿀 수 있음(f.elev)
+    g.position.set(px, 60 + (f.elev != null ? f.elev : (c0.elev || 0)), pz);
     g.rotation.y = -(f.rotation || 0) * Math.PI / 180;
     // 개별 크기 조절(W/D/H) 반영 — 카탈로그 대비 비율로 스케일 (실링팬은 천장 높이에 붙으므로 높이 제외)
     g.scale.set((f.w || c.w) / c.w, c.id === 'ceilfan' ? 1 : (f.h || c.h) / c.h, (f.d || c.d) / c.d);
@@ -1240,6 +1241,12 @@ export class Viewer3D {
 
     // 수납 가구(옷장/책장/화장대)는 원목 결, 그 외 box(가전·욕실)는 단색
     const woodBox = ['wardrobe', 'shelf', 'dresser'].includes(c.id);
+    // 주방 가구 문짝 구분선 — 약 450mm 폭으로 나눈 세로 줄 + 손잡이 홈(가로 줄). front: 앞면 z
+    const cabDoors = (w, h, y0, front) => {
+      const n = Math.max(1, Math.round(w / 450));
+      for (let i = 1; i < n; i++) addBox(4, h - 20, 3, y0 + h / 2, '#c9ccd0', front + 1, -w / 2 + (w / n) * i);
+      addBox(w - 20, 6, 3, y0 + h - 30, '#c9ccd0', front + 1);
+    };
 
     // 설비·가전·욕실은 id 별 전용 3D 모양 (밋밋한 박스 대신). 없으면 아래 kind 로.
     const fixture = () => {
@@ -1263,9 +1270,10 @@ export class Viewer3D {
           addBox(c.w - 180, 120, c.d - 180, c.h - 30, '#e0ebef');         // 안쪽 물칸(연한색)
           return true;
         }
-        case 'sink': case 'sinkwf': case 'cooktop': {
-          addBox(c.w, c.h - 60, c.d, (c.h - 60) / 2, c.color, 0, 0, 'wood'); // 하부장
-          addBox(c.w, 60, c.d, c.h - 30, '#3a3d42');                      // 상판(진회색)
+        case 'sink': case 'sink18': case 'sinkwf': case 'cooktop': {
+          addBox(c.w, c.h - 60, c.d, (c.h - 60) / 2, c.color, 0, 0, c.id === 'cooktop' ? 'wood' : undefined); // 하부장
+          if (c.id !== 'cooktop') cabDoors(c.w, c.h - 60 - 100, 100, c.d / 2);   // 문짝 구분선
+          addBox(c.w, 60, c.d, c.h - 30, c.id === 'cooktop' ? '#3a3d42' : '#f7f7f5');   // 상판(싱크대는 흰 인조대리석)
           if (c.id !== 'cooktop') {
             addBox(c.w * 0.3, 46, c.d * 0.62, c.h - 8, '#c7ccd0', 0, c.w * 0.26); // 싱크볼 테두리
             addCyl(15, 230, c.h + 95, '#b9bec3', -c.d / 2 + 130, c.w * 0.26);     // 수전
@@ -1369,6 +1377,27 @@ export class Viewer3D {
             for (const [ex, ez] of [[cw / 2 - 30, cd / 2 - 30], [-cw / 2 + 30, cd / 2 - 30], [cw / 2 - 30, -cd / 2 + 30], [-cw / 2 + 30, -cd / 2 + 30]]) addBox(25, 425, 25, 212, '#6b6f75', z + ez, x + ex);
           }
         }
+        break;
+      }
+      case 'kbase': {                                                   // 하부장: 걸레받이 + 몸통 + 상판
+        addBox(c.w - 20, 100, c.d - 60, 50, '#b9bcc0', -20);
+        addBox(c.w, c.h - 160, c.d, 100 + (c.h - 160) / 2, c.color);
+        cabDoors(c.w, c.h - 160, 100, c.d / 2);
+        addBox(c.w, 60, c.d + 20, c.h - 30, '#f7f7f5', 10);
+        break;
+      }
+      case 'kwall': case 'ktall': {                                     // 상부장(벽걸이)·키큰장: 몸통 + 문짝 구분선
+        addBox(c.w, c.h, c.d, c.h / 2, c.color);
+        cabDoors(c.w, c.h, 0, c.d / 2);
+        if (c.kind === 'ktall') {                                       // 키큰장: 가운데 가전 수납칸(오픈) 표시
+          addBox(c.w - 60, 560, 20, c.h * 0.45, '#3b3f44', c.d / 2 + 2);
+          addBox(c.w - 60, 10, c.d - 40, c.h * 0.45, '#8f959b', 0);
+        }
+        break;
+      }
+      case 'hood': {                                                    // 레인지후드: 사다리꼴 느낌 본체 + 덕트
+        addBox(c.w, 120, c.d, 60, c.color);
+        addBox(c.w * 0.45, c.h - 120, c.d * 0.45, 120 + (c.h - 120) / 2, c.color, -c.d * 0.2);
         break;
       }
       case 'tvstand': {

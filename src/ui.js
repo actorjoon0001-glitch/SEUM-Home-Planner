@@ -689,6 +689,10 @@ function thumbSvg(item) {
     chair: '<rect x="9" y="14" width="14" height="12" rx="2"/><rect x="9" y="6" width="14" height="8" rx="2"/>',
     diningSet: '<rect x="7" y="11" width="18" height="10" rx="1.5"/><rect x="8" y="4" width="6" height="5" rx="1"/><rect x="18" y="4" width="6" height="5" rx="1"/><rect x="8" y="23" width="6" height="5" rx="1"/><rect x="18" y="23" width="6" height="5" rx="1"/>',
     tvstand: '<rect x="3" y="14" width="26" height="10" rx="1.5"/><rect x="10" y="5" width="12" height="7" rx="1" opacity=".5"/><rect x="5" y="24" width="2" height="3"/><rect x="25" y="24" width="2" height="3"/>',
+    kbase: '<rect x="4" y="12" width="24" height="15" rx="1"/><rect x="3" y="10" width="26" height="3" rx="1" opacity=".6"/><rect x="15.5" y="14" width="1" height="11" fill="#fff" opacity=".7"/>',
+    kwall: '<rect x="4" y="4" width="24" height="11" rx="1"/><rect x="15.5" y="6" width="1" height="7" fill="#fff" opacity=".7"/><rect x="4" y="22" width="24" height="6" rx="1" opacity=".3"/>',
+    ktall: '<rect x="9" y="3" width="14" height="26" rx="1"/><rect x="11" y="12" width="10" height="6" fill="#333" opacity=".5"/>',
+    hood: '<path d="M10 6h12v8l6 6H4l6-6z"/>',
     tv: '<rect x="3" y="7" width="26" height="15" rx="1.5"/><rect x="13" y="22" width="6" height="4"/>',
     rug: '<rect x="3" y="8" width="26" height="16" rx="1.5"/><rect x="6" y="11" width="20" height="10" rx="1" fill="#fff" opacity=".4"/>',
     plant: '<ellipse cx="16" cy="10" rx="8" ry="7"/><rect x="12" y="16" width="8" height="10" rx="1"/>',
@@ -1365,6 +1369,7 @@ function furnForm(f) {
       <label class="fld"><span>높이 H (mm)</span><input id="f-h" type="number" step="50" value="${Math.round(f.h || c.h || 0)}"></label>
       <label class="fld"><span>색상</span><input id="f-color" type="color" value="${f.color || c.color || '#cccccc'}"></label>
     </div>
+    ${c.elev != null ? `<label class="fld" title="바닥에서 제품 아래쪽까지 높이 — 상부장 보통 1,450"><span>설치 높이 (mm)</span><input id="f-elev" type="number" step="50" value="${f.elev != null ? f.elev : c.elev}"></label>` : ''}
     <div class="swatches f-sw" id="f-sw">${FURN_PALETTE.map((col) => `<button class="sw ${col === (f.color || c.color) ? 'on' : ''}" style="background:${col}" data-c="${col}" title="${col}"></button>`).join('')}</div>
     <div class="btn-row" style="margin-top:4px">
       <button class="mini" id="f-size-reset" title="카탈로그 기본 크기로">기본 크기</button>
@@ -1393,7 +1398,9 @@ function bindFurnForm(f) {
   document.getElementById('f-h').onchange = (e) => upd(() => f.h = Math.max(20, +e.target.value || 20));
   document.getElementById('f-color').oninput = (e) => upd(() => f.color = e.target.value);
   document.querySelectorAll('#f-sw .sw').forEach((b) => b.onclick = () => upd(() => f.color = b.dataset.c));
-  document.getElementById('f-size-reset').onclick = () => upd(() => { delete f.w; delete f.d; delete f.h; });
+  const elevEl = document.getElementById('f-elev');
+  if (elevEl) elevEl.onchange = (e) => upd(() => f.elev = Math.max(0, +e.target.value || 0));
+  document.getElementById('f-size-reset').onclick = () => upd(() => { delete f.w; delete f.d; delete f.h; delete f.elev; });
   document.getElementById('f-color-reset').onclick = () => upd(() => { delete f.color; });
   document.getElementById('f-rot').onchange = (e) => upd(() => f.rotation = ((+e.target.value % 360) + 360) % 360);
   document.getElementById('f-cross').onchange = (e) => upd(() => f.cross = e.target.checked);

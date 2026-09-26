@@ -1388,26 +1388,33 @@ export class Editor2D {
     if (!segs.length) return false;
     const key = (p) => p[0] + ',' + p[1];
     const outMap = new Map();
-    for (const s of segs) { const k = key(s[0]); (outMap.get(k) || outMap.set(k, []).get(k)).push(s); }
-    let s0 = segs[0];
-    for (const s of segs) if (s[0][0] < s0[0][0] || (s[0][0] === s0[0][0] && s[0][1] < s0[0][1])) s0 = s;
-    const poly = []; const used = new Set(); let cur = s0;
-    for (let guard = 0; guard < segs.length + 5 && cur; guard++) {
-      poly.push(cur[0]); used.add(cur);
-      const outs = (outMap.get(key(cur[1])) || []).filter((s) => !used.has(s));
-      if (!outs.length) break;
-      const dir = [Math.sign(cur[1][0] - cur[0][0]), Math.sign(cur[1][1] - cur[0][1])];
-      cur = outs.find((o) => Math.sign(o[1][0] - o[0][0]) === dir[0] && Math.sign(o[1][1] - o[0][1]) === dir[1]) || outs[0];
-      if (key(cur[0]) === key(s0[0])) break;
+    for (const s of segs) { const k = key(s[0]); if (!outMap.has(k)) outMap.set(k, []); outMap.get(k).push(s); }
+    // 분리된 여러 덩어리(예: 데크로 떨어진 쌍둥이 두 동)를 각각 하나의 닫힌 외곽으로 추적.
+    //   예전엔 연결된 폴리곤 1개만 그려서, 떨어진 다른 동이 외곽선에서 빠지고
+    //   지붕·외장이 한 동에만 적용되는 문제가 있었다.
+    const usedAll = new Set();
+    const paths = [];
+    for (const seed of segs) {
+      if (usedAll.has(seed)) continue;
+      const poly = []; let cur = seed;
+      for (let guard = 0; guard < segs.length + 5 && cur && !usedAll.has(cur); guard++) {
+        poly.push(cur[0]); usedAll.add(cur);
+        const outs = (outMap.get(key(cur[1])) || []).filter((s) => !usedAll.has(s));
+        if (!outs.length) break;
+        const dir = [Math.sign(cur[1][0] - cur[0][0]), Math.sign(cur[1][1] - cur[0][1])];
+        cur = outs.find((o) => Math.sign(o[1][0] - o[0][0]) === dir[0] && Math.sign(o[1][1] - o[0][1]) === dir[1]) || outs[0];
+        if (cur && key(cur[0]) === key(seed[0])) break;
+      }
+      // 공선점 제거
+      const pts = [];
+      for (let k = 0; k < poly.length; k++) {
+        const a = poly[(k - 1 + poly.length) % poly.length], b = poly[k], c = poly[(k + 1) % poly.length];
+        if (!((a[0] === b[0] && b[0] === c[0]) || (a[1] === b[1] && b[1] === c[1]))) pts.push([b[0], b[1]]);
+      }
+      if (pts.length >= 3) paths.push({ closed: true, points: pts });
     }
-    // 공선점 제거
-    const pts = [];
-    for (let k = 0; k < poly.length; k++) {
-      const a = poly[(k - 1 + poly.length) % poly.length], b = poly[k], c = poly[(k + 1) % poly.length];
-      if (!((a[0] === b[0] && b[0] === c[0]) || (a[1] === b[1] && b[1] === c[1]))) pts.push([b[0], b[1]]);
-    }
-    if (pts.length < 3) return false;
-    store.commit((d) => { d.outline = { paths: [{ closed: true, points: pts }] }; });
+    if (!paths.length) return false;
+    store.commit((d) => { d.outline = { paths }; });
     this.draw();
     return true;
   }

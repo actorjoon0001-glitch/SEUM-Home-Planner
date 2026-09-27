@@ -180,6 +180,7 @@ export class Editor2D {
   draw() {
     const ctx = this.ctx, d = store.design;
     ctx.clearRect(0, 0, this.cssW, this.cssH);
+    this._dimHits = [];   // 이번 프레임의 치수 라벨 클릭영역(더블클릭 편집용)
     this._drawGrid();
 
     // 밑그림(참조 도면) + 외벽(벽체) + 방을 하나의 레이어 스택(z)으로 정렬해 그림
@@ -203,6 +204,9 @@ export class Editor2D {
     if (sel) this._drawHandles(sel);
     // 선택 벽체(외벽) 크기조절 핸들
     if (store.selectedOutline != null) this._drawOutlineHandles(store.selectedOutline);
+
+    // 전체 건물 외곽 치수 (치수 토글 시)
+    if (this.showDims) this._drawOverallDims();
 
     // 창호(개구부)
     for (const o of (d.openings || [])) this._drawOpening(o);
@@ -437,17 +441,8 @@ export class Editor2D {
       }
     }
 
-    // 치수선 (선택 시)
-    if (selected) {
-      ctx.fillStyle = '#c8102e';
-      ctx.font = '11px "Noto Sans KR", sans-serif';
-      ctx.fillText((room.w) + ' mm', x + w / 2, y - 10);
-      ctx.save();
-      ctx.translate(x - 12, y + h / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText((room.d) + ' mm', 0, 0);
-      ctx.restore();
-    }
+    // 치수선 — 선택 방은 빨강(더블클릭 편집) / '치수' 토글 시 모든 방 회색(편집 가능)
+    if (selected || this.showDims) this._roomDims(room, selected);
   }
 
   _drawHandles(room) {
@@ -1038,6 +1033,8 @@ export class Editor2D {
     cv.addEventListener('dblclick', (e) => {
       if (this.drawOutline && this.outlineDraft) { this._finishOutlinePoly(false); return; }
       const [px, py] = this._pos(e);
+      const dm = this._hitDim(px, py);        // 치수 더블클릭 → 값 편집(방 크기 변경)
+      if (dm) { this._editDim(dm); return; }
       const lb = this._hitLabel(px, py);      // 라벨 더블클릭 → 이름 수정
       if (lb) this._beginLabelEdit(lb);
     });
@@ -1090,6 +1087,9 @@ export class Editor2D {
       this.drag = { mode: 'pan', sx: px, sy: py, ox: this.ox, oy: this.oy };
       return;
     }
+
+    // 치수 라벨 위 클릭 → 선택 유지(더블클릭 편집 대기, 방 선택 해제 방지)
+    if (!this.drawOutline && !this.eraseMode && !this.measureMode && !this.labelMode && this._hitDim(px, py)) return;
 
     // 라벨 모드: 기존 라벨 클릭=편집, 빈 곳=새 라벨
     if (this.labelMode) {
@@ -1927,6 +1927,68 @@ export class Editor2D {
     ctx.fillStyle = color;
     ctx.fillText(label, mx, my + 1);
     ctx.restore();
+  }
+
+  // ── 치수선(편집 가능) ─────────────────────────────────────────────
+  // 두 점(px) 사이 치수선 + 값 라벨. edit={label,min,apply} 주면 더블클릭으로 값 편집.
+  _dimLine(ax, ay, bx, by, value, color, edit) {
+    const ctx = this.ctx;
+    const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L, t = 4;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();          // 본선
+    for (const [ex, ey] of [[ax, ay], [bx, by]]) {                                  // 양끝 눈금
+      ctx.beginPath(); ctx.moveTo(ex - nx * t, ey - ny * t); ctx.lineTo(ex + nx * t, ey + ny * t); ctx.stroke();
+    }
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const label = Math.round(value) + '';
+    ctx.font = '700 12px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = ctx.measureText(label).width + 12, h = 18;
+    ctx.fillStyle = '#fff'; ctx.fillRect(mx - w / 2, my - h / 2, w, h);
+    ctx.strokeStyle = color; ctx.lineWidth = edit ? 1.4 : 1; ctx.strokeRect(mx - w / 2, my - h / 2, w, h);
+    ctx.fillStyle = color; ctx.fillText(label, mx, my);
+    ctx.restore();
+    if (edit) this._dimHits.push({ x: mx - w / 2, y: my - h / 2, w, h, label: edit.label, min: edit.min || 100, cur: Math.round(value), apply: edit.apply });
+  }
+
+  // 방 하나의 치수(가로 W 위 · 세로 D 왼쪽). full=선택 방(빨강·편집) / 아니면 회색(치수토글, 편집 가능)
+  _roomDims(room, full) {
+    const [x, y] = this.toPx(room.x, room.y);
+    const [x2, y2] = this.toPx(room.x + room.w, room.y + room.d);
+    const color = full ? '#c8102e' : '#8a9099';
+    const off = 20;
+    this._dimLine(x, y - off, x2, y - off, room.w, color, { label: '가로 W (mm)', min: 500, apply: (v) => { room.w = v; } });
+    this._dimLine(x - off, y, x - off, y2, room.d, color, { label: '세로 D (mm)', min: 500, apply: (v) => { room.d = v; } });
+  }
+
+  // 전체 건물 외곽 치수(읽기용) — '치수' 토글 시 도면 바깥에 표시
+  _drawOverallDims() {
+    const rooms = store.design.rooms; if (!rooms.length) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of rooms) { minX = Math.min(minX, r.x); minY = Math.min(minY, r.y); maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d); }
+    const [x, y] = this.toPx(minX, minY); const [x2, y2] = this.toPx(maxX, maxY);
+    this._dimLine(x, y - 46, x2, y - 46, maxX - minX, '#3a3f44', null);
+    this._dimLine(x - 46, y, x - 46, y2, maxY - minY, '#3a3f44', null);
+  }
+
+  // 치수 라벨 클릭영역 히트테스트 / 편집
+  _hitDim(px, py) {
+    const hits = this._dimHits || [];
+    for (let i = hits.length - 1; i >= 0; i--) {
+      const h = hits[i];
+      if (px >= h.x && px <= h.x + h.w && py >= h.y && py <= h.y + h.h) return h;
+    }
+    return null;
+  }
+
+  _editDim(hit) {
+    const raw = prompt(`${hit.label}`, hit.cur);
+    if (raw == null) return;
+    const v = Math.round(parseFloat(raw));
+    if (!isFinite(v) || v < (hit.min || 100)) return;
+    store.commit(() => hit.apply(v));
+    this.draw();
   }
 
   // 집 외곽(외벽) 완성분 2D 표시 — 닫힌 공간은 흰 바닥 + 면적, 벽 + 치수

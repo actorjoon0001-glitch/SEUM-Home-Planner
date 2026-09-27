@@ -158,6 +158,64 @@ const T = [
     },
   },
   {
+    // 세움 15평 단독 (㈜세움 디자인하우징 실시공도면 1층, 계약 26.01.01, 경기도)
+    //  · 본채 7,000×7,000 ≈ 49㎡(약 15평): 좌 주방·다이닝+거실(개방), 우 욕실/현관(3연동중문·신발장)/침실
+    //  · 데크 4평 1,500×9,000(동측) · 포치 4평 7,000×2,000(남측) — 면적 별도
+    //  · 벽체 280t 메탈사이딩 / 지붕 T260 징크 / 강화마루
+    id: 'seum-15',
+    title: '세움 15평 단독 (7,000×7,000)',
+    category: '주택',
+    showroom: '본점',
+    tags: ['세움도면', '15평', '49㎡', '단독주택', '7000x7000', '데크', '포치'],
+    base: {
+      name: '세움 15평 단독 (7,000×7,000)',
+      productType: '주택',
+      ceilingHeight: 2400,
+      exterior: { material: 'metal', color: '#3d4651' },
+      roof: { type: 'gable', color: '#2e3b30' },
+      rooms: [
+        // 좌측 — 주방·다이닝(위) + 거실(아래) 개방형 LDK
+        { key: 'kit', type: 'kitchen', name: '주방·다이닝', x: 0,    y: 0,    w: 4300, d: 2800, open: ['s'] },
+        { key: 'liv', type: 'living',  name: '거실',        x: 0,    y: 2800, w: 4300, d: 4200, open: ['n'] },
+        // 우측 — 욕실 / 현관 / 침실
+        { key: 'bath', type: 'bath',     name: '욕실', x: 4300, y: 0,    w: 2700, d: 2000 },
+        { key: 'ent',  type: 'entrance', name: '현관', x: 4300, y: 2000, w: 2700, d: 1500 },
+        { key: 'bed',  type: 'bedroom',  name: '침실', x: 4300, y: 3500, w: 2700, d: 3500 },
+        // 데크(동측) · 포치(남측) — 면적 별도(개방)
+        { key: 'deck',  type: 'deck',  name: '데크', x: 7000, y: 0,    w: 1500, d: 9000 },
+        { key: 'porch', type: 'porch', name: '포치', x: 0,    y: 7000, w: 7000, d: 2000 },
+      ],
+      openings: [
+        // 주방·다이닝
+        { roomKey: 'kit', side: 'n', pos: 1800, winType: 'double', w: 1500, h: 700,  sill: 1300 },
+        { roomKey: 'kit', side: 'w', pos: 1400, winType: 'fixed',  w: 700,  h: 1800, sill: 300 },
+        // 거실 — 서측 픽스창 2개 + 남측 포치로 폴딩도어
+        { roomKey: 'liv', side: 'w', pos: 1300, winType: 'fixed',   w: 2000, h: 1000, sill: 1100 },
+        { roomKey: 'liv', side: 'w', pos: 3200, winType: 'fixed',   w: 2000, h: 1000, sill: 300 },
+        { roomKey: 'liv', side: 's', pos: 1800, winType: 'folding', w: 3000, h: 2100 },
+        // 욕실
+        { roomKey: 'bath', side: 'n', pos: 800,  winType: 'double',    w: 600,  h: 500,  sill: 1400 },
+        // 현관 — 거실측 3연동 중문 + 데크측 단열문
+        { roomKey: 'ent',  side: 'w', pos: 750,  winType: 'slideDoor', w: 1350, h: 2100 },
+        { roomKey: 'ent',  side: 'e', pos: 750,  winType: 'swingDoor', w: 900,  h: 2100 },
+        // 침실 — 거실측 문 + 남측창 + 데크측 픽스창
+        { roomKey: 'bed',  side: 'w', pos: 900,  winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed',  side: 's', pos: 1350, winType: 'double',    w: 2000, h: 1200, sill: 900 },
+        { roomKey: 'bed',  side: 'e', pos: 1750, winType: 'fixed',     w: 2000, h: 1000, sill: 900 },
+      ],
+      furniture: [
+        { catalogId: 'dining4', x: 1500, y: 1400, rotation: 0 },
+        { catalogId: 'sink',    x: 2900, y: 400,  rotation: 0 },
+        { catalogId: 'fridge',  x: 3800, y: 450,  rotation: 0 },
+        { catalogId: 'sofa3',   x: 1400, y: 5200, rotation: 0 },
+        { catalogId: 'tv',      x: 2000, y: 6600, rotation: 180 },
+        { catalogId: 'toilet',  x: 6600, y: 500,  rotation: 0 },
+        { catalogId: 'basin',   x: 4700, y: 400,  rotation: 0 },
+        { catalogId: 'bedQ',    x: 5600, y: 5300, rotation: 0 },
+      ],
+    },
+  },
+  {
     // 세움 쌍둥이 10평 (6평동 + 중앙 데크 + 4평동) — 브리즈웨이(중앙 데크 연결)형
     //  · 6평동: 6.2×3.2M 농막(S-1500) 개방형 원룸(거실·침실)
     //  · 4평동: 거실·주방 + 욕실 + 현관 (외곽 4,100×3,200 ≈ 13.1㎡)

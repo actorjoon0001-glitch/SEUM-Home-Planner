@@ -158,6 +158,36 @@ const T = [
     },
   },
   {
+    // 세움 황토찜질방 (계획안-A) — 단일 개방형 찜질방 + 전면 포치
+    //  · 본체 3,000×4,000: 황토미장+황토보드 바닥(건식보일러), 편백루바 천장, 좌우 1400×800 이중창
+    //  · 포치 3,000×1,900(남측) · 외쪽지붕(shed, T100 징크 백색) · 외장 스마트사이딩(황토색)+검정메탈 포인트
+    id: 'seum-hwangto',
+    title: '세움 황토찜질방 (3,000×4,000)',
+    category: '농막',
+    showroom: '본점',
+    tags: ['세움도면', '황토찜질방', '찜질방', '3000x4000', '외쪽지붕', '포치', '본점'],
+    base: {
+      name: '세움 황토찜질방 (3,000×4,000)',
+      productType: '농막',
+      ceilingHeight: 2400,
+      exterior: { material: 'cement', color: '#c2a173', dir: 'h' },
+      roof: { type: 'shed', color: '#b8bcc0' },
+      rooms: [
+        { key: 'jjim',  type: 'room',  name: '황토찜질방', x: 0, y: 0,    w: 3000, d: 4000 },
+        { key: 'porch', type: 'porch', name: '포치',       x: 0, y: 4000, w: 3000, d: 1900 },
+      ],
+      openings: [
+        { roomKey: 'jjim', side: 'w', pos: 2000, winType: 'double',    w: 1400, h: 800,  sill: 1100 },
+        { roomKey: 'jjim', side: 'e', pos: 2000, winType: 'double',    w: 1400, h: 800,  sill: 1100 },
+        { roomKey: 'jjim', side: 's', pos: 1500, winType: 'swingDoor', w: 900,  h: 2100 },
+      ],
+      furniture: [
+        { catalogId: 'tv',  x: 1500, y: 350,  rotation: 0 },
+        { catalogId: 'rug', x: 1500, y: 2100, rotation: 0 },
+      ],
+    },
+  },
+  {
     // 세움 15평 단독 (㈜세움 디자인하우징 실시공도면 1층, 계약 26.01.01, 경기도)
     //  · 본채 7,000×7,000 ≈ 49㎡(약 15평): 좌 주방·다이닝+거실(개방), 우 욕실/현관(3연동중문·신발장)/침실
     //  · 데크 4평 1,500×9,000(동측) · 포치 4평 7,000×2,000(남측) — 면적 별도

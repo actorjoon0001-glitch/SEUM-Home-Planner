@@ -216,6 +216,57 @@ const T = [
     },
   },
   {
+    // 세움 체류형 쉼터 10평 (32.80㎡, 본점 전시장 모델) — 농지법 체류형 쉼터
+    //  · 본채 8,200×5,600 중 약 32.8㎡: 욕실/주방/현관/침실 + 중앙 거실(개방)
+    //  · 좌·우 데크 2평씩(합성데크) 별도. 벽체 200t, 지붕 100T 징크(처마 없음=평지붕)
+    //  · 외장 전면 세라믹 + 3면 메탈사이딩(가로시공), 강화마루
+    id: 'seum-shelter-10',
+    title: '세움 체류형 쉼터 10평 (32.8㎡)',
+    category: '체류형 쉼터',
+    showroom: '본점',
+    tags: ['세움도면', '체류형쉼터', '10평', '32.8㎡', '농지', '데크', '본점'],
+    base: {
+      name: '세움 체류형 쉼터 10평 (32.8㎡)',
+      productType: '체류형 쉼터',
+      ceilingHeight: 2400,
+      exterior: { material: 'metal', color: '#3d4651', dir: 'h' },
+      roof: { type: 'flat', color: '#4a4a4a' },
+      rooms: [
+        // 상단 밴드 — 욕실 / 주방 / 현관 / 침실
+        { key: 'bath', type: 'bath',     name: '욕실', x: 0,    y: 0,    w: 1800, d: 2000 },
+        { key: 'kit',  type: 'kitchen',  name: '주방', x: 1800, y: 0,    w: 2000, d: 2000, open: ['s'] },
+        { key: 'ent',  type: 'entrance', name: '현관', x: 3800, y: 0,    w: 1200, d: 2000 },
+        { key: 'bed',  type: 'bedroom',  name: '침실', x: 5000, y: 0,    w: 3200, d: 2000 },
+        // 중앙 거실(개방)
+        { key: 'liv',  type: 'living',   name: '거실', x: 1800, y: 2000, w: 4600, d: 3600, open: ['n'] },
+        // 좌·우 데크 2평 (면적 별도)
+        { key: 'deckL', type: 'deck', name: '데크', x: 0,    y: 2000, w: 1800, d: 3600 },
+        { key: 'deckR', type: 'deck', name: '데크', x: 6400, y: 2000, w: 1800, d: 3600 },
+      ],
+      openings: [
+        { roomKey: 'bath', side: 'n', pos: 900,  winType: 'double', w: 600,  h: 500,  sill: 1600 },
+        { roomKey: 'kit',  side: 'n', pos: 1000, winType: 'double', w: 1500, h: 900,  sill: 1200 },
+        { roomKey: 'bed',  side: 'n', pos: 900,  winType: 'fixed',  w: 1000, h: 900,  sill: 1200 },
+        { roomKey: 'bed',  side: 'n', pos: 2200, winType: 'double', w: 1500, h: 900,  sill: 1200 },
+        { roomKey: 'bed',  side: 'e', pos: 1000, winType: 'double', w: 1500, h: 900,  sill: 1200 },
+        { roomKey: 'liv',  side: 's', pos: 2500, winType: 'sliding',   w: 2500, h: 2100, sill: 100 },
+        { roomKey: 'ent',  side: 's', pos: 600,  winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'liv',  side: 'w', pos: 1800, winType: 'swingDoor', w: 900,  h: 2100 },  // 좌 데크
+        { roomKey: 'liv',  side: 'e', pos: 1800, winType: 'swingDoor', w: 900,  h: 2100 },  // 우 데크
+      ],
+      furniture: [
+        { catalogId: 'toilet',  x: 900,  y: 500,  rotation: 0 },
+        { catalogId: 'basin',   x: 400,  y: 1500, rotation: 0 },
+        { catalogId: 'sink',    x: 2000, y: 400,  rotation: 0 },
+        { catalogId: 'fridge',  x: 3500, y: 450,  rotation: 0 },
+        { catalogId: 'dining4', x: 2800, y: 2600, rotation: 0 },
+        { catalogId: 'sofa3',   x: 3600, y: 4600, rotation: 0 },
+        { catalogId: 'tv',      x: 4000, y: 5400, rotation: 180 },
+        { catalogId: 'bedQ',    x: 6700, y: 1000, rotation: 0 },
+      ],
+    },
+  },
+  {
     // 세움 쌍둥이 10평 (6평동 + 중앙 데크 + 4평동) — 브리즈웨이(중앙 데크 연결)형
     //  · 6평동: 6.2×3.2M 농막(S-1500) 개방형 원룸(거실·침실)
     //  · 4평동: 거실·주방 + 욕실 + 현관 (외곽 4,100×3,200 ≈ 13.1㎡)

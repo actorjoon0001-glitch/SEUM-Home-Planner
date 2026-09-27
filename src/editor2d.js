@@ -271,7 +271,12 @@ export class Editor2D {
       if (i < parts.length - 1) { ctx.font = fontOf({}); w += ctx.measureText(sep).width; }
       total += w; return w;
     });
-    const y = yTop - fs * 2.2 - (this.showDims ? 34 : 0);   // 치수선이 켜져 있으면 그 위로
+    // 상단 치수선과 겹치지 않게 요약 알약을 그 위로 올림
+    //   (치수 토글=전체 외곽 치수 위 / 방 선택=빨간 치수 위 / 둘 다 아니면 기본)
+    const selAny = store.selectedRoom != null || store.selectedOutline != null;
+    const y = this.showDims ? (yTop - 61 - fs)
+      : selAny ? (yTop - 35 - fs)
+        : (yTop - fs * 2.2);
     // 배경 알약
     const padX = fs * 0.9, h = fs * 2;
     ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.strokeStyle = '#e2e4e8'; ctx.lineWidth = 1;

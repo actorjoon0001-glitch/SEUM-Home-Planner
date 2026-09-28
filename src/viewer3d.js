@@ -775,7 +775,8 @@ export class Viewer3D {
             { shift: [nx * off, nz * off], tol: off + 350, userData: { extFace: key } });
           // 같은 면 안의 포인트 자재 띠 — 기본 마감보다 살짝 앞으로(양각) 덧댐
           const bands = (fo && Array.isArray(fo.bands)) ? fo.bands : [];
-          const boff = off + 60 + 25;  // 기본 마감 바깥면(off+60) 앞으로 25mm 양각
+          // 띠 상자 두께 40, 중심을 기본 마감 바깥면(off+60)보다 확실히 앞에 둬 겹침(z-fighting) 방지
+          const bandTh = 40, boff = off + 60 + 15 + bandTh / 2;   // 띠 뒷면이 기본면보다 15mm 앞
           for (const bd of bands) {
             const u0 = Math.max(0, Math.min(1, Math.min(bd.u0, bd.u1)));
             const u1 = Math.max(0, Math.min(1, Math.max(bd.u0, bd.u1)));
@@ -783,7 +784,7 @@ export class Viewer3D {
             const A2 = [a[0] + (c[0] - a[0]) * u0, a[1] + (c[1] - a[1]) * u0];
             const C2 = [a[0] + (c[0] - a[0]) * u1, a[1] + (c[1] - a[1]) * u1];
             const bMat = bd.material || baseMat, bDef = EXTERIOR_MATERIALS[bMat] || mDef, bCol = bd.color || bDef.color;
-            this._buildCarvedEdge(A2, C2, H, 50, 0, b,
+            this._buildCarvedEdge(A2, C2, H, bandTh, 0, b,
               (segLen, h) => TEX.exteriorMaterial(bMat, bCol, segLen, h, bDef.roughness, bDef.metalness, ex.dir),
               { shift: [nx * boff, nz * boff], tol: boff + 350, userData: { extFace: key } });
           }
@@ -1727,6 +1728,8 @@ export class Viewer3D {
   }
   // 면별 외장재 모드 on/off
   setFaceMode(on) { this.faceMode = !!on; if (!on) { this.faceBrush = null; this._clearFacePreview(); } }
+  // 면별 외장재 전체 초기화 — 모든 면·띠 오버라이드 제거(기본 외장재로 복귀)
+  clearAllExteriorFaces() { store.commit((d) => { d.exteriorFaces = {}; }); }
   // 클릭한 외장 면(외곽선 변) 키 찾기
   _facePick(e) {
     this._raycaster.setFromCamera(this._ndc(e), this.camera);

@@ -550,13 +550,34 @@ export class Viewer3D {
       );
       glass.renderOrder = 2;
       g.add(glass);
-      // 세로 분할 프레임(멀리언)
-      const panes = Math.max(1, t.panes || 1);
-      const mullW = t.fold ? FT : FT * 0.7;
-      for (let i = 1; i < panes; i++) {
-        const x = -W / 2 + (W * i) / panes;
-        const mull = new THREE.Mesh(new THREE.BoxGeometry(mullW, Hh - FT * 2, WALL_T), frameMat);
-        mull.position.set(x, 0, 0); g.add(mull);
+      if (t.combo === 'foldSwing') {
+        // 폴딩(왼쪽) + 여닫이(오른쪽) 복합 도어
+        const sr = t.swingRatio || 0.28;
+        const xSplit = -W / 2 + W * (1 - sr);
+        // 구분 세로틀(굵게)
+        const div = new THREE.Mesh(new THREE.BoxGeometry(FT, Hh - FT * 2, WALL_T), frameMat);
+        div.position.set(xSplit, 0, 0); g.add(div);
+        // 왼쪽 폴딩 세로 살
+        const nFold = Math.max(2, t.panes || 4);
+        const foldW = xSplit - (-W / 2);
+        for (let i = 1; i < nFold; i++) {
+          const x = -W / 2 + (foldW * i) / nFold;
+          const m = new THREE.Mesh(new THREE.BoxGeometry(FT * 0.7, Hh - FT * 2, WALL_T), frameMat);
+          m.position.set(x, 0, 0); g.add(m);
+        }
+        // 오른쪽 여닫이 문 손잡이 (구분틀 옆)
+        const kn = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 200, 12),
+          new THREE.MeshStandardMaterial({ color: '#c9ccd0', metalness: 0.6, roughness: 0.3 }));
+        kn.rotation.x = Math.PI / 2; kn.position.set(xSplit + FT * 1.3, 0, WALL_T / 2 + 20); g.add(kn);
+      } else {
+        // 세로 분할 프레임(멀리언)
+        const panes = Math.max(1, t.panes || 1);
+        const mullW = t.fold ? FT : FT * 0.7;
+        for (let i = 1; i < panes; i++) {
+          const x = -W / 2 + (W * i) / panes;
+          const mull = new THREE.Mesh(new THREE.BoxGeometry(mullW, Hh - FT * 2, WALL_T), frameMat);
+          mull.position.set(x, 0, 0); g.add(mull);
+        }
       }
       // 가로 중간 살(창살) — 미닫이·폴딩(좌우로 미는 세로 짝)·유리중문(noRail)은 생략
       if (!t.noRail && !t.slide) {

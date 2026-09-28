@@ -765,7 +765,24 @@ export class Editor2D {
     ctx.fillStyle = this.monoMode ? '#ffffff' : '#f4f5f7';
     ctx.fillRect(-len / 2, -thick / 2 - 1, len, thick + 2);
 
-    if (isDoor) {
+    if (t.combo === 'foldSwing') {
+      // 폴딩(왼쪽) + 여닫이(오른쪽) 복합 도어
+      ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : (o.color || '#4a5560'));
+      ctx.lineWidth = selected ? 2.2 : 1.6;
+      const sr = t.swingRatio || 0.28;
+      const foldLen = len * (1 - sr), swingLen = len * sr, x0 = -len / 2;
+      // 왼쪽 폴딩 지그재그 패널
+      const nF = Math.max(2, t.panes || 4), pw = foldLen / nF;
+      ctx.beginPath();
+      for (let i = 0; i < nF; i++) { const xx = x0 + i * pw; ctx.moveTo(xx, 0); ctx.lineTo(xx + pw / 2, -pw * 0.5); ctx.lineTo(xx + pw, 0); }
+      ctx.stroke();
+      // 구분선
+      const sx = x0 + foldLen;
+      ctx.beginPath(); ctx.moveTo(sx, -thick / 2); ctx.lineTo(sx, thick / 2); ctx.stroke();
+      // 오른쪽 여닫이 문짝 + 열림 호
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, swingLen); ctx.stroke();
+      ctx.beginPath(); ctx.arc(sx, 0, swingLen, 0, Math.PI / 2); ctx.stroke();
+    } else if (isDoor) {
       ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#4a5560');
       ctx.lineWidth = selected ? 2.5 : 1.6;
       if (t.slide) {

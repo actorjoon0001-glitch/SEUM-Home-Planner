@@ -1626,52 +1626,42 @@ function buildToolbar({ editor, viewer, onModeChange }) {
 
   $('tb-new').onclick = () => { if (confirm('빈 새 도면을 시작할까요? 저장하지 않은 변경은 사라집니다.')) { store.newDesign(); editor.fit(); viewer._needCam = true; viewer.dirty = true; } };
 
-  // 저장: 로그인돼 있으면 Supabase(클라우드), 아니면 이 기기(로컬)에 저장
-  $('tb-save').onclick = async () => {
+  // 저장 공통 — asNew=true 면 항상 새 도면으로 따로 저장(기존 유지), 아니면 덮어쓰기(신규면 새로)
+  const doSave = async (asNew) => {
     if (cloud.configured() && cloud.user) {
       try {
         try { store.design.thumb = editor.toImage(360, 240, 'image/jpeg', 0.6); } catch (e) { /* noop */ }
-        if (store.cloudId) {
-          // 이미 클라우드에 있는 도면 → 덮어쓰기 vs 새 도면으로 따로 저장 선택
-          //   (기본=따로 저장: 실수로 기존 도면을 덮어써 잃어버리지 않게)
-          const saveNew = confirm(
-            '이 도면을 어떻게 저장할까요?\n\n' +
-            '[확인] 새 도면으로 따로 저장 (기존 도면은 그대로 유지)\n' +
-            '[취소] 기존 도면에 덮어쓰기(업데이트)');
-          if (saveNew) {
-            const name = prompt('새로 저장할 도면 이름', (store.design.name || '무제 도면') + ' 사본');
-            if (!name) return;
-            store.design.name = name;
-            const saved = await cloud.saveDesign({ name, data: store.design, isShared: false, isTemplate: false });
-            store.cloudId = saved.id; store.design.name = saved.name;
-            flash('☁ 새 도면으로 따로 저장됨 — 기존 도면은 그대로예요');
-          } else {
-            const saved = await cloud.quickSave({ id: store.cloudId, name: store.design.name || '무제 도면', data: store.design });
-            store.cloudId = saved.id; store.design.name = saved.name;
-            flash('☁ 기존 도면에 덮어써 저장됨');
-          }
-        } else {
-          // 새 도면 → 이름 받아 클라우드에 새로 저장
-          const name = prompt('클라우드에 저장할 도면 이름', store.design.name || '무제 도면');
+        if (asNew || !store.cloudId) {
+          // 새 도면으로 따로 저장 (또는 아직 클라우드에 없는 도면의 첫 저장)
+          const base = store.design.name || '무제 도면';
+          const suggested = (asNew && store.cloudId) ? base + ' 사본' : base;
+          const name = prompt(asNew ? '새 도면으로 저장할 이름 (기존 도면은 그대로 유지)' : '클라우드에 저장할 도면 이름', suggested);
           if (!name) return;
           store.design.name = name;
           const saved = await cloud.saveDesign({ name, data: store.design, isShared: false, isTemplate: false });
           store.cloudId = saved.id; store.design.name = saved.name;
-          flash('☁ 클라우드에 저장됨 — "불러오기"에서 다시 열 수 있어요');
+          flash(asNew ? '☁ 새 도면으로 따로 저장됨 — 기존 도면은 그대로예요' : '☁ 클라우드에 저장됨 — "불러오기"에서 다시 열 수 있어요');
+        } else {
+          // 기존 도면 덮어쓰기(업데이트)
+          const saved = await cloud.quickSave({ id: store.cloudId, name: store.design.name || '무제 도면', data: store.design });
+          store.cloudId = saved.id; store.design.name = saved.name;
+          flash('☁ 저장됨 (덮어쓰기)');
         }
       } catch (e) {
         alert('클라우드 저장 실패: ' + (e.message || e) + '\n(이 기기에도 백업 저장합니다)');
         store.saveAs(store.design.name || '무제 도면');
       }
     } else if (cloud.configured()) {
-      // 설정은 됐지만 미로그인 → 로그인/클라우드 창 열기
       flash('클라우드에 저장하려면 먼저 로그인하세요');
       openCloudDialog();
     } else {
-      const name = prompt('저장할 도면 이름', store.design.name);
+      const name = prompt('저장할 도면 이름', asNew ? (store.design.name || '무제') + ' 사본' : store.design.name);
       if (name) { store.saveAs(name); flash(`'${name}' 저장됨 (이 기기)`); }
     }
   };
+  // 저장 = 덮어쓰기(기존 도면 업데이트) / 새로 저장 = 새 도면으로 따로 저장
+  $('tb-save').onclick = () => doSave(false);
+  if ($('tb-saveas')) $('tb-saveas').onclick = () => doSave(true);
 
   // 불러오기: 로그인돼 있으면 클라우드 목록, 아니면 이 기기(로컬) 목록
   $('tb-open').onclick = () => {

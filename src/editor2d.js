@@ -235,8 +235,42 @@ export class Editor2D {
     // 방 그리기 미리보기
     if (this.drag && this.drag.mode === 'drawnew') this._drawNewPreview(this.drag);
 
+    // 벽부착 제품(외부등·콘센트) 드래그 중: 정확히 어디 벽에 붙는지 표시
+    if (this._wallSnapHint) this._drawWallSnapHint(this._wallSnapHint);
+
     // 선택 안내
     this._drawScaleBar();
+  }
+
+  // 벽부착 제품이 붙을 지점을 화면에 명확히 표시 — 붙는 벽면 폭 하이라이트 + 부착점 + 바깥 방향 화살표
+  _drawWallSnapHint(h) {
+    const ctx = this.ctx;
+    const [wx, wy] = this.toPx(h.wx, h.wy);                   // 벽면상의 부착점
+    const hw = (h.w / 2) * this.scale;                        // 제품 절반 폭(px)
+    const ex = h.ex, ey = h.ey;                               // 벽 방향(단위)
+    const nx = h.nx, ny = h.ny;                               // 바깥 법선(단위)
+    ctx.save();
+    // 1) 붙는 벽면 구간 하이라이트(제품 폭만큼)
+    ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(wx - ex * hw, wy - ey * hw);
+    ctx.lineTo(wx + ex * hw, wy + ey * hw);
+    ctx.stroke();
+    // 2) 부착점 원
+    ctx.fillStyle = '#c8102e';
+    ctx.beginPath(); ctx.arc(wx, wy, 5, 0, Math.PI * 2); ctx.fill();
+    // 3) 바깥(설치 방향) 화살표
+    const aL = 26;
+    const tx = wx + nx * aL, ty = wy + ny * aL;
+    ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(tx, ty); ctx.stroke();
+    const ah = 6;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - nx * ah - ny * ah * 0.7, ty - ny * ah + nx * ah * 0.7);
+    ctx.lineTo(tx - nx * ah + ny * ah * 0.7, ty - ny * ah - nx * ah * 0.7);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
   }
 
   // ---- 전체 평수 요약 — 도면 맨 위 가운데에 "실내 19.1평 · 포치 6.8평 · 데크 4.3평 · 합계 30.2평" ----
@@ -1373,7 +1407,7 @@ export class Editor2D {
       const cat = catalogOf(drag.f.catalogId) || {};
       if (cat.wallMount) {   // 벽부착 제품 → 가까운 벽에 스냅
         const sn = this._snapWallMount(drag.f, mx - drag.dx, my - drag.dy);
-        if (sn) { store.liveUpdate(() => { drag.f.x = sn.x; drag.f.y = sn.y; drag.f.rotation = sn.rotation; drag.f.wallNormal = sn.wallNormal; }); return; }
+        if (sn) { this._wallSnapHint = sn.hint; store.liveUpdate(() => { drag.f.x = sn.x; drag.f.y = sn.y; drag.f.rotation = sn.rotation; drag.f.wallNormal = sn.wallNormal; }); return; }
       }
       store.liveUpdate(() => {
         drag.f.x = this._mv(mx - drag.dx);
@@ -1438,6 +1472,7 @@ export class Editor2D {
   }
 
   _up() {
+    if (this._wallSnapHint) { this._wallSnapHint = null; }   // 부착 위치 표시 해제
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
     if (this.drag && (this.drag.mode === 'movesummary' || this.drag.mode === 'movertlabel')) { store.liveEnd(); this.drag = null; return; }
     if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline', 'resizeoutline', 'resizef'].includes(this.drag.mode)) {
@@ -2418,6 +2453,7 @@ export class Editor2D {
     }
     if (!best) return null;
     const fdepth = f.d || cat.d || 100;
+    const fwidth = f.w || cat.w || 200;
     const wallHalf = (store.design.wallThickness || 150) / 2;
     const off = wallHalf + fdepth / 2;   // 구조 벽 바깥면에 딱 붙게
     return {
@@ -2425,6 +2461,8 @@ export class Editor2D {
       y: Math.round(best.py + best.ny * off),
       rotation: Math.round(Math.atan2(best.ey, best.ex) * 180 / Math.PI),
       wallNormal: [best.nx, best.ny],
+      // 부착 위치 표시용(붙는 벽면 지점·방향·폭)
+      hint: { wx: best.px, wy: best.py, nx: best.nx, ny: best.ny, ex: best.ex, ey: best.ey, w: fwidth, off },
     };
   }
 

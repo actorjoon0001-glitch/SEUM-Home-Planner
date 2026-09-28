@@ -12,7 +12,7 @@ import { swatchDataURL, extKind, ROTATABLE } from './textures.js';
 import { initAiChat } from './aichat.js';
 import { initFacePaint } from './facepaint.js';
 import { openPhotoRender } from './photoRender.js';
-import { rotateRoomsInDesign } from './roomops.js';
+import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
@@ -1377,10 +1377,12 @@ function roomForm(room) {
 
 function bindRoomForm(room) {
   const upd = (key, val) => store.commit(() => { room[key] = val; });
+  // 방 치수·위치가 바뀌면 외곽선(3D 지붕·외벽)도 몸통에 맞춰 다시 계산
+  const updGeom = (key, val) => store.commit((d) => { room[key] = val; if (d.outline) syncOutlineToRooms(d); });
   document.getElementById('r-name').onchange = (e) => upd('name', e.target.value);
   document.getElementById('r-type').onchange = (e) => upd('type', e.target.value);
   for (const k of ['w', 'd', 'x', 'y']) {
-    document.getElementById('r-' + k).onchange = (e) => upd(k, Math.max(0, +e.target.value || 0));
+    document.getElementById('r-' + k).onchange = (e) => updGeom(k, Math.max(0, +e.target.value || 0));
   }
   document.querySelectorAll('#r-walls .wt').forEach((btn) => btn.onclick = () => store.commit(() => {
     const s = btn.dataset.s;
@@ -1392,9 +1394,11 @@ function bindRoomForm(room) {
     const copy = { ...room, id: 'r' + Date.now().toString(36), x: room.x + 400, y: room.y + 400 };
     if (Array.isArray(room.open)) copy.open = room.open.slice();
     d.rooms.push(copy); store.selectedRoom = copy.id;
+    if (d.outline) syncOutlineToRooms(d);
   });
   document.getElementById('r-del').onclick = () => store.commit((d) => {
     d.rooms = d.rooms.filter((r) => r.id !== room.id); store.selectedRoom = null;
+    if (d.outline) syncOutlineToRooms(d);
   });
   document.getElementById('r-rotl').onclick = () => rotateSelectedRooms(-1);
   document.getElementById('r-rotr').onclick = () => rotateSelectedRooms(+1);

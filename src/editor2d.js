@@ -2,6 +2,7 @@
 // 방 추가/이동/크기조절, 가구 배치/이동/회전, 팬/줌, 치수 표시
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, openingOutline, outlinePoints, outlineShape, outlineShapes } from './data.js';
+import { syncOutlineToRooms } from './roomops.js';
 
 const GRID = 100;          // 스냅 단위 (mm)
 const HANDLE = 8;          // 핸들 픽셀 크기
@@ -1372,7 +1373,13 @@ export class Editor2D {
   _up() {
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
     if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline', 'resizeoutline', 'resizef'].includes(this.drag.mode)) {
+      // 방을 옮기거나 크기조절했으면 외곽선(3D 지붕·외벽)을 몸통에 맞춰 다시 계산.
+      //   (외곽선을 직접 편집하는 moveoutline/resizeoutline 은 제외 — 사용자 편집 보존)
+      if ((this.drag.mode === 'mover' || this.drag.mode === 'resize') && store.design.outline) {
+        syncOutlineToRooms(store.design);
+      }
       store.liveEnd();
+      this.draw();
     }
     this.drag = null;
   }

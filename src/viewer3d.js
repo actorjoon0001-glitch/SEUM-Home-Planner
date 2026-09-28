@@ -82,6 +82,8 @@ export class Viewer3D {
     this.faceMode = false;
     this.faceBrush = null;   // { material, color } 또는 { material:null }(=기본으로 되돌림)
     this._faceDrag = null;   // 면 위 드래그 상태 { key, u0, u1 }
+    this._selBand = null;    // 선택된 색 띠 { key, idx } (클릭해 폭 조절)
+    this._bandDrag = null;   // 띠 가장자리 드래그 { key, idx, edge }
     this._raycaster = new THREE.Raycaster();
     this._edrag = null;
     this._gesture = null;   // 클릭↔드래그 판정 상태 (집 선택 vs 화면 회전)
@@ -315,6 +317,8 @@ export class Viewer3D {
 
       // 집을 클릭해 선택하면 이동·회전·크기조절 핸들 표시 (별도 편집 모드 불필요)
       if (store.selectedRoom) this._buildEditHandles(d, b);
+      // 면별 외장재: 선택된 색 띠의 폭 조절 핸들
+      if (this.faceMode && this._selBand) this._buildBandHandles(d, b);
     } finally {
       this.modelGroup = root;
     }
@@ -480,10 +484,11 @@ export class Viewer3D {
 
   // 개구부를 제외한 벽 솔리드 사각형 목록 [a, b, yLo, yHi]
   // ext: 모서리 메움을 위해 양 끝을 늘리는 길이
-  _wallRects(L, ops, wallH, ext) {
+  _wallRects(L, ops, wallH, ext, extB) {
+    const eA = ext, eB = (extB != null) ? extB : ext;   // 양 끝 연장을 따로(밴드 구간 이음매는 0)
     const yBase = 60, wallTop = yBase + wallH;
     const rects = [];
-    let cursor = -ext;
+    let cursor = -eA;
     for (const o of ops) {
       const top = Math.min(wallTop, yBase + o.top);
       if (o.a > cursor) rects.push([cursor, o.a, yBase, wallTop]);     // 개구부 사이 꽉 찬 벽
@@ -491,7 +496,7 @@ export class Viewer3D {
       if (o.sill > 0) rects.push([o.a, o.c2, yBase, yBase + o.sill]);  // 하부(창 밑) 벽
       cursor = Math.max(cursor, o.c2);
     }
-    if (cursor < L + ext) rects.push([cursor, L + ext, yBase, wallTop]);
+    if (cursor < L + eB) rects.push([cursor, L + eB, yBase, wallTop]);
     return rects;
   }
 
@@ -678,7 +683,9 @@ export class Viewer3D {
     const sx = (opts && opts.shift) ? opts.shift[0] : 0;
     const sz = (opts && opts.shift) ? opts.shift[1] : 0;
     const ops = this._edgeOpenings(A, [ux, uz], len, b, opts && opts.tol);
-    const rects = this._wallRects(len, ops, wallH, ext);
+    const extA = (opts && opts.extA != null) ? opts.extA : ext;   // 밴드 구간이면 끝 연장을 따로 지정
+    const extB = (opts && opts.extB != null) ? opts.extB : ext;
+    const rects = this._wallRects(len, ops, wallH, extA, extB);
     const ang = -Math.atan2(dz, dx);
     for (const [a, bEnd, yLo, yHi] of rects) {
       const segLen = bEnd - a, h = yHi - yLo;
@@ -762,31 +769,37 @@ export class Viewer3D {
           let nx = dz / len, nz = -dx / len;                       // 변의 수직
           const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
           if ((mx - cxs) * nx + (mz - czs) * nz < 0) { nx = -nx; nz = -nz; } // 중심 반대(=바깥)로
-          // 이 변의 재질 — 면별 오버라이드가 있으면 그것, 없으면 기본 외장재
+          // 면별 외장재 — 오버라이드가 있으면 그 재질/색, 없으면 기본 외장재.
+          //   '띠'는 덧붙이지 않고, 같은 평면(off)에서 변을 구간별로 잘라 색만 다르게 칠한다
+          //   → 기본 외장재 위에 판을 겹쳐 붙이지 않으므로 두께 없이 자연스럽게 색만 바뀜.
           const key = 'p' + pi + 'e' + i;
           const fo = faces[key];
-          const fMat = (fo && fo.material) || baseMat;
-          const fDef = EXTERIOR_MATERIALS[fMat] || mDef;
-          const fCol = (fo && fo.color) || fDef.color;
-          // 개구부는 '원래 외벽선(a→c)'에서 찾고(창·문 위치는 여기 있음), 마감 박스만
-          //   바깥으로 off 만큼 평행이동해 그린다 → 겹침 없이 창/문 구멍 유지.
-          this._buildCarvedEdge(a, c, H, T, T, b,
-            (segLen, h) => TEX.exteriorMaterial(fMat, fCol, segLen, h, fDef.roughness, fDef.metalness, ex.dir),
-            { shift: [nx * off, nz * off], tol: off + 350, userData: { extFace: key } });
-          // 같은 면 안의 포인트 자재 띠 — 기본 마감보다 살짝 앞으로(양각) 덧댐
-          const bands = (fo && Array.isArray(fo.bands)) ? fo.bands : [];
-          // 띠 상자 두께 40, 중심을 기본 마감 바깥면(off+60)보다 확실히 앞에 둬 겹침(z-fighting) 방지
-          const bandTh = 40, boff = off + 60 + 15 + bandTh / 2;   // 띠 뒷면이 기본면보다 15mm 앞
-          for (const bd of bands) {
-            const u0 = Math.max(0, Math.min(1, Math.min(bd.u0, bd.u1)));
-            const u1 = Math.max(0, Math.min(1, Math.max(bd.u0, bd.u1)));
-            if (u1 - u0 < 0.01) continue;
-            const A2 = [a[0] + (c[0] - a[0]) * u0, a[1] + (c[1] - a[1]) * u0];
-            const C2 = [a[0] + (c[0] - a[0]) * u1, a[1] + (c[1] - a[1]) * u1];
-            const bMat = bd.material || baseMat, bDef = EXTERIOR_MATERIALS[bMat] || mDef, bCol = bd.color || bDef.color;
-            this._buildCarvedEdge(A2, C2, H, bandTh, 0, b,
-              (segLen, h) => TEX.exteriorMaterial(bMat, bCol, segLen, h, bDef.roughness, bDef.metalness, ex.dir),
-              { shift: [nx * boff, nz * boff], tol: boff + 350, userData: { extFace: key } });
+          const baseFMat = (fo && fo.material) || baseMat;   // 면 전체 기본(부분 띠가 아닌 영역)
+          const baseFCol = (fo && fo.color) || null;
+          // 유효한 띠들(정렬·클램프)
+          const bands = (fo && Array.isArray(fo.bands) ? fo.bands : [])
+            .map((bd) => ({ u0: Math.max(0, Math.min(1, Math.min(bd.u0, bd.u1))), u1: Math.max(0, Math.min(1, Math.max(bd.u0, bd.u1))), material: bd.material, color: bd.color }))
+            .filter((bd) => bd.u1 - bd.u0 > 0.004);
+          // 변을 밴드 경계로 잘라 구간 목록 생성
+          const cutSet = new Set([0, 1]);
+          for (const bd of bands) { cutSet.add(Math.round(bd.u0 * 1e4) / 1e4); cutSet.add(Math.round(bd.u1 * 1e4) / 1e4); }
+          const cuts = [...cutSet].sort((p, q) => p - q);
+          for (let s = 0; s < cuts.length - 1; s++) {
+            const ua = cuts[s], ub = cuts[s + 1]; if (ub - ua < 0.002) continue;
+            const umid = (ua + ub) / 2;
+            // 이 구간을 덮는 띠(나중에 칠한 것 우선) → 없으면 면 기본
+            const cover = [...bands].reverse().find((bd) => umid >= bd.u0 && umid <= bd.u1);
+            const segMat = cover ? (cover.material || baseMat) : baseFMat;
+            const sDef = EXTERIOR_MATERIALS[segMat] || mDef;
+            const segCol = cover ? (cover.color || sDef.color) : (baseFCol || sDef.color);
+            const A2 = [a[0] + (c[0] - a[0]) * ua, a[1] + (c[1] - a[1]) * ua];
+            const C2 = [a[0] + (c[0] - a[0]) * ub, a[1] + (c[1] - a[1]) * ub];
+            // 개구부는 '원래 외벽선'에서 찾고 마감 박스만 off 만큼 평행이동 → 겹침 없이 창/문 구멍 유지.
+            //   구간 이음매(내부 경계)는 끝 연장 0, 진짜 모서리(0/1)만 T 만큼 연장해 코너를 메움.
+            this._buildCarvedEdge(A2, C2, H, T, 0, b,
+              (segLen, h) => TEX.exteriorMaterial(segMat, segCol, segLen, h, sDef.roughness, sDef.metalness, ex.dir),
+              { shift: [nx * off, nz * off], tol: off + 350, userData: { extFace: key },
+                extA: ua <= 0.0001 ? T : 0, extB: ub >= 0.9999 ? T : 0 });
           }
         }
       });
@@ -1288,9 +1301,11 @@ export class Viewer3D {
     const c0 = catalogOf(f.catalogId); if (!c0) return;
     const c = f.color ? { ...c0, color: f.color } : c0;   // 제품별 색상 변경(f.color) — 주 색상만 바꾸고 부속(다리·손잡이 등)은 유지
     let [px, pz] = this._p(f.x, f.y, b);
-    // 벽부착 제품(외부 벽등·콘센트): 외장 마감이 있으면 그 바깥으로 밀어 가려지지 않게
+    // 벽부착 제품(외부 벽등·콘센트): 외장 마감 '바깥면' 앞으로 확실히 내밀어 가려지지 않게
     if (c0.wallMount && Array.isArray(f.wallNormal) && this.showExterior) {
-      const extra = 160;   // 외장 마감(약 120~145mm) + 여유 → 그 바깥으로 나오게
+      const cladOuter = (store.design.wallThickness || 150) / 2 + 120;  // 벽중심→외장 마감 바깥면(마감두께 120)
+      const dEff = (f.d || c0.d || 100);                                // 제품 깊이(스케일 반영값)
+      const extra = cladOuter + dEff / 2 + 20;                          // 제품 뒷면이 마감면 바로 앞에 붙게
       px += f.wallNormal[0] * extra; pz += f.wallNormal[1] * extra;
     }
     const g = new THREE.Group();
@@ -1548,22 +1563,25 @@ export class Viewer3D {
         break;
       }
       case 'decksteps': {
-        // 데크 계단 — 기초가 있으면 지면에서 데크(기초 높이)까지 딱 맞게 오르는 계단.
-        //   (제품은 기초로 올라간 house 그룹 안에 있으므로 로컬 0 = 데크 바닥, -F = 지면)
+        // 데크 계단 — 지면에 딱 붙고, 기초가 있으면 데크(기초+바닥) 상단까지 딱 맞게 오르는 계단.
+        //   집 그룹이 기초 높이 F 만큼 올라가 있으므로, 이 제품 그룹을 로컬 0 에 두면
+        //   기하 y=0(=세계 F)가 데크 근처, y=-F(=세계 0)가 지면. → 아래를 지면(-F)부터 쌓는다.
         const F = this._foundationH || 0;
+        g.position.y = 0;   // 바닥 두께(+60) 오프셋 제거 → 계단은 항상 지면 기준
         if (F > 0) {
-          const n = f.steps > 0 ? f.steps : Math.max(2, Math.min(6, Math.round(F / 180)));
-          const sh = F / n, sd = c.d / n;
+          const rise = F + 30;   // 지면 → 데크 바닥 상단(세계 F+30)
+          const n = f.steps > 0 ? f.steps : Math.max(2, Math.min(6, Math.round(rise / 190)));
+          const sh = rise / n, sd = c.d / n;
           for (let i = 0; i < n; i++) {
             const h = (i + 1) * sh;                                  // 지면에서 이 단 윗면까지
             addBox(c.w, h, sd, -F + h / 2, c.color, -c.d / 2 + sd * (i + 0.5));   // 뒤(데크쪽)로 갈수록 높음
           }
         } else {
-          // 기초 없을 때: 지면 위 작은 단
+          // 기초 없을 때: 지면 위 작은 단(맨 아래 단이 지면에 닿게 -F=0 기준으로 쌓음)
           const totalH = f.h != null ? f.h : c.h;
           const n = f.steps > 0 ? f.steps : Math.max(2, Math.min(4, Math.round(totalH / 170)));
           const sh = totalH / n, sd = c.d / n;
-          for (let i = 0; i < n; i++) { const dep = c.d - sd * i; addBox(c.w, sh, dep, sh * i + sh / 2, c.color, c.d / 2 - dep / 2); }
+          for (let i = 0; i < n; i++) { const h = (i + 1) * sh; addBox(c.w, h, c.d - sd * i, h / 2, c.color, c.d / 2 - (c.d - sd * i) / 2); }
         }
         break;
       }
@@ -1729,7 +1747,7 @@ export class Viewer3D {
     this.dirty = true;
   }
   // 면별 외장재 모드 on/off
-  setFaceMode(on) { this.faceMode = !!on; if (!on) { this.faceBrush = null; this._clearFacePreview(); } }
+  setFaceMode(on) { this.faceMode = !!on; if (!on) { this.faceBrush = null; this._clearFacePreview(); this._selBand = null; this._bandDrag = null; this.dirty = true; } }
   // 면별 외장재 전체 초기화 — 모든 면·띠 오버라이드 제거(기본 외장재로 복귀)
   clearAllExteriorFaces() { store.commit((d) => { d.exteriorFaces = {}; }); }
   // 클릭한 외장 면(외곽선 변) 키 찾기
@@ -1779,7 +1797,49 @@ export class Viewer3D {
     const b = this._bounds();
     const A = this._p(A0[0], A0[1], b), B = this._p(B0[0], B0[1], b);
     const dx = B[0] - A[0], dz = B[1] - A[1], len = Math.hypot(dx, dz) || 1;
-    return { A, dir: [dx / len, dz / len], len };
+    // 바깥 법선 (도형 중심 반대쪽)
+    const P = pts.map((p) => this._p(p[0], p[1], b));
+    let ccx = 0, ccz = 0; for (const q of P) { ccx += q[0]; ccz += q[1]; } ccx /= P.length; ccz /= P.length;
+    let nx = dz / len, nz = -dx / len;
+    const mx = (A[0] + B[0]) / 2, mz = (A[1] + B[1]) / 2;
+    if ((mx - ccx) * nx + (mz - ccz) * nz < 0) { nx = -nx; nz = -nz; }
+    return { A, dir: [dx / len, dz / len], len, n: [nx, nz] };
+  }
+  // 면 key 위 u 위치에 있는 띠 인덱스(없으면 -1)
+  _bandAt(key, u) {
+    const fo = (store.design.exteriorFaces || {})[key];
+    if (!fo || !Array.isArray(fo.bands)) return -1;
+    for (let i = fo.bands.length - 1; i >= 0; i--) {
+      const bd = fo.bands[i], lo = Math.min(bd.u0, bd.u1), hi = Math.max(bd.u0, bd.u1);
+      if (u >= lo && u <= hi) return i;
+    }
+    return -1;
+  }
+  // 밴드 조절 핸들 클릭 판정
+  _pickBandHandle(e) {
+    this._raycaster.setFromCamera(this._ndc(e), this.camera);
+    const hits = this._raycaster.intersectObjects(this.modelGroup.children, true);
+    for (const h of hits) { const u = h.object.userData || {}; if (u.bandHandle) return u; }
+    return null;
+  }
+  // 선택된 띠의 좌우 조절 핸들(초록 세로 바) — 면 바깥으로 내밀어 잡기 쉽게
+  _buildBandHandles(d, b) {
+    const sel = this._selBand; if (!sel) return;
+    const fo = (d.exteriorFaces || {})[sel.key]; if (!fo || !Array.isArray(fo.bands) || !fo.bands[sel.idx]) return;
+    const info = this._faceEdgeInfo(sel.key); if (!info) return;
+    const bd = fo.bands[sel.idx], H = (d.ceilingHeight || 2400);
+    const outN = info.n, push = ((d.wallThickness || 150) / 2) + 260;
+    for (const edge of ['u0', 'u1']) {
+      const u = Math.max(0, Math.min(1, bd[edge]));
+      const bx = info.A[0] + info.dir[0] * info.len * u + outN[0] * push;
+      const bz = info.A[1] + info.dir[1] * info.len * u + outN[1] * push;
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(70, H * 0.92, 70),
+        new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.2, roughness: 0.4 }));
+      bar.position.set(bx, H * 0.5, bz);
+      bar.rotation.y = Math.atan2(-info.dir[1], info.dir[0]);
+      bar.userData = { bandHandle: edge, key: sel.key, idx: sel.idx };
+      this.modelGroup.add(bar);
+    }
   }
   // 클릭 지점의 외장 면 + 변을 따라간 위치(0~1) 반환
   _facePickAt(e) {
@@ -1828,6 +1888,13 @@ export class Viewer3D {
     this._needsRender = true;
   }
   _clearFacePreview() { if (this._facePreviewMesh) { this._facePreviewMesh.visible = false; this._needsRender = true; } }
+  // 선택된 색 구간의 범위 상자(주황)를 보여줘 폭을 눈으로 확인하며 조절
+  _showSelBandPreview() {
+    const s = this._selBand; if (!s) { this._clearFacePreview(); return; }
+    const fo = (store.design.exteriorFaces || {})[s.key];
+    const band = fo && fo.bands && fo.bands[s.idx];
+    if (band) this._updateFacePreview(s.key, band.u0, band.u1); else this._clearFacePreview();
+  }
   _buildEditHandles(d, b) {
     const room = d.rooms.find((r) => r.id === store.selectedRoom); if (!room) return;
     // 함께 선택된 방들(다중 선택 = 건물 통째) — 대표 방 포함해 모두 강조
@@ -1905,8 +1972,28 @@ export class Viewer3D {
   _edDown(e) {
     // 면별 외장재 모드: 클릭=면 전체, 드래그=드래그한 폭만큼 자재 띠
     if (this.faceMode && e.button === 0) {
+      // 1) 선택된 띠의 조절 핸들을 잡으면 → 가장자리 드래그로 폭 조절
+      const hp = this._pickBandHandle(e);
+      if (hp) { this._bandDrag = { key: hp.key, idx: hp.idx, edge: hp.bandHandle }; this.controls.enabled = false; store.snapshot(); return; }
       const pick = this._facePickAt(e);
-      if (pick) { this._faceDrag = { key: pick.key, u0: pick.u, u1: pick.u }; this.controls.enabled = false; }
+      if (pick) {
+        const fo = (store.design.exteriorFaces || {})[pick.key];
+        // 2) 기존 색 띠를 클릭 → 선택(폭 조절 핸들 + 주황 범위 상자 표시), 칠하지 않음
+        const bi = this._bandAt(pick.key, pick.u);
+        if (bi >= 0) { this._selBand = { key: pick.key, idx: bi }; this._showSelBandPreview(); this.dirty = true; return; }
+        // 3) 전체 칠한 면을 클릭 → 폭 조절 가능한 [0,1] 띠로 바꾸고 선택(범위 재조절)
+        if (fo && fo.material && !(Array.isArray(fo.bands) && fo.bands.length)) {
+          store.commit((dd) => {
+            const f2 = (dd.exteriorFaces = dd.exteriorFaces || {})[pick.key];
+            f2.bands = [{ u0: 0, u1: 1, material: f2.material, color: f2.color }];
+            delete f2.material; delete f2.color;
+          });
+          this._selBand = { key: pick.key, idx: 0 }; this._showSelBandPreview(); this.dirty = true; return;
+        }
+        // 4) 그 외 빈 면 → 칠하기(클릭=전체, 드래그=띠)
+        if (this._selBand) { this._selBand = null; this._clearFacePreview(); this.dirty = true; }
+        this._faceDrag = { key: pick.key, u0: pick.u, u1: pick.u }; this.controls.enabled = false;
+      } else if (this._selBand) { this._selBand = null; this._clearFacePreview(); this.dirty = true; }
       return;
     }
     if (e.button !== 0) return;            // 좌클릭만 편집 — 휠(가운데)·우클릭은 카메라 이동/회전
@@ -1980,6 +2067,18 @@ export class Viewer3D {
     this._gesture = { x0: e.clientX, y0: e.clientY, roomId: roomId || null, moved: false };
   }
   _edMove(e) {
+    if (this._bandDrag) {   // 선택한 띠의 한쪽 가장자리를 끌어 폭 조절
+      const bd = this._bandDrag; const u = this._faceUAt(e, bd.key);
+      if (u != null) {
+        store.liveUpdate(() => {
+          const fo = (store.design.exteriorFaces || {})[bd.key]; const band = fo && fo.bands && fo.bands[bd.idx];
+          if (band) band[bd.edge] = u;
+        });
+        const fo = (store.design.exteriorFaces || {})[bd.key]; const band = fo && fo.bands && fo.bands[bd.idx];
+        if (band) this._updateFacePreview(bd.key, band.u0, band.u1);   // 조절 중 범위 상자 갱신
+      }
+      return;
+    }
     if (this._faceDrag) {   // 면별 외장재 드래그 — 변 직선에 투영해 끝까지 잡히게 + 범위 미리보기
       const u = this._faceUAt(e, this._faceDrag.key);
       if (u != null) { this._faceDrag.u1 = u; this._updateFacePreview(this._faceDrag.key, this._faceDrag.u0, u); }
@@ -2021,6 +2120,16 @@ export class Viewer3D {
     }
   }
   _edUp() {
+    if (this._bandDrag) {   // 띠 폭 조절 종료 — u0/u1 정규화(뒤집힘 보정)
+      const bd = this._bandDrag; this._bandDrag = null;
+      store.liveEnd(); this.controls.enabled = true;
+      store.commit((d) => {
+        const fo = (d.exteriorFaces || {})[bd.key];
+        const band = fo && fo.bands && fo.bands[bd.idx];
+        if (band && band.u0 > band.u1) { const t = band.u0; band.u0 = band.u1; band.u1 = t; }
+      });
+      this._showSelBandPreview(); this.dirty = true; return;
+    }
     if (this._faceDrag) {
       const fd = this._faceDrag; this._faceDrag = null; this.controls.enabled = true;
       this._clearFacePreview();

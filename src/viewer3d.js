@@ -1472,6 +1472,26 @@ export class Viewer3D {
         g.add(leaf);
         break;
       }
+      case 'sconce': {
+        // 외부 벽등(간접등) — 벽면에 붙는 세로 박스 + 위아래로 새어나오는 빛
+        addBox(c.w, c.h, c.d, 0, c.color);                                  // 등기구 몸통
+        const glowMat = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffd98a', emissiveIntensity: 1.4, roughness: 0.5 });
+        // 위·아래 발광면 (간접광 느낌)
+        const top = new THREE.Mesh(new THREE.BoxGeometry(c.w * 0.7, 24, c.d * 0.7), glowMat); top.position.set(0, c.h / 2 - 6, 0); g.add(top);
+        const bot = new THREE.Mesh(new THREE.BoxGeometry(c.w * 0.7, 24, c.d * 0.7), glowMat); bot.position.set(0, -c.h / 2 + 6, 0); g.add(bot);
+        // 벽을 타고 번지는 빛 (포인트 라이트, 성능 위해 약하게)
+        const lightUp = new THREE.PointLight(0xffe6b0, 6, 2600, 2); lightUp.position.set(0, c.h / 2 + 200, c.d); g.add(lightUp);
+        const lightDn = new THREE.PointLight(0xffe6b0, 6, 2600, 2); lightDn.position.set(0, -c.h / 2 - 200, c.d); g.add(lightDn);
+        break;
+      }
+      case 'outlet': {
+        // 야외 방수 콘센트 — 흰 박스 + 방수 덮개(살짝 열린 뚜껑)
+        addBox(c.w, c.h, c.d, 0, c.color);                                  // 본체
+        const lid = addBox(c.w * 0.96, c.h * 0.5, 18, c.h * 0.18, '#d7d5cf'); // 방수 덮개
+        lid.position.z = c.d / 2 + 8; lid.rotation.x = -0.5;
+        addBox(c.w * 0.5, c.h * 0.28, 8, -c.h * 0.15, '#8b8f95', c.d / 2 + 2); // 콘센트 구멍부
+        break;
+      }
       default: // box
         addBox(c.w, c.h, c.d, c.h / 2, c.color, 0, 0, woodBox ? 'wood' : undefined);
     }

@@ -178,9 +178,13 @@ export const FURNITURE_CATALOG = [
   { id: 'lamp',    cat: '소품', name: '스탠드 조명',  kind: 'plant',    w: 350,  d: 350,  h: 1600, color: '#d8cbb0' },
   { id: 'railing', cat: '소품', name: '난간',         kind: 'box',      w: 2000, d: 80,   h: 900,  color: '#9aa0a8' },
   { id: 'ceilfan', cat: '소품', name: '실링팬',       kind: 'box',      w: 1100, d: 1100, h: 300,  color: '#cbb89a' },
+
+  // 외부 (외벽에 부착 — elev=설치 높이)
+  { id: 'sconce',  cat: '외부', name: '외부 벽등(간접등)', kind: 'sconce', w: 130, d: 100, h: 280, elev: 1950, color: '#2b2e33' },
+  { id: 'outletx', cat: '외부', name: '야외 방수 콘센트',  kind: 'outlet', w: 110, d: 75,  h: 150, elev: 400,  color: '#eceae6' },
 ];
 
-export const CATEGORIES = ['가구', '주방', '가전', '욕실', '소품'];
+export const CATEGORIES = ['가구', '주방', '가전', '욕실', '소품', '외부'];
 
 // 빈 도면 (새 도면 시작 시 — 아무 방도 없는 상태)
 export function createEmptyDesign() {

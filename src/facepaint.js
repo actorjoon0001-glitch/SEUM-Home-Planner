@@ -26,6 +26,10 @@ export function initFacePaint(opts = {}) {
   #fp-bar .sw.sel .chip{border-color:#c8102e}
   #fp-bar .sw.sel{color:#c8102e;font-weight:700}
   #fp-bar .sw.def .chip{background:repeating-linear-gradient(45deg,#eee,#eee 6px,#ddd 6px,#ddd 12px);display:flex;align-items:center;justify-content:center;font-size:16px}
+  #fp-color{flex-basis:100%;display:flex;align-items:center;gap:8px;border-top:1px solid #eee;padding-top:10px;margin-top:2px;font-size:12px;color:#555}
+  #fp-color input[type=color]{width:44px;height:30px;border:1px solid #ddd;border-radius:6px;padding:0;background:#fff;cursor:pointer}
+  #fp-color .fp-sw2{display:flex;gap:5px;flex-wrap:wrap}
+  #fp-color .fp-sw2 b{width:22px;height:22px;border-radius:5px;border:1px solid rgba(0,0,0,.12);cursor:pointer}
   `;
   document.head.appendChild(st);
 
@@ -41,6 +45,13 @@ export function initFacePaint(opts = {}) {
   const select = (key) => {
     viewer.faceBrush = key === '__default__' ? { material: null } : { material: key, color: EXTERIOR_MATERIALS[key].color };
     swatches.forEach((s) => s.el.classList.toggle('sel', s.key === key));
+    // 색상 선택기 상태 갱신 (기본 브러시면 비활성)
+    if (colorRow) {
+      const on = key !== '__default__';
+      colorRow.style.opacity = on ? '1' : '0.4';
+      colorInput.disabled = !on;
+      if (on) colorInput.value = viewer.faceBrush.color || '#888888';
+    }
   };
   // 기본(오버라이드 제거) + 재질들
   const mk = (key, label, chipHtml, cls) => {
@@ -56,6 +67,17 @@ export function initFacePaint(opts = {}) {
     swatches[swatches.length - 1].el.querySelector('.chip').style.background = m.color;
   }
 
+  // 색상 선택기 — 같은 재질(예: 메탈사이딩)을 원하는 색으로 칠해 2색 조합 표현
+  const colorRow = document.createElement('div');
+  colorRow.id = 'fp-color';
+  const PRESET = ['#3a3f46', '#6b7079', '#9aa0a8', '#c9c3b8', '#b98b5e', '#8a6b49', '#5b4636', '#2b2e33', '#e7e2d8', '#c0492e'];
+  colorRow.innerHTML = `<span>색상</span><input type="color" id="fp-col"><div class="fp-sw2">${PRESET.map((c) => `<b style="background:${c}" data-c="${c}"></b>`).join('')}</div>`;
+  bar.appendChild(colorRow);
+  const colorInput = colorRow.querySelector('#fp-col');
+  const applyColor = (c) => { if (viewer.faceBrush && viewer.faceBrush.material) { viewer.faceBrush.color = c; colorInput.value = c; } };
+  colorInput.oninput = (e) => applyColor(e.target.value);
+  colorRow.querySelectorAll('.fp-sw2 b').forEach((b) => b.onclick = () => applyColor(b.dataset.c));
+
   btn.onclick = () => {
     const on = !viewer.faceMode;
     viewer.setFaceMode(on);
@@ -65,7 +87,7 @@ export function initFacePaint(opts = {}) {
       onNeed3D(); onShowExterior();
       if (!viewer.faceBrush) select(Object.keys(EXTERIOR_MATERIALS)[0]);
       else { const b = viewer.faceBrush; select(b.material || '__default__'); }
-      flash('면별 외장재 — 재질 고르고: 클릭=면 전체, 드래그=드래그한 폭만큼 포인트 띠 (기본↺=되돌림)');
+      flash('면별 외장재 — 재질·색상 고르고: 클릭=면 전체, 드래그=폭만큼 띠. 같은 사이딩을 색상만 바꿔 2색 조합도 가능 (기본↺=되돌림)');
     } else flash('면별 외장재 종료');
   };
 }

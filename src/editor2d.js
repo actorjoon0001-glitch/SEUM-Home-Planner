@@ -184,6 +184,7 @@ export class Editor2D {
     ctx.clearRect(0, 0, this.cssW, this.cssH);
     this._dimHits = [];   // 이번 프레임의 치수 라벨 클릭영역(더블클릭 편집용)
     this._summaryRect = null;   // 이번 프레임의 평수 요약 알약 히트박스(드래그 이동용)
+    this._roomLabelHits = [];   // 이번 프레임의 방 이름 라벨 히트박스(드래그 이동용)
     this._drawGrid();
 
     // 밑그림(참조 도면) + 외벽(벽체) + 방을 하나의 레이어 스택(z)으로 정렬해 그림
@@ -216,6 +217,9 @@ export class Editor2D {
 
     // 가구
     if (this.showFurniture) for (const f of d.furniture) this._drawFurniture(f);
+
+    // 방 이름·면적 라벨 — 가구 위(맨 앞)에 그려 가리지 않게 (드래그로 이동 가능)
+    for (const L of layers) if (L.room) this._drawRoomLabel(L.room);
 
     // 텍스트 라벨 (방 이름 등)
     this._drawLabels();
@@ -436,25 +440,7 @@ export class Editor2D {
     drawWall(x, y, x, y + h, 'w');
     drawWall(x + w, y, x + w, y + h, 'e');
 
-    // 라벨 + 면적
-    const area = (room.w * room.d) / 1e6; // m²
-    ctx.fillStyle = '#33373d';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const big = Math.min(16, Math.max(10, w / 8));
-    ctx.font = `600 ${big}px "Noto Sans KR", sans-serif`;
-    if (w > 40 && h > 30) {
-      // 이름은 사용자가 직접 넣은 방만 표시(자동 라벨 없음). 이름 표시 옵션이 꺼져 있으면 모두 숨김.
-      const hasName = this.showRoomNames && !!(room.name && room.name.trim());
-      if (hasName) ctx.fillText(room.name, x + w / 2, y + h / 2 - (this.showArea ? big * 0.5 : 0));
-      if (this.showArea) {
-        ctx.font = `${big * 0.8}px "Noto Sans KR", sans-serif`;
-        ctx.fillStyle = '#6b7079';
-        const txt = this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`;
-        // 이름이 없으면 평수를 중앙에, 있으면 이름 아래에
-        ctx.fillText(txt, x + w / 2, y + h / 2 + (hasName ? big * 0.6 : 0));
-      }
-    }
+    // 이름·면적 라벨은 가구에 가리지 않도록 별도 패스(_drawRoomLabel)에서 맨 위에 그림
 
     // 치수선 — 선택 방은 빨강(더블클릭 편집) / '치수' 토글 시 모든 방 회색(편집 가능)
     if (selected || this.showDims) this._roomDims(room, selected);
@@ -1133,6 +1119,20 @@ export class Editor2D {
       return;
     }
 
+    // 방 이름 라벨 클릭 → 드래그로 위치 이동 (가구에 가려질 때 글씨를 옆/위로)
+    if (!this.drawOutline && !this.eraseMode && !this.measureMode && !this.labelMode) {
+      const rl = this._hitRoomLabel(px, py);
+      if (rl) {
+        const room = store.design.rooms.find((r) => r.id === rl.roomId);
+        if (room) {
+          const [mx, my] = this.toMm(px, py);
+          const off = room.labelOffset || { dx: 0, dy: 0 };
+          this.drag = { mode: 'movertlabel', room, sx: mx, sy: my, ox: off.dx || 0, oy: off.dy || 0 };
+          return;
+        }
+      }
+    }
+
     // 치수 라벨 위 클릭 → 선택 유지(더블클릭 편집 대기, 방 선택 해제 방지)
     if (!this.drawOutline && !this.eraseMode && !this.measureMode && !this.labelMode && this._hitDim(px, py)) return;
 
@@ -1331,6 +1331,12 @@ export class Editor2D {
       store.liveUpdate(() => { store.design.summaryOffset = { dx: Math.round(dx), dy: Math.round(dy) }; });
       return;
     }
+    // 방 이름 라벨 이동
+    if (drag.mode === 'movertlabel') {
+      const dx = drag.ox + (mx - drag.sx), dy = drag.oy + (my - drag.sy);
+      store.liveUpdate(() => { drag.room.labelOffset = { dx: Math.round(dx), dy: Math.round(dy) }; });
+      return;
+    }
 
     // 실제 편집이 시작되는 첫 이동에서만 되돌리기 스냅샷 기록
     if (!drag.snapped) { store.snapshot(); drag.snapped = true; }
@@ -1410,7 +1416,7 @@ export class Editor2D {
 
   _up() {
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
-    if (this.drag && this.drag.mode === 'movesummary') { store.liveEnd(); this.drag = null; return; }
+    if (this.drag && (this.drag.mode === 'movesummary' || this.drag.mode === 'movertlabel')) { store.liveEnd(); this.drag = null; return; }
     if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline', 'resizeoutline', 'resizef'].includes(this.drag.mode)) {
       // 방을 옮기거나 크기조절했으면 외곽선(3D 지붕·외벽)을 몸통에 맞춰 다시 계산.
       //   (외곽선을 직접 편집하는 moveoutline/resizeoutline 은 제외 — 사용자 편집 보존)
@@ -1830,6 +1836,48 @@ export class Editor2D {
     ctx.closePath();
   }
 
+  // 방 이름·면적 라벨 — 가구 위(맨 앞)에 그리고, 드래그로 옮길 수 있게 히트박스 기록.
+  //   room.labelOffset {dx,dy}(mm) 만큼 방 중심에서 이동.
+  _drawRoomLabel(room) {
+    const ctx = this.ctx;
+    const [x, y] = this.toPx(room.x, room.y);
+    const w = room.w * this.scale, h = room.d * this.scale;
+    if (!(w > 40 && h > 30)) return;
+    const hasName = this.showRoomNames && !!(room.name && room.name.trim());
+    if (!hasName && !this.showArea) return;
+    const off = room.labelOffset || { dx: 0, dy: 0 };
+    const cx = x + w / 2 + (off.dx || 0) * this.scale;
+    const cy = y + h / 2 + (off.dy || 0) * this.scale;
+    const area = (room.w * room.d) / 1e6;
+    const big = Math.min(16, Math.max(10, w / 8));
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // 가독성: 흰 반투명 배경 깔기 (가구 위에서도 글씨가 보이게)
+    const lines = [];
+    if (hasName) lines.push({ t: room.name, f: `600 ${big}px "Noto Sans KR", sans-serif`, c: '#33373d' });
+    if (this.showArea) lines.push({ t: this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`, f: `${big * 0.8}px "Noto Sans KR", sans-serif`, c: '#6b7079' });
+    let maxW = 0;
+    for (const ln of lines) { ctx.font = ln.f; maxW = Math.max(maxW, ctx.measureText(ln.t).width); }
+    const lineH = big * 1.15, totalH = lines.length * lineH;
+    const padX = 6, padY = 3;
+    const bx = cx - maxW / 2 - padX, by = cy - totalH / 2 - padY, bw = maxW + padX * 2, bh = totalH + padY * 2;
+    this._roomLabelHits.push({ roomId: room.id, x: bx, y: by, w: bw, h: bh });
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); ctx.fill();
+    let ly = cy - totalH / 2 + lineH / 2;
+    for (const ln of lines) { ctx.font = ln.f; ctx.fillStyle = ln.c; ctx.fillText(ln.t, cx, ly); ly += lineH; }
+    ctx.restore();
+  }
+
+  _hitRoomLabel(px, py) {
+    const hits = this._roomLabelHits || [];
+    for (let i = hits.length - 1; i >= 0; i--) {
+      const hh = hits[i];
+      if (px >= hh.x && px <= hh.x + hh.w && py >= hh.y && py <= hh.y + hh.h) return hh;
+    }
+    return null;
+  }
+
   _hitLabel(px, py) {
     const ctx = this.ctx;
     ctx.save(); ctx.font = '600 13px sans-serif';
@@ -2231,7 +2279,7 @@ export class Editor2D {
     const selRoom = d.rooms.find((r) => r.id === store.selectedRoom);
     const RC = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
     let cur = 'default';
-    if (this._hitSummary(px, py)) cur = 'move';   // 평수 요약 알약 → 이동 커서
+    if (this._hitSummary(px, py) || this._hitRoomLabel(px, py)) cur = 'move';   // 요약·방이름 라벨 → 이동 커서
     if (cur === 'default' && selRoom) {
       const hk = this._hitHandle(selRoom, px, py);
       if (hk) cur = RC[hk];

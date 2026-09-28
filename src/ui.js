@@ -1629,10 +1629,24 @@ function buildToolbar({ editor, viewer, onModeChange }) {
       try {
         try { store.design.thumb = editor.toImage(360, 240, 'image/jpeg', 0.6); } catch (e) { /* noop */ }
         if (store.cloudId) {
-          // 이미 클라우드에 있는 도면 → 덮어쓰기(공유·템플릿 설정 유지)
-          const saved = await cloud.quickSave({ id: store.cloudId, name: store.design.name || '무제 도면', data: store.design });
-          store.cloudId = saved.id; store.design.name = saved.name;
-          flash('☁ 클라우드에 저장됨');
+          // 이미 클라우드에 있는 도면 → 덮어쓰기 vs 새 도면으로 따로 저장 선택
+          //   (기본=따로 저장: 실수로 기존 도면을 덮어써 잃어버리지 않게)
+          const saveNew = confirm(
+            '이 도면을 어떻게 저장할까요?\n\n' +
+            '[확인] 새 도면으로 따로 저장 (기존 도면은 그대로 유지)\n' +
+            '[취소] 기존 도면에 덮어쓰기(업데이트)');
+          if (saveNew) {
+            const name = prompt('새로 저장할 도면 이름', (store.design.name || '무제 도면') + ' 사본');
+            if (!name) return;
+            store.design.name = name;
+            const saved = await cloud.saveDesign({ name, data: store.design, isShared: false, isTemplate: false });
+            store.cloudId = saved.id; store.design.name = saved.name;
+            flash('☁ 새 도면으로 따로 저장됨 — 기존 도면은 그대로예요');
+          } else {
+            const saved = await cloud.quickSave({ id: store.cloudId, name: store.design.name || '무제 도면', data: store.design });
+            store.cloudId = saved.id; store.design.name = saved.name;
+            flash('☁ 기존 도면에 덮어써 저장됨');
+          }
         } else {
           // 새 도면 → 이름 받아 클라우드에 새로 저장
           const name = prompt('클라우드에 저장할 도면 이름', store.design.name || '무제 도면');

@@ -1100,8 +1100,10 @@ function buildFinish() {
     <input id="fin-rise" type="range" min="200" max="2600" step="50" style="width:100%">
     <div class="tool-group-label" style="margin-top:8px">지붕 두께 <small class="muted" id="fin-thick-v"></small></div>
     <input id="fin-thick" type="range" min="80" max="400" step="10" style="width:100%">
-    <div class="tool-group-label" style="margin-top:12px">지붕 색상</div>
+    <div class="tool-group-label" style="margin-top:12px">지붕 색상 (윗면)</div>
     <div class="swatches" id="fin-rf-sw"></div>
+    <div class="tool-group-label" style="margin-top:12px">지붕 테두리·두께 색 (파사드)</div>
+    <div class="swatches" id="fin-fascia-sw"></div>
     <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>`;
   const qi = wrap.querySelector('#fin-q');
   qi.oninput = () => { query = qi.value.trim(); renderCards(); };
@@ -1176,6 +1178,17 @@ function buildFinish() {
     rfSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
       writeRoof((r) => { r.color = b.dataset.c; }); showRoof();
     });
+    // 지붕 테두리·두께(파사드) 색 — 기본 흰색. '지붕색과 동일'로 두께까지 한 색 가능
+    const faSw = wrap.querySelector('#fin-fascia-sw');
+    if (faSw) {
+      const curFa = effRoof.fascia || '#ebe8e1';
+      const faColors = ['#ebe8e1', '#ffffff', ...ROOF_PALETTE];
+      faSw.innerHTML = `<button class="sw ${!effRoof.fascia || effRoof.fascia === effRoof.color ? '' : ''}" style="background:linear-gradient(135deg,${effRoof.color || '#3a3f44'} 50%,#fff 50%);font-size:9px" data-same="1" title="지붕색과 동일">＝</button>`
+        + faColors.map((c) => `<button class="sw ${curFa === c ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
+      faSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
+        writeRoof((r) => { r.fascia = b.dataset.same ? (r.color || effRoof.color || '#3a3f44') : b.dataset.c; }); showRoof();
+      });
+    }
     // 지붕 경사(높이)·두께 슬라이더 — 입력 중 라벨만 갱신, 놓으면 적용(undo 1회)
     const defRise = (ROOF_TYPES[effRoof.type] || ROOF_TYPES.gable || {}).rise || 1200;
     const riseEl = wrap.querySelector('#fin-rise'), riseV = wrap.querySelector('#fin-rise-v');

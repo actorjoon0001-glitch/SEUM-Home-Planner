@@ -1392,6 +1392,12 @@ function roomForm(room) {
     <p class="ph">공간 속성</p>
     <label class="fld"><span>이름 <small class="muted">(도면에서 글씨 더블클릭으로도 수정)</small></span><input id="r-name" value="${esc(room.name)}" placeholder="예: ${esc(typeLabel)}"></label>
     <label class="ck"><input type="checkbox" id="r-hidearea"${room.hideArea ? ' checked' : ''}> 평수(면적) 숨기기</label>
+    <div class="fld"><span>이름 글씨 크기</span>
+      <div class="seg" id="r-lblsize">
+        ${[['0.8','작게'],['1','기본'],['1.4','크게'],['1.8','더 크게'],['2.4','아주 크게']].map(([s,l]) =>
+          `<button class="mini${(room.labelScale || 1) == +s ? ' active' : ''}" data-s="${s}">${l}</button>`).join('')}
+      </div>
+    </div>
     <label class="fld"><span>종류</span><select id="r-type">${opts}</select></label>
     <div class="grid2">
       <label class="fld"><span>가로 W (mm)</span><input id="r-w" type="number" step="100" value="${room.w}"></label>
@@ -1438,6 +1444,7 @@ function bindRoomForm(room) {
   document.getElementById('r-name').onchange = (e) => upd('name', e.target.value);
   const ha = document.getElementById('r-hidearea');
   if (ha) ha.onchange = (e) => upd('hideArea', e.target.checked);
+  document.querySelectorAll('#r-lblsize button').forEach((b) => b.onclick = () => upd('labelScale', +b.dataset.s));
   document.getElementById('r-type').onchange = (e) => upd('type', e.target.value);
   for (const k of ['w', 'd', 'x', 'y']) {
     document.getElementById('r-' + k).onchange = (e) => updGeom(k, Math.max(0, +e.target.value || 0));

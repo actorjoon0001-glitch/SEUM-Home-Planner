@@ -1489,6 +1489,26 @@ export class Viewer3D {
         const lightDn = new THREE.PointLight(0xffe6b0, 6, 2600, 2); lightDn.position.set(0, -c.h / 2 - 200, c.d); g.add(lightDn);
         break;
       }
+      case 'tarp': {
+        // 타프(차양막) — 가운데가 살짝 솟은 사각 천 + 네 모서리 기둥(바닥까지)
+        const hw = c.w / 2, hd = c.d / 2, seg = 8;
+        const geo = new THREE.PlaneGeometry(c.w, c.d, seg, seg);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const fx = 1 - (pos.getX(i) / hw) ** 2, fy = 1 - (pos.getY(i) / hd) ** 2;
+          pos.setZ(i, Math.max(0, fx) * Math.max(0, fy) * 220);   // 중앙 볼록(장력)
+        }
+        geo.computeVertexNormals();
+        const fabric = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
+        fabric.rotation.x = -Math.PI / 2; fabric.castShadow = true; fabric.receiveShadow = true; g.add(fabric);
+        const postH = (f.elev != null ? f.elev : (c.elev || 2400));
+        const postMat = new THREE.MeshStandardMaterial({ color: '#9aa0a8', metalness: 0.4, roughness: 0.5 });
+        for (const [sx, sz] of [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]) {
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(30, 30, postH, 10), postMat);
+          pole.position.set(sx, -postH / 2, sz); pole.castShadow = true; g.add(pole);
+        }
+        break;
+      }
       case 'outlet': {
         // 야외 방수 콘센트 — 흰 박스 + 방수 덮개(살짝 열린 뚜껑)
         addBox(c.w, c.h, c.d, 0, c.color);                                  // 본체

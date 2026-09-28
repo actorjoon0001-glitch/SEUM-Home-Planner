@@ -542,6 +542,14 @@ export class Editor2D {
       rrect(-hw, -hd, w, d, Math.min(14, d * 0.2)); ctx.fillStyle = light; ctx.fill(); ctx.stroke();
       rrect(-hw + w * 0.1, -hd + d * 0.12, w * 0.8, d * 0.76, Math.min(10, d * 0.16)); ctx.stroke();
       ctx.beginPath(); ctx.arc(0, hd * 0.62, Math.max(1.6, d * 0.05), 0, Math.PI * 2); ctx.stroke();
+    } else if (kind === 'tarp') {                             // 타프(차양막): 점선 사각 + 대각선(천)
+      ctx.save();
+      ctx.fillStyle = 'rgba(230,228,218,0.35)'; ctx.fillRect(-hw, -hd, w, d);
+      ctx.setLineDash([6, 4]); ctx.strokeStyle = stroke; ctx.lineWidth = selected ? 2 : 1.2;
+      ctx.strokeRect(-hw, -hd, w, d);
+      ctx.beginPath(); ctx.moveTo(-hw, -hd); ctx.lineTo(hw, hd); ctx.moveTo(hw, -hd); ctx.lineTo(-hw, hd); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
     } else if (kind === 'sofa') {                             // 소파: 좌석 + 등받이(뒤) + 팔걸이 + 쿠션 분할
       box();
       const arm = w * 0.12, back = d * 0.22;

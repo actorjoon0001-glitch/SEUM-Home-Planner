@@ -1545,6 +1545,9 @@ function furnForm(f) {
       <label class="fld"><span>색상</span><input id="f-color" type="color" value="${f.color || c.color || '#cccccc'}"></label>
     </div>
     ${c.elev != null ? `<label class="fld" title="바닥에서 제품 아래쪽까지 높이 — 상부장 보통 1,450"><span>설치 높이 (mm)</span><input id="f-elev" type="number" step="50" value="${f.elev != null ? f.elev : c.elev}"></label>` : ''}
+    ${c.kind === 'decksteps' ? `<div class="fld"><span>계단 단수</span>
+      <div class="seg" id="f-steps">${[2, 3, 4, 5].map((n) => `<button class="mini${(f.steps || 0) === n ? ' active' : ''}" data-n="${n}">${n}단</button>`).join('')}
+        <button class="mini${!f.steps ? ' active' : ''}" data-n="0" title="기초 높이에 맞춰 자동">자동</button></div></div>` : ''}
     <div class="swatches f-sw" id="f-sw">${FURN_PALETTE.map((col) => `<button class="sw ${col === (f.color || c.color) ? 'on' : ''}" style="background:${col}" data-c="${col}" title="${col}"></button>`).join('')}</div>
     <div class="btn-row" style="margin-top:4px">
       <button class="mini" id="f-size-reset" title="카탈로그 기본 크기로">기본 크기</button>
@@ -1575,6 +1578,7 @@ function bindFurnForm(f) {
   document.querySelectorAll('#f-sw .sw').forEach((b) => b.onclick = () => upd(() => f.color = b.dataset.c));
   const elevEl = document.getElementById('f-elev');
   if (elevEl) elevEl.onchange = (e) => upd(() => f.elev = Math.max(0, +e.target.value || 0));
+  document.querySelectorAll('#f-steps button').forEach((b) => b.onclick = () => upd(() => { const n = +b.dataset.n; if (n) f.steps = n; else delete f.steps; }));
   document.getElementById('f-size-reset').onclick = () => upd(() => { delete f.w; delete f.d; delete f.h; delete f.elev; });
   document.getElementById('f-color-reset').onclick = () => upd(() => { delete f.color; });
   document.getElementById('f-rot').onchange = (e) => upd(() => f.rotation = ((+e.target.value % 360) + 360) % 360);

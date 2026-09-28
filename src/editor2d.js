@@ -16,6 +16,7 @@ export class Editor2D {
     this.dpr = window.devicePixelRatio || 1;
 
     this.drag = null;        // 진행 중 드래그 상태
+    this.selRooms = new Set(); // 다중 선택된 방 id (Shift+클릭). 비면 단일 선택(store.selectedRoom)
     this.hoverHandle = null;
     this.showFurniture = true;
 
@@ -372,7 +373,9 @@ export class Editor2D {
     const t = ROOM_TYPES[room.type] || ROOM_TYPES.hall;
     const [x, y] = this.toPx(room.x, room.y);
     const w = room.w * this.scale, h = room.d * this.scale;
-    const selected = room.id === store.selectedRoom;
+    // 선택 강조 = 기준 방(store.selectedRoom) 또는 다중 선택 그룹(selRooms)
+    const primarySel = room.id === store.selectedRoom;
+    const selected = primarySel || this.selRooms.has(room.id);
 
     // 바닥 — 흰 바닥. 바닥 투명도 적용 → 밑그림(도면) 위에서 비쳐 보이게
     ctx.save();
@@ -1148,6 +1151,17 @@ export class Editor2D {
       return;
     }
 
+    // Shift+클릭 = 다중 선택 토글 (핸들·창호보다 우선). 빈 곳 Shift+클릭은 무시.
+    if (e.shiftKey) {
+      const rm = this._hitRoom(px, py);
+      if (rm) {
+        if (this.selRooms.has(rm.id)) { this.selRooms.delete(rm.id); store.select(this.selRooms.values().next().value || null, null); }
+        else { this.selRooms.add(rm.id); store.select(rm.id, null); }
+        this.draw();
+      }
+      return;
+    }
+
     // 선택된 방 핸들 우선
     const selRoom = d.rooms.find((r) => r.id === store.selectedRoom);
     if (selRoom) {
@@ -1182,6 +1196,7 @@ export class Editor2D {
     // 창호 클릭 (벽 가장자리 또는 자유 배치)
     const op = this._hitOpening(px, py);
     if (op) {
+      this.selRooms.clear();
       store.select(null, null, op.id);
       const [mx, my] = this.toMm(px, py);
       this.drag = { mode: 'moveo', o: op, dx: op.free ? mx - op.x : 0, dy: op.free ? my - op.y : 0 };
@@ -1191,24 +1206,30 @@ export class Editor2D {
     // 가구 클릭
     const f = this._hitFurniture(px, py);
     if (f) {
+      this.selRooms.clear();
       store.select(null, f.id);
       const [mx, my] = this.toMm(px, py);
       this.drag = { mode: 'movef', f, dx: mx - f.x, dy: my - f.y };
       return;
     }
 
-    // 방 클릭
+    // 방 클릭 — 일반 클릭=선택/이동(그룹 멤버를 끌면 함께 이동). Shift 토글은 위에서 처리.
     const room = this._hitRoom(px, py);
     if (room) {
+      if (!this.selRooms.has(room.id)) this.selRooms = new Set([room.id]);   // 그룹 밖 방 클릭=단일 선택으로 리셋
       store.select(room.id, null);
       const [mx, my] = this.toMm(px, py);
-      this.drag = { mode: 'mover', room, dx: mx - room.x, dy: my - room.y };
+      const grp = this.selRooms.size > 1
+        ? [...this.selRooms].map((id) => store.design.rooms.find((r) => r.id === id)).filter(Boolean).map((r) => ({ room: r, ox: r.x, oy: r.y }))
+        : null;
+      this.drag = { mode: 'mover', room, dx: mx - room.x, dy: my - room.y, grp, ox: room.x, oy: room.y };
       return;
     }
 
     // 외벽(벽체) 선 클릭 → 선택 + 통째로 이동 (방처럼)
     const oi = this._hitOutline(px, py);
     if (oi != null) {
+      this.selRooms.clear();
       store.selectOutline(oi);
       const [mx, my] = this.toMm(px, py);
       let orig = null;
@@ -1218,6 +1239,7 @@ export class Editor2D {
     }
 
     // 빈 곳 → 선택 해제 + 팬
+    this.selRooms.clear();
     store.select(null, null);
     this.drag = { mode: 'pan', sx: px, sy: py, ox: this.ox, oy: this.oy };
   }
@@ -1271,7 +1293,12 @@ export class Editor2D {
       store.liveUpdate(() => { drag.label.x = this._mv(mx - drag.dx); drag.label.y = this._mv(my - drag.dy); });
     } else if (drag.mode === 'mover') {
       const sn = this._snapRoomMove(drag.room, this._mv(mx - drag.dx), this._mv(my - drag.dy));
-      store.liveUpdate(() => { drag.room.x = sn.x; drag.room.y = sn.y; });
+      store.liveUpdate(() => {
+        if (drag.grp) {   // 다중 선택: 기준 방 이동량만큼 그룹 전체를 같이 이동
+          const ddx = sn.x - drag.ox, ddy = sn.y - drag.oy;
+          for (const g of drag.grp) { g.room.x = g.ox + ddx; g.room.y = g.oy + ddy; }
+        } else { drag.room.x = sn.x; drag.room.y = sn.y; }
+      });
     } else if (drag.mode === 'movef') {
       store.liveUpdate(() => {
         drag.f.x = this._mv(mx - drag.dx);

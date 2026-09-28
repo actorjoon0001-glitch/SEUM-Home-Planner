@@ -1490,22 +1490,32 @@ export class Viewer3D {
         break;
       }
       case 'tarp': {
-        // 타프(차양막) — 가운데가 살짝 솟은 사각 천 + 네 모서리 기둥(바닥까지)
-        const hw = c.w / 2, hd = c.d / 2, seg = 8;
-        const geo = new THREE.PlaneGeometry(c.w, c.d, seg, seg);
-        const pos = geo.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          const fx = 1 - (pos.getX(i) / hw) ** 2, fy = 1 - (pos.getY(i) / hd) ** 2;
-          pos.setZ(i, Math.max(0, fx) * Math.max(0, fy) * 220);   // 중앙 볼록(장력)
-        }
-        geo.computeVertexNormals();
-        const fabric = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
-        fabric.rotation.x = -Math.PI / 2; fabric.castShadow = true; fabric.receiveShadow = true; g.add(fabric);
+        // 타프(차양막) — 삼각 세일 2장을 높이 다르게 겹쳐 얹은 모던 그늘막
+        const hw = c.w / 2, hd = c.d / 2;
+        const fabricMat = new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+        // 세 모서리 A·B·C([x,z,y=높이])로 삼각 세일 하나 — 변 가운데를 sag 만큼 늘어뜨려 부드럽게
+        const sail = (A, B, C, sag) => {
+          const mid = (P, Q) => [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2, (P[2] + Q[2]) / 2 - sag];
+          const V = [A, B, C, mid(A, B), mid(B, C), mid(C, A)];
+          const pos = new Float32Array(V.length * 3);
+          V.forEach((p, i) => { pos[i * 3] = p[0]; pos[i * 3 + 1] = p[2]; pos[i * 3 + 2] = p[1]; });
+          const g2 = new THREE.BufferGeometry();
+          g2.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+          g2.setIndex([0, 3, 5, 3, 1, 4, 5, 4, 2, 3, 4, 5]);
+          g2.computeVertexNormals();
+          const m = new THREE.Mesh(g2, fabricMat); m.castShadow = true; m.receiveShadow = true; g.add(m);
+        };
+        const hi = 360, lo = 40;
+        // 세일1: 좌하(높)–우하(낮)–우상(높)
+        sail([-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], 150);
+        // 세일2: 좌하(낮)–좌상(높)–우상(낮), 조금 위로 겹치게 (대각선을 공유해 X자로 겹침)
+        sail([-hw, -hd, lo + 90], [-hw, hd, hi + 60], [hw, hd, lo + 90], 150);
+        // 네 모서리 지지 기둥 (바닥까지)
         const postH = (f.elev != null ? f.elev : (c.elev || 2400));
-        const postMat = new THREE.MeshStandardMaterial({ color: '#9aa0a8', metalness: 0.4, roughness: 0.5 });
-        for (const [sx, sz] of [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]) {
-          const pole = new THREE.Mesh(new THREE.CylinderGeometry(30, 30, postH, 10), postMat);
-          pole.position.set(sx, -postH / 2, sz); pole.castShadow = true; g.add(pole);
+        const postMat = new THREE.MeshStandardMaterial({ color: '#9aa0a8', metalness: 0.45, roughness: 0.5 });
+        for (const [sx, sz, ph] of [[-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], [-hw, hd, hi]]) {
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, postH + ph, 10), postMat);
+          pole.position.set(sx, (ph - postH) / 2, sz); pole.castShadow = true; g.add(pole);
         }
         break;
       }

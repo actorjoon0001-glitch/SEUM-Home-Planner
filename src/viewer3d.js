@@ -1298,7 +1298,9 @@ export class Viewer3D {
     g.position.set(px, 60 + (f.elev != null ? f.elev : (c0.elev || 0)), pz);
     g.rotation.y = -(f.rotation || 0) * Math.PI / 180;
     // 개별 크기 조절(W/D/H) 반영 — 카탈로그 대비 비율로 스케일 (실링팬은 천장 높이에 붙으므로 높이 제외)
-    g.scale.set((f.w || c.w) / c.w, c.id === 'ceilfan' ? 1 : (f.h || c.h) / c.h, (f.d || c.d) / c.d);
+    // 실링팬·데크계단은 높이를 기하에서 직접 처리 → Y 스케일 제외(계단이 뜨거나 파묻히지 않게)
+    const noYScale = c.id === 'ceilfan' || c.kind === 'decksteps';
+    g.scale.set((f.w || c.w) / c.w, noYScale ? 1 : (f.h || c.h) / c.h, (f.d || c.d) / c.d);
     const mat = (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 });
     // finish: 'fabric'|'wood' → 질감 텍스처, 그 외(undefined) → 단색
     const finMat = (col, w, dd, finish) => {

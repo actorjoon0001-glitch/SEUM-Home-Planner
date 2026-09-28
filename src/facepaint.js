@@ -39,6 +39,10 @@ export function initFacePaint(opts = {}) {
   #fp-color .fp-sw2{display:flex;gap:6px;flex-wrap:wrap}
   #fp-color .fp-sw2 b{width:24px;height:24px;border-radius:6px;border:1px solid rgba(0,0,0,.14);cursor:pointer;transition:transform .1s}
   #fp-color .fp-sw2 b:hover{transform:scale(1.12)}
+  #fp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 16px 14px;border-top:1px solid #f0f0f0;font-size:11.5px;color:#8a9099}
+  #fp-foot b{color:#c8102e}
+  #fp-foot button{flex:0 0 auto;border:1px solid #e0c3c3;background:#fff5f5;color:#c8102e;font-weight:700;font-size:12px;border-radius:8px;padding:6px 12px;cursor:pointer}
+  #fp-foot button:hover{background:#c8102e;color:#fff;border-color:#c8102e}
   `;
   document.head.appendChild(st);
 
@@ -93,6 +97,16 @@ export function initFacePaint(opts = {}) {
   const applyColor = (c) => { if (viewer.faceBrush && viewer.faceBrush.material) { viewer.faceBrush.color = c; colorInput.value = c; } };
   colorInput.oninput = (e) => applyColor(e.target.value);
   colorRow.querySelectorAll('.fp-sw2 b').forEach((b) => b.onclick = () => applyColor(b.dataset.c));
+
+  // 지우기 안내 + 전체 초기화
+  const foot = document.createElement('div');
+  foot.id = 'fp-foot';
+  foot.innerHTML = `<span>지우기: <b>기본(되돌림)↺</b> 고르고 면 클릭(전체)·드래그(띠)</span><button id="fp-reset" type="button">전체 초기화</button>`;
+  bar.appendChild(foot);
+  foot.querySelector('#fp-reset').onclick = () => {
+    if (viewer.clearAllExteriorFaces) viewer.clearAllExteriorFaces();
+    flash('면별 외장재 전체 초기화 — 기본 외장재로');
+  };
 
   btn.onclick = () => {
     const on = !viewer.faceMode;

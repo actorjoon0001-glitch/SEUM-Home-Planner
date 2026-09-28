@@ -542,6 +542,10 @@ export class Editor2D {
       rrect(-hw, -hd, w, d, Math.min(14, d * 0.2)); ctx.fillStyle = light; ctx.fill(); ctx.stroke();
       rrect(-hw + w * 0.1, -hd + d * 0.12, w * 0.8, d * 0.76, Math.min(10, d * 0.16)); ctx.stroke();
       ctx.beginPath(); ctx.arc(0, hd * 0.62, Math.max(1.6, d * 0.05), 0, Math.PI * 2); ctx.stroke();
+    } else if (kind === 'decksteps') {                        // 데크 계단: 단(tread) 가로선
+      box();
+      ctx.strokeStyle = stroke; ctx.lineWidth = 1;
+      for (let i = 1; i < 3; i++) { const y = -hd + (d * i) / 3; ctx.beginPath(); ctx.moveTo(-hw, y); ctx.lineTo(hw, y); ctx.stroke(); }
     } else if (kind === 'tarp') {                             // 타프(차양막): 점선 사각 + 대각선(천)
       ctx.save();
       ctx.fillStyle = 'rgba(230,228,218,0.35)'; ctx.fillRect(-hw, -hd, w, d);

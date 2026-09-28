@@ -836,13 +836,38 @@ export class Viewer3D {
     const add = (m) => { m.castShadow = true; m.receiveShadow = true; this.modelGroup.add(m); };
     const H = F + 2;
     // 콘크리트 기초: 벽 바깥면에서 20mm 안쪽으로 (외장재가 기초 위에 살짝 걸쳐 보이게)
-    const fb = this._roofBounds(d, b);
-    const hasOutline = outlineShapes(d.outline).length > 0;
+    const shapes = outlineShapes(d.outline);
+    const hasOutline = shapes.length > 0;
     const off = (this.showExterior ? (hasOutline ? (d.wallThickness || 150) / 2 + 120 : 120) : (hasOutline ? (d.wallThickness || 150) / 2 : WALL_T / 2)) - 20;
-    const w = fb.w + off * 2, dd = fb.h + off * 2;
-    const base = new THREE.Mesh(new THREE.BoxGeometry(w, H, dd), TEX.concreteMaterial(w, H));
-    base.position.set(fb.cx - b.cx, H / 2 - 2, fb.cz - b.cz);
-    add(base);
+    // 외곽선(집 footprint)이 있으면 그 모양 그대로 기초를 만든다 — 건물마다 따로, 데크 틈은 비움.
+    //   (예전엔 전체 바운딩 사각형 하나라 쌍둥이/L자 모양에서 이상하게 넓게 깔렸음)
+    const builtShaped = hasOutline && shapes.some((s) => s.closed && s.pts.length >= 3);
+    if (builtShaped) {
+      for (const { pts, closed } of shapes) {
+        if (!closed || pts.length < 3) continue;
+        const P = pts.map((p) => this._p(p[0], p[1], b));
+        let cx = 0, cz = 0; for (const q of P) { cx += q[0]; cz += q[1]; } cx /= P.length; cz /= P.length;
+        const shape = new THREE.Shape();
+        let minx = Infinity, maxx = -Infinity;
+        P.forEach((q, i) => {
+          const dx = q[0] - cx, dz = q[1] - cz, len = Math.hypot(dx, dz) || 1;   // 중심 반대(바깥)로 off 만큼 확장
+          const ox = q[0] + dx / len * off, oz = q[1] + dz / len * off;
+          minx = Math.min(minx, ox); maxx = Math.max(maxx, ox);
+          if (i) shape.lineTo(ox, -oz); else shape.moveTo(ox, -oz);   // Shape 의 y = 월드 -z (회전 후 원위치)
+        });
+        shape.closePath();
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: H, bevelEnabled: false });
+        const mesh = new THREE.Mesh(geo, TEX.concreteMaterial(Math.max(1, maxx - minx), H));
+        mesh.rotation.x = -Math.PI / 2; mesh.position.y = -2;   // 지면(-2)부터 위로 F
+        add(mesh);
+      }
+    } else {
+      const fb = this._roofBounds(d, b);
+      const w = fb.w + off * 2, dd = fb.h + off * 2;
+      const base = new THREE.Mesh(new THREE.BoxGeometry(w, H, dd), TEX.concreteMaterial(w, H));
+      base.position.set(fb.cx - b.cx, H / 2 - 2, fb.cz - b.cz);
+      add(base);
+    }
     // 데크·포치·발코니 하부 스커트
     for (const r of d.rooms) {
       if (!OPEN_ROOM_TYPES.includes(r.type)) continue;
@@ -1505,17 +1530,28 @@ export class Viewer3D {
           g2.computeVertexNormals();
           const m = new THREE.Mesh(g2, fabricMat); m.castShadow = true; m.receiveShadow = true; g.add(m);
         };
-        const hi = 360, lo = 40;
+        const hi = 260, lo = 30;
         // 세일1: 좌하(높)–우하(낮)–우상(높)
-        sail([-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], 150);
+        sail([-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], 120);
         // 세일2: 좌하(낮)–좌상(높)–우상(낮), 조금 위로 겹치게 (대각선을 공유해 X자로 겹침)
-        sail([-hw, -hd, lo + 90], [-hw, hd, hi + 60], [hw, hd, lo + 90], 150);
+        sail([-hw, -hd, lo + 70], [-hw, hd, hi + 40], [hw, hd, lo + 70], 120);
         // 네 모서리 지지 기둥 (바닥까지)
         const postH = (f.elev != null ? f.elev : (c.elev || 2400));
         const postMat = new THREE.MeshStandardMaterial({ color: '#9aa0a8', metalness: 0.45, roughness: 0.5 });
         for (const [sx, sz, ph] of [[-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], [-hw, hd, hi]]) {
           const pole = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, postH + ph, 10), postMat);
           pole.position.set(sx, (ph - postH) / 2, sz); pole.castShadow = true; g.add(pole);
+        }
+        break;
+      }
+      case 'decksteps': {
+        // 데크 계단 — 높이(h)에 맞춰 2~4단 자동. 앞(+z)이 낮고 뒤(-z=데크쪽)로 오를수록 높음
+        const totalH = f.h != null ? f.h : c.h;
+        const n = Math.max(2, Math.min(4, Math.round(totalH / 170)));
+        const sh = totalH / n, sd = c.d / n;
+        for (let i = 0; i < n; i++) {
+          const dep = c.d - sd * i;                 // 위 단일수록 얕게
+          addBox(c.w, sh, dep, sh * i + sh / 2, c.color, c.d / 2 - dep / 2);   // 앞면 정렬, 뒤로 오름
         }
         break;
       }

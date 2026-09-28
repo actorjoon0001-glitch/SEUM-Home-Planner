@@ -180,8 +180,8 @@ export const FURNITURE_CATALOG = [
   { id: 'ceilfan', cat: '소품', name: '실링팬',       kind: 'box',      w: 1100, d: 1100, h: 300,  color: '#cbb89a' },
 
   // 외부 (외벽에 부착 — elev=설치 높이)
-  { id: 'sconce',  cat: '외부', name: '외부 벽등(간접등)', kind: 'sconce', w: 130, d: 100, h: 280, elev: 1950, color: '#2b2e33' },
-  { id: 'outletx', cat: '외부', name: '야외 방수 콘센트',  kind: 'outlet', w: 110, d: 75,  h: 150, elev: 400,  color: '#eceae6' },
+  { id: 'sconce',  cat: '외부', name: '외부 벽등(간접등)', kind: 'sconce', w: 130, d: 100, h: 280, elev: 1950, color: '#2b2e33', wallMount: true },
+  { id: 'outletx', cat: '외부', name: '야외 방수 콘센트',  kind: 'outlet', w: 110, d: 75,  h: 150, elev: 400,  color: '#eceae6', wallMount: true },
 ];
 
 export const CATEGORIES = ['가구', '주방', '가전', '욕실', '소품', '외부'];

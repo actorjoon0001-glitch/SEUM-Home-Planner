@@ -1358,6 +1358,11 @@ export class Editor2D {
         } else { drag.room.x = sn.x; drag.room.y = sn.y; }
       });
     } else if (drag.mode === 'movef') {
+      const cat = catalogOf(drag.f.catalogId) || {};
+      if (cat.wallMount) {   // 벽부착 제품 → 가까운 벽에 스냅
+        const sn = this._snapWallMount(drag.f, mx - drag.dx, my - drag.dy);
+        if (sn) { store.liveUpdate(() => { drag.f.x = sn.x; drag.f.y = sn.y; drag.f.rotation = sn.rotation; drag.f.wallNormal = sn.wallNormal; }); return; }
+      }
       store.liveUpdate(() => {
         drag.f.x = this._mv(mx - drag.dx);
         drag.f.y = this._mv(my - drag.dy);
@@ -2356,9 +2361,59 @@ export class Editor2D {
       return;
     }
     // 가구 드롭
-    store.commit((d) => {
-      d.furniture.push({ id: 'f' + Date.now().toString(36), catalogId: raw, x: this.snap(mx), y: this.snap(my), rotation: 0 });
-    });
+    const cat = catalogOf(raw) || {};
+    const f = { id: 'f' + Date.now().toString(36), catalogId: raw, x: this.snap(mx), y: this.snap(my), rotation: 0 };
+    if (cat.wallMount) {   // 벽부착 제품은 떨어뜨린 위치에서 가까운 벽에 스냅
+      const sn = this._snapWallMount(f, mx, my);
+      if (sn) { f.x = sn.x; f.y = sn.y; f.rotation = sn.rotation; f.wallNormal = sn.wallNormal; }
+    }
+    store.commit((d) => { d.furniture.push(f); });
+  }
+
+  // 벽부착 제품(외부 벽등·콘센트) — 가장 가까운 외벽(외곽선/방 모서리)에 스냅.
+  //   벽 바깥면에 붙여 세우고, 벽 방향으로 회전. 외장 마감이 있으면 3D에서 그 바깥으로 밀어 안 가리게(f.wallNormal 저장).
+  _snapWallMount(f, mx, my) {
+    const cat = catalogOf(f.catalogId) || {};
+    const edges = [];
+    const shapes = outlineShapes(store.design.outline);
+    if (shapes.length) {
+      for (const { pts } of shapes) {
+        const n = pts.length; let cx = 0, cy = 0; for (const p of pts) { cx += p[0]; cy += p[1]; } cx /= n; cy /= n;
+        for (let i = 0; i < n; i++) edges.push({ a: pts[i], c: pts[(i + 1) % n], cx, cy });
+      }
+    } else {
+      const OPEN = ['balcony', 'deck', 'porch'];
+      for (const r of store.design.rooms) {
+        if (OPEN.includes(r.type)) continue;
+        const cx = r.x + r.w / 2, cy = r.y + r.d / 2;
+        const P = [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.d], [r.x, r.y + r.d]];
+        for (let i = 0; i < 4; i++) edges.push({ a: P[i], c: P[(i + 1) % 4], cx, cy });
+      }
+    }
+    if (!edges.length) return null;
+    let best = null, bd = Infinity;
+    for (const e of edges) {
+      const dx = e.c[0] - e.a[0], dy = e.c[1] - e.a[1], len2 = dx * dx + dy * dy || 1;
+      let t = ((mx - e.a[0]) * dx + (my - e.a[1]) * dy) / len2; t = Math.max(0, Math.min(1, t));
+      const px = e.a[0] + dx * t, py = e.a[1] + dy * t;
+      const dist = Math.hypot(mx - px, my - py);
+      if (dist < bd) {
+        const len = Math.sqrt(len2); let nx = dy / len, ny = -dx / len;
+        const midx = (e.a[0] + e.c[0]) / 2, midy = (e.a[1] + e.c[1]) / 2;
+        if ((midx - e.cx) * nx + (midy - e.cy) * ny < 0) { nx = -nx; ny = -ny; }   // 바깥 방향으로
+        bd = dist; best = { px, py, ex: dx / len, ey: dy / len, nx, ny };
+      }
+    }
+    if (!best) return null;
+    const fdepth = f.d || cat.d || 100;
+    const wallHalf = (store.design.wallThickness || 150) / 2;
+    const off = wallHalf + fdepth / 2;   // 구조 벽 바깥면에 딱 붙게
+    return {
+      x: Math.round(best.px + best.nx * off),
+      y: Math.round(best.py + best.ny * off),
+      rotation: Math.round(Math.atan2(best.ey, best.ex) * 180 / Math.PI),
+      wallNormal: [best.nx, best.ny],
+    };
   }
 
   // 방을 드롭 — 닫힌 외벽 안이면 그 안에 들어가도록 맞추고, 외곽/옆방에 스냅

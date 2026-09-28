@@ -1395,8 +1395,8 @@ function bindRoomForm(room) {
   document.getElementById('r-del').onclick = () => store.commit((d) => {
     d.rooms = d.rooms.filter((r) => r.id !== room.id); store.selectedRoom = null;
   });
-  document.getElementById('r-rotl').onclick = () => store.commit((d) => rotateRoom(room, d, -1));
-  document.getElementById('r-rotr').onclick = () => store.commit((d) => rotateRoom(room, d, +1));
+  document.getElementById('r-rotl').onclick = () => rotateSelectedRooms(-1);
+  document.getElementById('r-rotr').onclick = () => rotateSelectedRooms(+1);
   document.querySelectorAll('#r-deckdir button').forEach((b) => b.onclick = () => upd('deckDir', b.dataset.dir));
   bindFloorOpacity();
   bindLayerControls('room', room.id);
@@ -1405,12 +1405,36 @@ function bindRoomForm(room) {
 // 선택한 공간 하나만 90° 회전 — 가로·세로를 맞바꾸고 중심을 유지.
 //   그 방에 붙은 창/문(개구부), 트인 면(open), 방 안에 놓인 가구도 함께 돌린다.
 //   dir=+1 시계, -1 반시계 (화면 좌표: y 아래 방향).
-function rotateRoom(room, d, dir) {
+// 선택한 방 회전 — 여러 방(Shift 다중 선택)이면 그룹 중심 기준으로 함께 90° 회전.
+function rotateSelectedRooms(dir) {
+  const grp = (_editor && _editor.selRooms && _editor.selRooms.size > 1) ? [..._editor.selRooms] : null;
+  store.commit((d) => {
+    if (grp) {
+      const rooms = grp.map((id) => d.rooms.find((r) => r.id === id)).filter(Boolean);
+      if (!rooms.length) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const r of rooms) { minX = Math.min(minX, r.x); minY = Math.min(minY, r.y); maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d); }
+      const gcx = (minX + maxX) / 2, gcy = (minY + maxY) / 2;
+      const primary = store.selectedRoom;
+      for (const r of rooms) rotateRoom(r, d, dir, gcx, gcy);
+      if (grp.includes(primary)) store.selectedRoom = primary;   // 기준 방 선택 유지
+    } else {
+      const room = d.rooms.find((r) => r.id === store.selectedRoom);
+      if (room) rotateRoom(room, d, dir);
+    }
+  });
+}
+
+// dir: +1 시계 / -1 반시계. pvx,pvy: 회전 중심(생략 시 방 자기 중심 = 제자리 회전,
+//   여러 방을 함께 돌릴 땐 그룹 중심을 넘겨 그 점을 기준으로 회전).
+function rotateRoom(room, d, dir, pvx, pvy) {
   const cx = room.x + room.w / 2, cy = room.y + room.d / 2;
   const oldW = room.w, oldD = room.d;
+  if (pvx == null) pvx = cx;
+  if (pvy == null) pvy = cy;
   const rot = (x, y) => dir > 0
-    ? [cx + (y - cy), cy - (x - cx)]   // 시계
-    : [cx - (y - cy), cy + (x - cx)];  // 반시계
+    ? [pvx + (y - pvy), pvy - (x - pvx)]   // 시계
+    : [pvx - (y - pvy), pvy + (x - pvx)];  // 반시계
   // 회전 후 좌표를 가장 가까운 변에 배정 → { side, pos }
   const classify = (nx, ny) => {
     const dN = Math.abs(ny - room.y), dS = Math.abs(ny - (room.y + room.d));
@@ -1435,9 +1459,10 @@ function rotateRoom(room, d, dir) {
   const preOpen = (Array.isArray(room.open) ? room.open : []).map((s) => rot(openMid[s][0], openMid[s][1]));
   const furns = (d.furniture || []).filter((f) => f.x > room.x && f.x < room.x + oldW && f.y > room.y && f.y < room.y + oldD);
   const preF = furns.map((f) => ({ f, p: rot(f.x, f.y) }));
-  // 방: 가로·세로 스왑 + 중심 유지
+  // 방: 가로·세로 스왑 + 중심을 피벗 기준 회전 위치로 이동
+  const [ncx, ncy] = rot(cx, cy);
   room.w = oldD; room.d = oldW;
-  room.x = Math.round(cx - room.w / 2); room.y = Math.round(cy - room.d / 2);
+  room.x = Math.round(ncx - room.w / 2); room.y = Math.round(ncy - room.d / 2);
   // 개구부 재배치
   for (const { o, p } of preOps) { const c = classify(p[0], p[1]); o.side = c.side; o.pos = c.pos; }
   // 트인 면 재배치

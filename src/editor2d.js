@@ -882,7 +882,9 @@ export class Editor2D {
     const hw = (f.w || c.w) * this.scale / 2, hd = (f.d || c.d) * this.scale / 2;
     const ang = (f.rotation || 0) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
     const cn = (lx, ly) => [cx + lx * ca - ly * sa, cy + lx * sa + ly * ca];
-    return { nw: cn(-hw, -hd), ne: cn(hw, -hd), se: cn(hw, hd), sw: cn(-hw, hd) };
+    // 모서리(대각선 조절) + 변 중앙(한 방향만 조절: e/w=가로, n/s=세로)
+    return { nw: cn(-hw, -hd), ne: cn(hw, -hd), se: cn(hw, hd), sw: cn(-hw, hd),
+      n: cn(0, -hd), s: cn(0, hd), e: cn(hw, 0), w: cn(-hw, 0) };
   }
   _hitFurnHandle(f, px, py) {
     const pts = this._furnHandlePoints(f); if (!pts) return null;
@@ -893,7 +895,10 @@ export class Editor2D {
     const pts = this._furnHandlePoints(f); if (!pts) return;
     const ctx = this.ctx;
     ctx.save(); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2;
-    for (const p of Object.values(pts)) { ctx.fillRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE); ctx.strokeRect(p[0] - HANDLE / 2, p[1] - HANDLE / 2, HANDLE, HANDLE); }
+    for (const [k, p] of Object.entries(pts)) {
+      const s = k.length === 2 ? HANDLE : HANDLE * 0.78;   // 모서리=큰 네모, 변 중앙=작은 네모(한 방향 조절)
+      ctx.fillRect(p[0] - s / 2, p[1] - s / 2, s, s); ctx.strokeRect(p[0] - s / 2, p[1] - s / 2, s, s);
+    }
     ctx.restore();
   }
 
@@ -1190,7 +1195,7 @@ export class Editor2D {
     }
     if (selF) {
       const hk = this._hitFurnHandle(selF, px, py);
-      if (hk) { this.drag = { mode: 'resizef', f: selF }; return; }
+      if (hk) { this.drag = { mode: 'resizef', f: selF, hk }; return; }
     }
 
     // 창호 클릭 (벽 가장자리 또는 자유 배치)
@@ -1336,9 +1341,12 @@ export class Editor2D {
       const dxmm = mx - drag.f.x, dymm = my - drag.f.y;
       const lx = dxmm * Math.cos(ang) - dymm * Math.sin(ang);
       const ly = dxmm * Math.sin(ang) + dymm * Math.cos(ang);
+      const hk = drag.hk || 'se';
+      const wAxis = hk.includes('e') || hk.includes('w');   // 좌우 모서리·변 → 가로(w)만
+      const dAxis = hk.includes('n') || hk.includes('s');   // 상하 모서리·변 → 세로(d)만
       const nw = Math.max(100, Math.round(Math.abs(lx) * 2 / 10) * 10);   // 중심 고정 대칭 확대
       const nd = Math.max(100, Math.round(Math.abs(ly) * 2 / 10) * 10);
-      store.liveUpdate(() => { drag.f.w = nw; drag.f.d = nd; });
+      store.liveUpdate(() => { if (wAxis) drag.f.w = nw; if (dAxis) drag.f.d = nd; });
     } else if (drag.mode === 'rotate') {
       const [cx, cy] = this.toPx(drag.f.x, drag.f.y);
       let ang = Math.atan2(py - cy, px - cx) * 180 / Math.PI + 90;

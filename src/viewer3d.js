@@ -1545,13 +1545,22 @@ export class Viewer3D {
         break;
       }
       case 'decksteps': {
-        // 데크 계단 — 높이(h)에 맞춰 2~4단 자동. 앞(+z)이 낮고 뒤(-z=데크쪽)로 오를수록 높음
-        const totalH = f.h != null ? f.h : c.h;
-        const n = Math.max(2, Math.min(4, Math.round(totalH / 170)));
-        const sh = totalH / n, sd = c.d / n;
-        for (let i = 0; i < n; i++) {
-          const dep = c.d - sd * i;                 // 위 단일수록 얕게
-          addBox(c.w, sh, dep, sh * i + sh / 2, c.color, c.d / 2 - dep / 2);   // 앞면 정렬, 뒤로 오름
+        // 데크 계단 — 기초가 있으면 지면에서 데크(기초 높이)까지 딱 맞게 오르는 계단.
+        //   (제품은 기초로 올라간 house 그룹 안에 있으므로 로컬 0 = 데크 바닥, -F = 지면)
+        const F = this._foundationH || 0;
+        if (F > 0) {
+          const n = f.steps > 0 ? f.steps : Math.max(2, Math.min(6, Math.round(F / 180)));
+          const sh = F / n, sd = c.d / n;
+          for (let i = 0; i < n; i++) {
+            const h = (i + 1) * sh;                                  // 지면에서 이 단 윗면까지
+            addBox(c.w, h, sd, -F + h / 2, c.color, -c.d / 2 + sd * (i + 0.5));   // 뒤(데크쪽)로 갈수록 높음
+          }
+        } else {
+          // 기초 없을 때: 지면 위 작은 단
+          const totalH = f.h != null ? f.h : c.h;
+          const n = f.steps > 0 ? f.steps : Math.max(2, Math.min(4, Math.round(totalH / 170)));
+          const sh = totalH / n, sd = c.d / n;
+          for (let i = 0; i < n; i++) { const dep = c.d - sd * i; addBox(c.w, sh, dep, sh * i + sh / 2, c.color, c.d / 2 - dep / 2); }
         }
         break;
       }
@@ -1717,7 +1726,7 @@ export class Viewer3D {
     this.dirty = true;
   }
   // 면별 외장재 모드 on/off
-  setFaceMode(on) { this.faceMode = !!on; if (!on) this.faceBrush = null; }
+  setFaceMode(on) { this.faceMode = !!on; if (!on) { this.faceBrush = null; this._clearFacePreview(); } }
   // 클릭한 외장 면(외곽선 변) 키 찾기
   _facePick(e) {
     this._raycaster.setFromCamera(this._ndc(e), this.camera);
@@ -1743,11 +1752,13 @@ export class Viewer3D {
     store.commit((d) => {
       d.exteriorFaces = d.exteriorFaces || {};
       const fo = d.exteriorFaces[key] || {};
+      // 새 띠와 겹치는 기존 띠는 먼저 제거 → 덮어쓰기(같은 자리에 겹쳐 쌓여 z-fighting 나던 문제 해결)
+      const keep = Array.isArray(fo.bands) ? fo.bands.filter((bd) => Math.max(bd.u0, bd.u1) <= u0 + 0.002 || Math.min(bd.u0, bd.u1) >= u1 - 0.002) : [];
       if (!brush.material) {
-        if (Array.isArray(fo.bands)) fo.bands = fo.bands.filter((bd) => Math.max(bd.u0, bd.u1) <= u0 || Math.min(bd.u0, bd.u1) >= u1);
+        fo.bands = keep;   // 기본 붓 = 그 구간 띠 지우기
       } else {
-        fo.bands = Array.isArray(fo.bands) ? fo.bands : [];
-        fo.bands.push({ u0, u1, material: brush.material, color: brush.color });
+        keep.push({ u0, u1, material: brush.material, color: brush.color });
+        fo.bands = keep;
       }
       d.exteriorFaces[key] = fo;
     });
@@ -1779,6 +1790,39 @@ export class Viewer3D {
     }
     return null;
   }
+  // 특정 면(key) 위에서 포인터의 변 방향 위치(0~1) — 면 밖으로 나가도 변 직선에 투영해 끝(0/1)까지 잡힘
+  _faceUAt(e, key) {
+    const info = this._faceEdgeInfo(key); if (!info) return null;
+    this._raycaster.setFromCamera(this._ndc(e), this.camera);
+    const nx = info.dir[1], nz = -info.dir[0];   // 변에 수직인 수직평면
+    const plane = new THREE.Plane(new THREE.Vector3(nx, 0, nz), -(nx * info.A[0] + nz * info.A[1]));
+    const pt = new THREE.Vector3();
+    if (!this._raycaster.ray.intersectPlane(plane, pt)) return null;
+    const u = ((pt.x - info.A[0]) * info.dir[0] + (pt.z - info.A[1]) * info.dir[1]) / info.len;
+    return Math.min(1, Math.max(0, u));
+  }
+  // 드래그 중 적용 범위(띠) 미리보기 상자 — scene 에 직접 두어 rebuild 와 무관하게 표시
+  _updateFacePreview(key, u0, u1) {
+    const info = this._faceEdgeInfo(key); if (!info) { this._clearFacePreview(); return; }
+    const lo = Math.min(u0, u1), hi = Math.max(u0, u1);
+    const w = Math.max(20, (hi - lo) * info.len);
+    const H = (store.design.ceilingHeight || 2400) + 160;
+    const cu = (lo + hi) / 2;
+    const cx = info.A[0] + info.dir[0] * info.len * cu, cz = info.A[1] + info.dir[1] * info.len * cu;
+    if (!this._facePreviewMesh) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.4, depthTest: false, side: THREE.DoubleSide });
+      this._facePreviewMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+      this._facePreviewMesh.renderOrder = 999;
+      this.scene.add(this._facePreviewMesh);
+    }
+    const m = this._facePreviewMesh;
+    m.visible = true;
+    m.position.set(cx, H / 2, cz);
+    m.rotation.y = Math.atan2(-info.dir[1], info.dir[0]);
+    m.scale.set(w, H, 80);
+    this._needsRender = true;
+  }
+  _clearFacePreview() { if (this._facePreviewMesh) { this._facePreviewMesh.visible = false; this._needsRender = true; } }
   _buildEditHandles(d, b) {
     const room = d.rooms.find((r) => r.id === store.selectedRoom); if (!room) return;
     // 함께 선택된 방들(다중 선택 = 건물 통째) — 대표 방 포함해 모두 강조
@@ -1931,9 +1975,9 @@ export class Viewer3D {
     this._gesture = { x0: e.clientX, y0: e.clientY, roomId: roomId || null, moved: false };
   }
   _edMove(e) {
-    if (this._faceDrag) {   // 면별 외장재 드래그 — 같은 면 위에서만 폭 갱신
-      const pick = this._facePickAt(e);
-      if (pick && pick.key === this._faceDrag.key) this._faceDrag.u1 = pick.u;
+    if (this._faceDrag) {   // 면별 외장재 드래그 — 변 직선에 투영해 끝까지 잡히게 + 범위 미리보기
+      const u = this._faceUAt(e, this._faceDrag.key);
+      if (u != null) { this._faceDrag.u1 = u; this._updateFacePreview(this._faceDrag.key, this._faceDrag.u0, u); }
       return;
     }
     if (!this._edrag) {
@@ -1974,6 +2018,7 @@ export class Viewer3D {
   _edUp() {
     if (this._faceDrag) {
       const fd = this._faceDrag; this._faceDrag = null; this.controls.enabled = true;
+      this._clearFacePreview();
       const w = Math.abs(fd.u1 - fd.u0);
       if (w < 0.03) this._facePaint(fd.key);                                   // 살짝 = 클릭 → 면 전체
       else this._facePaintBand(fd.key, Math.min(fd.u0, fd.u1), Math.max(fd.u0, fd.u1)); // 드래그 → 폭만큼 띠

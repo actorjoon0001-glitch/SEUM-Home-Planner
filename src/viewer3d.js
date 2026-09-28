@@ -558,8 +558,8 @@ export class Viewer3D {
         const mull = new THREE.Mesh(new THREE.BoxGeometry(mullW, Hh - FT * 2, WALL_T), frameMat);
         mull.position.set(x, 0, 0); g.add(mull);
       }
-      // 가로 중간 살(창살) — 유리 중문 등(noRail)은 생략
-      if (!t.noRail) {
+      // 가로 중간 살(창살) — 미닫이·폴딩(좌우로 미는 세로 짝)·유리중문(noRail)은 생략
+      if (!t.noRail && !t.slide) {
         const rail = new THREE.Mesh(new THREE.BoxGeometry(W - FT * 2, FT * 0.6, WALL_T * 0.8), frameMat);
         rail.position.set(0, 0, 0); g.add(rail);
       }

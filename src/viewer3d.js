@@ -1261,7 +1261,12 @@ export class Viewer3D {
   _buildFurniture(f, b, ceilH = 2400) {
     const c0 = catalogOf(f.catalogId); if (!c0) return;
     const c = f.color ? { ...c0, color: f.color } : c0;   // 제품별 색상 변경(f.color) — 주 색상만 바꾸고 부속(다리·손잡이 등)은 유지
-    const [px, pz] = this._p(f.x, f.y, b);
+    let [px, pz] = this._p(f.x, f.y, b);
+    // 벽부착 제품(외부 벽등·콘센트): 외장 마감이 있으면 그 바깥으로 밀어 가려지지 않게
+    if (c0.wallMount && Array.isArray(f.wallNormal) && this.showExterior) {
+      const extra = 160;   // 외장 마감(약 120~145mm) + 여유 → 그 바깥으로 나오게
+      px += f.wallNormal[0] * extra; pz += f.wallNormal[1] * extra;
+    }
     const g = new THREE.Group();
     // 벽걸이 제품(상부장·후드)은 설치 높이(elev)만큼 띄움 — 제품별로 바꿀 수 있음(f.elev)
     g.position.set(px, 60 + (f.elev != null ? f.elev : (c0.elev || 0)), pz);

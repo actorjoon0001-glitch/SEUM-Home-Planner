@@ -10,6 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
+import { rotateRoomsInDesign, moveRoomsInDesign } from './roomops.js';
 import * as TEX from './textures.js';
 TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 (2D UI 는 three 의존 제거됨)
 
@@ -74,8 +75,9 @@ export class Viewer3D {
     this.wallOpacity = 1;       // 3D 벽 투명도 (1=불투명) — 내부 들여다보기
     this.floorOpacity = 1;      // 3D 바닥 투명도 (1=불투명)
 
-    // 3D 직접 편집 (방 선택·이동·크기조절)
+    // 3D 직접 편집 (방 선택·이동·크기조절·회전)
     this.editMode = false;
+    this.selRooms = new Set();   // Shift+클릭 다중 선택(건물 통째 이동/회전)
     // 면별 외장재 — 벽 면을 클릭해 재질 칠하기
     this.faceMode = false;
     this.faceBrush = null;   // { material, color } 또는 { material:null }(=기본으로 되돌림)
@@ -1598,7 +1600,7 @@ export class Viewer3D {
   // --- 3D 직접 편집 (방 이동·크기조절) ---
   setEditMode(on) {
     this.editMode = !!on;
-    if (!on) { if (store.selectedRoom) { store.selectedRoom = null; store.emit(); } }
+    if (!on) { this.selRooms.clear(); if (store.selectedRoom) { store.selectedRoom = null; store.emit(); } }
     this.dirty = true;
   }
   // 면별 외장재 모드 on/off
@@ -1666,20 +1668,47 @@ export class Viewer3D {
   }
   _buildEditHandles(d, b) {
     const room = d.rooms.find((r) => r.id === store.selectedRoom); if (!room) return;
-    // 선택 방 강조(테두리)
-    const [px, pz] = this._p(room.x, room.y, b);
-    const ring = new THREE.Mesh(new THREE.BoxGeometry(room.w, 40, room.d),
-      new THREE.MeshStandardMaterial({ color: '#c8102e', transparent: true, opacity: 0.18 }));
-    ring.position.set(px + room.w / 2, 70, pz + room.d / 2); this.modelGroup.add(ring);
-    // 모서리 핸들 4개
-    const corners = [['nw', room.x, room.y], ['ne', room.x + room.w, room.y], ['sw', room.x, room.y + room.d], ['se', room.x + room.w, room.y + room.d]];
-    for (const [name, cxmm, cymm] of corners) {
-      const [hx, hz] = this._p(cxmm, cymm, b);
-      const h = new THREE.Mesh(new THREE.BoxGeometry(360, 360, 360),
-        new THREE.MeshStandardMaterial({ color: '#c8102e', metalness: 0.2, roughness: 0.5 }));
-      h.position.set(hx, 260, hz); h.userData = { handle: name, roomId: room.id };
-      this.modelGroup.add(h);
+    // 함께 선택된 방들(다중 선택 = 건물 통째) — 대표 방 포함해 모두 강조
+    const selIds = this.selRooms.size ? new Set([...this.selRooms, room.id]) : new Set([room.id]);
+    const group = d.rooms.filter((r) => selIds.has(r.id));
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of group) {
+      minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
+      // 선택 방 강조(반투명 박스)
+      const [rx, rz] = this._p(r.x, r.y, b);
+      const ring = new THREE.Mesh(new THREE.BoxGeometry(r.w, 40, r.d),
+        new THREE.MeshStandardMaterial({ color: '#c8102e', transparent: true, opacity: 0.28 }));
+      ring.position.set(rx + r.w / 2, 70, rz + r.d / 2); this.modelGroup.add(ring);
     }
+    // 모서리 크기조절 핸들 — 단일 선택일 때만 (그룹이면 이동·회전만)
+    if (group.length === 1) {
+      const corners = [['nw', room.x, room.y], ['ne', room.x + room.w, room.y], ['sw', room.x, room.y + room.d], ['se', room.x + room.w, room.y + room.d]];
+      for (const [name, cxmm, cymm] of corners) {
+        const [hx, hz] = this._p(cxmm, cymm, b);
+        const h = new THREE.Mesh(new THREE.BoxGeometry(360, 360, 360),
+          new THREE.MeshStandardMaterial({ color: '#c8102e', metalness: 0.2, roughness: 0.5 }));
+        h.position.set(hx, 260, hz); h.userData = { handle: name, roomId: room.id };
+        this.modelGroup.add(h);
+      }
+    }
+    // 90° 회전 핸들 — 선택(그룹) 중심 위에 초록 원기둥. 클릭하면 시계방향 90° 회전.
+    const [gcx, gcz] = this._p((minX + maxX) / 2, (minY + maxY) / 2, b);
+    const HY = 1150;   // 핸들 높이 (지붕 아래, 잘 보이고 집을 안 가림)
+    const rotMat = new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.2, roughness: 0.4 });
+    const rh = new THREE.Mesh(new THREE.TorusGeometry(430, 120, 14, 32), rotMat);
+    rh.rotation.x = Math.PI / 2; rh.position.set(gcx, HY, gcz);
+    rh.userData = { handle: 'rotate', roomId: room.id };
+    this.modelGroup.add(rh);
+    // 회전 방향 표시용 화살촉 (시계방향)
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(200, 380, 18), rotMat);
+    tip.position.set(gcx + 430, HY, gcz); tip.rotation.z = -Math.PI / 2;
+    tip.userData = { handle: 'rotate', roomId: room.id };
+    this.modelGroup.add(tip);
+    // 핸들과 방을 잇는 기둥(선택 위치 안내)
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(34, 34, HY - 70, 8),
+      new THREE.MeshStandardMaterial({ color: '#16a34a', transparent: true, opacity: 0.5 }));
+    stem.position.set(gcx, (HY - 70) / 2, gcz); this.modelGroup.add(stem);
   }
   _ndc(e) {
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -1733,7 +1762,41 @@ export class Viewer3D {
     const pick = this._pick(e);
     if (!pick) return;                    // 빈 곳 → 궤도(회전) 그대로
     const room = store.design.rooms.find((r) => r.id === pick.roomId); if (!room) return;
+
+    // 초록 회전 핸들 클릭 → 선택(그룹) 90° 시계방향 회전
+    if (pick.handle === 'rotate') {
+      const ids = this.selRooms.size ? [...new Set([...this.selRooms, room.id])] : [room.id];
+      const primary = store.selectedRoom || room.id;
+      store.commit((d) => rotateRoomsInDesign(d, ids, +1));
+      store.selectedRoom = primary; store.emit();
+      return;
+    }
+
+    // Shift+클릭 = 다중 선택 토글 (건물 통째 이동/회전)
+    if (e.shiftKey) {
+      if (this.selRooms.has(room.id)) {
+        this.selRooms.delete(room.id);
+        store.selectedRoom = this.selRooms.values().next().value || room.id;
+      } else {
+        this.selRooms.add(room.id);
+        store.selectedRoom = room.id;
+      }
+      store.emit();
+      return;
+    }
+
     const g = this._groundHit(e); if (!g) return;
+
+    // 이미 다중 선택된 방을 (Shift 없이) 잡으면 → 선택된 모든 방을 함께 이동
+    if (this.selRooms.size > 1 && this.selRooms.has(room.id) && !pick.handle) {
+      if (store.selectedRoom !== room.id) { store.selectedRoom = room.id; store.emit(); }
+      this.controls.enabled = false;
+      this._edrag = { mode: 'group', ids: [...this.selRooms], anchorId: room.id, dx: g.x - room.x, dy: g.y - room.y };
+      return;
+    }
+
+    // 단일 선택 (기존 동작)
+    this.selRooms.clear();
     if (store.selectedRoom !== room.id) { store.selectedRoom = room.id; store.emit(); }
     this.controls.enabled = false;        // 드래그 중 회전 정지
     this._edrag = pick.handle
@@ -1755,6 +1818,12 @@ export class Viewer3D {
     if (dr.mode === 'furn') {           // 가구 이동 — 50mm 단위
       const s50 = (v) => Math.round(v / 50) * 50;
       store.liveUpdate(() => { dr.f.x = s50(g.x - dr.dx); dr.f.y = s50(g.y - dr.dy); });
+      return;
+    }
+    if (dr.mode === 'group') {           // 다중 선택 방 함께 이동
+      const anchor = store.design.rooms.find((r) => r.id === dr.anchorId); if (!anchor) return;
+      const ddx = snap(g.x - dr.dx) - anchor.x, ddy = snap(g.y - dr.dy) - anchor.y;
+      if (ddx || ddy) store.liveUpdate(() => moveRoomsInDesign(store.design, dr.ids, ddx, ddy));
       return;
     }
     if (dr.mode === 'move') {

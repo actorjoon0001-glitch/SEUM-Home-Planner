@@ -82,30 +82,50 @@ function buildDashboard(deps) {
 // 도면 미니 미리보기 (방 + 외곽)
 function drawPlanThumb(cv, d) {
   const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
-  ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#f3f5f8'; ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#f5f7fa'; ctx.fillRect(0, 0, W, H);
   if (!d) return;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const acc = (x, y) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); };
   for (const r of d.rooms || []) { acc(r.x, r.y); acc(r.x + r.w, r.y + r.d); }
   for (const p of (d.outline && d.outline.paths) || []) for (const pt of p.points || []) acc(ptX(pt), ptY(pt));
   if (!isFinite(minX)) return;
-  const pad = 12, bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+  const pad = 18, bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
   const s = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh);
   const ox = (W - bw * s) / 2 - minX * s, oy = (H - bh * s) / 2 - minY * s;
   const X = (x) => x * s + ox, Y = (y) => y * s + oy;
-  for (const p of (d.outline && d.outline.paths) || []) {
+  const outs = (d.outline && d.outline.paths) || [];
+  const hasClosed = outs.some((p) => p.closed);
+  // 건물 바닥 — 흰 면 + 은은한 그림자 (카드마다 일관된 '미니 도면' 느낌)
+  ctx.save();
+  ctx.shadowColor = 'rgba(30,40,60,0.12)'; ctx.shadowBlur = 9; ctx.shadowOffsetY = 2;
+  ctx.fillStyle = '#ffffff';
+  if (hasClosed) {
+    for (const p of outs) {
+      const pts = p.points || []; if (!pts.length || !p.closed) continue;
+      ctx.beginPath(); ctx.moveTo(X(ptX(pts[0])), Y(ptY(pts[0])));
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(X(ptX(pts[i])), Y(ptY(pts[i])));
+      ctx.closePath(); ctx.fill();
+    }
+  } else {
+    ctx.fillRect(X(minX), Y(minY), bw * s, bh * s);   // 외곽선 없는 도면: 방 묶음의 바운딩을 흰 바닥으로
+  }
+  ctx.restore();
+  // 방 — 종류색 옅게
+  for (const r of d.rooms || []) {
+    const t = ROOM_TYPES[r.type] || {};
+    ctx.globalAlpha = 0.5; ctx.fillStyle = t.color || '#cbd5e1';
+    ctx.fillRect(X(r.x), Y(r.y), r.w * s, r.d * s);
+    ctx.globalAlpha = 1; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
+    ctx.strokeRect(X(r.x), Y(r.y), r.w * s, r.d * s);
+  }
+  // 외곽선 — 또렷하게 위에 한 번 더
+  ctx.strokeStyle = '#8a9099'; ctx.lineWidth = 1.4; ctx.lineJoin = 'round';
+  for (const p of outs) {
     const pts = p.points || []; if (!pts.length) continue;
     ctx.beginPath(); ctx.moveTo(X(ptX(pts[0])), Y(ptY(pts[0])));
     for (let i = 1; i < pts.length; i++) ctx.lineTo(X(ptX(pts[i])), Y(ptY(pts[i])));
-    if (p.closed) { ctx.closePath(); ctx.fillStyle = 'rgba(217,180,137,0.7)'; ctx.fill(); }
-    ctx.strokeStyle = '#5b5f66'; ctx.lineWidth = 1.4; ctx.stroke();
-  }
-  for (const r of d.rooms || []) {
-    const t = ROOM_TYPES[r.type] || {};
-    ctx.globalAlpha = 0.85; ctx.fillStyle = t.color || '#cbd5e1';
-    ctx.fillRect(X(r.x), Y(r.y), r.w * s, r.d * s);
-    ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
-    ctx.strokeRect(X(r.x), Y(r.y), r.w * s, r.d * s);
+    if (p.closed) ctx.closePath();
+    ctx.stroke();
   }
 }
 function fmtDate(ts) { try { return ts ? new Date(ts).toLocaleDateString('ko-KR') : ''; } catch (e) { return ''; } }

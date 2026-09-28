@@ -1707,9 +1707,8 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   const editBtn = $('view-edit');
   if (editBtn) editBtn.onclick = () => {
     if (!viewer.active) onModeChange('3d');
-    const on = !viewer.editMode; viewer.setEditMode(on);
-    editBtn.classList.toggle('on', on);
-    flash(on ? '3D 편집 — 드래그=이동, 빨간 모서리=크기조절, 초록 핸들=90° 회전, Shift+클릭=여러 방 선택(건물 통째 이동·회전)' : '3D 편집 종료');
+    viewer.clearSelection && viewer.clearSelection();   // 선택 해제 → 깔끔한 상담 화면
+    flash('집을 클릭해 선택 · 드래그로 이동 · 초록 핸들로 90° 회전 · 빨간 모서리로 크기조절 · Shift+클릭으로 여러 채 선택 · 빈 곳 드래그는 화면 회전');
   };
 
   // 키보드 단축키

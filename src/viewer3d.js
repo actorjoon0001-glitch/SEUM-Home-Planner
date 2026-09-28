@@ -84,6 +84,7 @@ export class Viewer3D {
     this._faceDrag = null;   // 면 위 드래그 상태 { key, u0, u1 }
     this._raycaster = new THREE.Raycaster();
     this._edrag = null;
+    this._gesture = null;   // 클릭↔드래그 판정 상태 (집 선택 vs 화면 회전)
     cv.addEventListener('pointerdown', (e) => this._edDown(e));
     cv.addEventListener('pointermove', (e) => this._edMove(e));
     window.addEventListener('pointerup', () => this._edUp());
@@ -312,8 +313,8 @@ export class Viewer3D {
       if (this.showExterior) this._buildExterior(d, b, H);
       if (this.showRoof) this._buildRoof(d, b, H);
 
-      // 편집 모드: 선택된 방에 모서리 핸들 표시
-      if (this.editMode && store.selectedRoom) this._buildEditHandles(d, b);
+      // 집을 클릭해 선택하면 이동·회전·크기조절 핸들 표시 (별도 편집 모드 불필요)
+      if (store.selectedRoom) this._buildEditHandles(d, b);
     } finally {
       this.modelGroup = root;
     }
@@ -1758,50 +1759,62 @@ export class Viewer3D {
       this._edrag = { mode: 'furn', f, dx: g.x - f.x, dy: g.y - f.y };
       return;
     }
-    if (!this.editMode) return;
+    // 3D 직접 편집 — 별도 '편집 모드' 없이 집을 바로 클릭/드래그.
+    //   빈 곳 드래그 = 화면 회전(궤도), 집 클릭 = 선택, 선택된 집 드래그 = 이동.
     const pick = this._pick(e);
-    if (!pick) return;                    // 빈 곳 → 궤도(회전) 그대로
-    const room = store.design.rooms.find((r) => r.id === pick.roomId); if (!room) return;
 
     // 초록 회전 핸들 클릭 → 선택(그룹) 90° 시계방향 회전
-    if (pick.handle === 'rotate') {
+    if (pick && pick.handle === 'rotate') {
+      const room = store.design.rooms.find((r) => r.id === pick.roomId); if (!room) return;
       const ids = this.selRooms.size ? [...new Set([...this.selRooms, room.id])] : [room.id];
       const primary = store.selectedRoom || room.id;
+      this.controls.enabled = false;      // 핸들 누르는 동안 화면 회전 방지 (up 에서 복구)
       store.commit((d) => rotateRoomsInDesign(d, ids, +1));
       store.selectedRoom = primary; store.emit();
       return;
     }
 
+    // 빨간 모서리 핸들 드래그 → 크기조절
+    if (pick && pick.handle) {
+      const room = store.design.rooms.find((r) => r.id === pick.roomId); if (!room) return;
+      this.controls.enabled = false;
+      this._edrag = { mode: 'resize', room, handle: pick.handle };
+      return;
+    }
+
+    const roomId = pick && pick.roomId;
+
     // Shift+클릭 = 다중 선택 토글 (건물 통째 이동/회전)
-    if (e.shiftKey) {
-      if (this.selRooms.has(room.id)) {
-        this.selRooms.delete(room.id);
-        store.selectedRoom = this.selRooms.values().next().value || room.id;
+    if (e.shiftKey && roomId) {
+      if (this.selRooms.has(roomId)) {
+        this.selRooms.delete(roomId);
+        store.selectedRoom = this.selRooms.values().next().value || roomId;
       } else {
-        this.selRooms.add(room.id);
-        store.selectedRoom = room.id;
+        this.selRooms.add(roomId);
+        store.selectedRoom = roomId;
       }
       store.emit();
       return;
     }
 
-    const g = this._groundHit(e); if (!g) return;
-
-    // 이미 다중 선택된 방을 (Shift 없이) 잡으면 → 선택된 모든 방을 함께 이동
-    if (this.selRooms.size > 1 && this.selRooms.has(room.id) && !pick.handle) {
-      if (store.selectedRoom !== room.id) { store.selectedRoom = room.id; store.emit(); }
-      this.controls.enabled = false;
-      this._edrag = { mode: 'group', ids: [...this.selRooms], anchorId: room.id, dx: g.x - room.x, dy: g.y - room.y };
+    // 이미 선택된 집을 (Shift 없이) 잡으면 → 바로 이동 시작 (단일/그룹)
+    const grabbingSelected = roomId && (roomId === store.selectedRoom || this.selRooms.has(roomId));
+    if (grabbingSelected) {
+      const room = store.design.rooms.find((r) => r.id === roomId);
+      const g = this._groundHit(e); if (!g) return;
+      this.controls.enabled = false;      // 드래그 중 화면 회전 정지
+      if (this.selRooms.size > 1 && this.selRooms.has(roomId)) {
+        if (store.selectedRoom !== roomId) { store.selectedRoom = roomId; store.emit(); }
+        this._edrag = { mode: 'group', ids: [...this.selRooms], anchorId: roomId, dx: g.x - room.x, dy: g.y - room.y };
+      } else {
+        this._edrag = { mode: 'move', room, dx: g.x - room.x, dy: g.y - room.y };
+      }
       return;
     }
 
-    // 단일 선택 (기존 동작)
-    this.selRooms.clear();
-    if (store.selectedRoom !== room.id) { store.selectedRoom = room.id; store.emit(); }
-    this.controls.enabled = false;        // 드래그 중 회전 정지
-    this._edrag = pick.handle
-      ? { mode: 'resize', room, handle: pick.handle }
-      : { mode: 'move', room, dx: g.x - room.x, dy: g.y - room.y };
+    // 그 외(선택 안 된 집 또는 빈 곳) → 클릭이면 선택/해제, 드래그면 화면 회전.
+    //   컨트롤을 켜 둔 채 클릭·드래그를 구분(_edMove 에서 이동량으로 판정).
+    this._gesture = { x0: e.clientX, y0: e.clientY, roomId: roomId || null, moved: false };
   }
   _edMove(e) {
     if (this._faceDrag) {   // 면별 외장재 드래그 — 같은 면 위에서만 폭 갱신
@@ -1809,7 +1822,13 @@ export class Viewer3D {
       if (pick && pick.key === this._faceDrag.key) this._faceDrag.u1 = pick.u;
       return;
     }
-    if (!this._edrag) return;
+    if (!this._edrag) {
+      // 클릭↔드래그 판정 중: 일정 이상 움직이면 화면 회전으로 간주(선택 취소)
+      if (this._gesture && !this._gesture.moved) {
+        if (Math.hypot(e.clientX - this._gesture.x0, e.clientY - this._gesture.y0) > 6) this._gesture.moved = true;
+      }
+      return;
+    }
     const g = this._groundHit(e); if (!g) return;
     // 드래그당 한 번만 스냅샷 → Ctrl+Z 되돌리기 지원(2D 편집과 동일)
     if (!this._edrag.snapped) { store.snapshot(); this._edrag.snapped = true; }
@@ -1846,8 +1865,29 @@ export class Viewer3D {
       else this._facePaintBand(fd.key, Math.min(fd.u0, fd.u1), Math.max(fd.u0, fd.u1)); // 드래그 → 폭만큼 띠
       return;
     }
-    if (this._edrag) { this._edrag = null; store.liveEnd(); }
+    if (this._edrag) { this._edrag = null; store.liveEnd(); this.controls.enabled = true; return; }
+    // 클릭(거의 안 움직임) 판정 → 집 선택 / 빈 곳이면 선택 해제
+    if (this._gesture) {
+      const gs = this._gesture; this._gesture = null;
+      if (!gs.moved) {
+        if (gs.roomId) {
+          this.selRooms.clear();
+          if (store.selectedRoom !== gs.roomId) {
+            store.selectedRoom = gs.roomId; store.selectedFurniture = null; store.selectedOpening = null; store.emit();
+          }
+        } else if (store.selectedRoom || this.selRooms.size) {
+          this.selRooms.clear(); store.selectedRoom = null; store.emit();
+        }
+      }
+    }
     this.controls.enabled = true;
+  }
+
+  // 3D 선택 해제 (깔끔한 상담 화면으로)
+  clearSelection() {
+    this.selRooms.clear();
+    if (store.selectedRoom || store.selectedFurniture) { store.selectedRoom = null; store.selectedFurniture = null; store.emit(); }
+    this.dirty = true;
   }
 
   view(type) {

@@ -1096,6 +1096,10 @@ function buildFinish() {
       <button type="button" class="seg-btn" data-ridge="z" title="용마루가 도면 세로(위↕아래) 방향 — 박공 삼각면이 위·아래(북·남)쪽에">세로 ↕</button>
       <button type="button" class="seg-btn" data-ridge="x" title="용마루가 도면 가로(좌↔우) 방향 — 박공 삼각면이 좌·우(서·동)쪽에">가로 ↔</button>
     </div>
+    <div class="tool-group-label" style="margin-top:12px">지붕 경사 <small class="muted" id="fin-rise-v"></small></div>
+    <input id="fin-rise" type="range" min="200" max="2600" step="50" style="width:100%">
+    <div class="tool-group-label" style="margin-top:8px">지붕 두께 <small class="muted" id="fin-thick-v"></small></div>
+    <input id="fin-thick" type="range" min="80" max="400" step="10" style="width:100%">
     <div class="tool-group-label" style="margin-top:12px">지붕 색상</div>
     <div class="swatches" id="fin-rf-sw"></div>
     <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>`;
@@ -1172,6 +1176,24 @@ function buildFinish() {
     rfSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
       writeRoof((r) => { r.color = b.dataset.c; }); showRoof();
     });
+    // 지붕 경사(높이)·두께 슬라이더 — 입력 중 라벨만 갱신, 놓으면 적용(undo 1회)
+    const defRise = (ROOF_TYPES[effRoof.type] || ROOF_TYPES.gable || {}).rise || 1200;
+    const riseEl = wrap.querySelector('#fin-rise'), riseV = wrap.querySelector('#fin-rise-v');
+    if (riseEl) {
+      const cur = effRoof.rise > 0 ? effRoof.rise : defRise;
+      riseEl.value = Math.min(2600, Math.max(200, cur));
+      if (riseV) riseV.textContent = `${riseEl.value}mm`;
+      riseEl.oninput = () => { if (riseV) riseV.textContent = `${riseEl.value}mm`; };
+      riseEl.onchange = () => { writeRoof((r) => { r.rise = +riseEl.value; }); showRoof(); };
+    }
+    const thEl = wrap.querySelector('#fin-thick'), thV = wrap.querySelector('#fin-thick-v');
+    if (thEl) {
+      const cur = effRoof.thickness > 0 ? effRoof.thickness : 180;
+      thEl.value = Math.min(400, Math.max(80, cur));
+      if (thV) thV.textContent = `${thEl.value}mm`;
+      thEl.oninput = () => { if (thV) thV.textContent = `${thEl.value}mm`; };
+      thEl.onchange = () => { writeRoof((r) => { r.thickness = +thEl.value; }); showRoof(); };
+    }
   }
   renderCards();
   store.subscribe(renderCards);

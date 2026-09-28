@@ -1390,7 +1390,8 @@ function roomForm(room) {
   const typeLabel = (ROOM_TYPES[room.type] || {}).label || '';
   return `
     <p class="ph">공간 속성</p>
-    <label class="fld"><span>이름 <small class="muted">(비우면 표시 안 됨)</small></span><input id="r-name" value="${esc(room.name)}" placeholder="예: ${esc(typeLabel)}"></label>
+    <label class="fld"><span>이름 <small class="muted">(도면에서 글씨 더블클릭으로도 수정)</small></span><input id="r-name" value="${esc(room.name)}" placeholder="예: ${esc(typeLabel)}"></label>
+    <label class="ck"><input type="checkbox" id="r-hidearea"${room.hideArea ? ' checked' : ''}> 평수(면적) 숨기기</label>
     <label class="fld"><span>종류</span><select id="r-type">${opts}</select></label>
     <div class="grid2">
       <label class="fld"><span>가로 W (mm)</span><input id="r-w" type="number" step="100" value="${room.w}"></label>
@@ -1435,6 +1436,8 @@ function bindRoomForm(room) {
   // 방 치수·위치가 바뀌면 외곽선(3D 지붕·외벽)도 몸통에 맞춰 다시 계산
   const updGeom = (key, val) => store.commit((d) => { room[key] = val; if (d.outline) syncOutlineToRooms(d); });
   document.getElementById('r-name').onchange = (e) => upd('name', e.target.value);
+  const ha = document.getElementById('r-hidearea');
+  if (ha) ha.onchange = (e) => upd('hideArea', e.target.checked);
   document.getElementById('r-type').onchange = (e) => upd('type', e.target.value);
   for (const k of ['w', 'd', 'x', 'y']) {
     document.getElementById('r-' + k).onchange = (e) => updGeom(k, Math.max(0, +e.target.value || 0));

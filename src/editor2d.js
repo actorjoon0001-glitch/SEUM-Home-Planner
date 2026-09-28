@@ -1058,6 +1058,8 @@ export class Editor2D {
       const [px, py] = this._pos(e);
       const dm = this._hitDim(px, py);        // 치수 더블클릭 → 값 편집(방 크기 변경)
       if (dm) { this._editDim(dm); return; }
+      const rl = this._hitRoomLabel(px, py);  // 방 이름 라벨 더블클릭 → 이름 수정
+      if (rl) { this._editRoomLabel(rl.roomId); return; }
       const lb = this._hitLabel(px, py);      // 라벨 더블클릭 → 이름 수정
       if (lb) this._beginLabelEdit(lb);
     });
@@ -1844,7 +1846,8 @@ export class Editor2D {
     const w = room.w * this.scale, h = room.d * this.scale;
     if (!(w > 40 && h > 30)) return;
     const hasName = this.showRoomNames && !!(room.name && room.name.trim());
-    if (!hasName && !this.showArea) return;
+    const showAreaHere = this.showArea && !room.hideArea;   // 방별 평수 숨기기
+    if (!hasName && !showAreaHere) return;
     const off = room.labelOffset || { dx: 0, dy: 0 };
     const cx = x + w / 2 + (off.dx || 0) * this.scale;
     const cy = y + h / 2 + (off.dy || 0) * this.scale;
@@ -1855,7 +1858,7 @@ export class Editor2D {
     // 가독성: 흰 반투명 배경 깔기 (가구 위에서도 글씨가 보이게)
     const lines = [];
     if (hasName) lines.push({ t: room.name, f: `600 ${big}px "Noto Sans KR", sans-serif`, c: '#33373d' });
-    if (this.showArea) lines.push({ t: this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`, f: `${big * 0.8}px "Noto Sans KR", sans-serif`, c: '#6b7079' });
+    if (showAreaHere) lines.push({ t: this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`, f: `${big * 0.8}px "Noto Sans KR", sans-serif`, c: '#6b7079' });
     let maxW = 0;
     for (const ln of lines) { ctx.font = ln.f; maxW = Math.max(maxW, ctx.measureText(ln.t).width); }
     const lineH = big * 1.15, totalH = lines.length * lineH;
@@ -1867,6 +1870,14 @@ export class Editor2D {
     let ly = cy - totalH / 2 + lineH / 2;
     for (const ln of lines) { ctx.font = ln.f; ctx.fillStyle = ln.c; ctx.fillText(ln.t, cx, ly); ly += lineH; }
     ctx.restore();
+  }
+
+  // 방 이름 라벨 더블클릭 편집 — 이름 수정(비우면 이름 숨김)
+  _editRoomLabel(roomId) {
+    const room = store.design.rooms.find((r) => r.id === roomId); if (!room) return;
+    const v = prompt('방 이름 (비우면 이름 숨김 · 평수 숨기기는 오른쪽 속성창에서)', room.name || '');
+    if (v === null) return;
+    store.commit(() => { room.name = v.trim(); });
   }
 
   _hitRoomLabel(px, py) {

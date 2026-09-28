@@ -8,6 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
 import { rotateRoomsInDesign, moveRoomsInDesign, syncOutlineToRooms } from './roomops.js';
@@ -1329,6 +1330,14 @@ export class Viewer3D {
       g.add(m); return m;
     };
 
+    // 모서리 둥근 박스 — 매트리스·이불·베개 등 푹신한 오브젝트에 사용
+    const addRounded = (w, h, dd, y, col, z = 0, x = 0, finish, radius) => {
+      const r = Math.max(2, Math.min(radius != null ? radius : 40, Math.min(w, h, dd) / 2 - 1));
+      const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, dd, 4, r), finMat(col, w, dd, finish));
+      m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+      g.add(m); return m;
+    };
+
     const addCyl = (r, h, y, col, z = 0, x = 0, seg = 20) => {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(col));
       m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
@@ -1437,11 +1446,24 @@ export class Viewer3D {
         break;
       }
       case 'bed': {
-        addBox(c.w, c.h * 0.5, c.d, c.h * 0.25, c.color, 0, 0, 'fabric');              // 매트리스 베이스
-        addBox(c.w, c.h * 0.35, c.d * 0.85, c.h * 0.62, '#ece4d8', c.d * 0.06, 0, 'fabric'); // 이불
-        addBox(c.w, c.h * 0.9, c.d * 0.12, c.h * 0.45, '#bfa988', -c.d / 2 + c.d * 0.05, 0, 'wood'); // 헤드보드
-        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, -c.w * 0.22, 'fabric');
-        addBox(c.w * 0.42, c.h * 0.18, c.d * 0.22, c.h * 0.58, '#f7f3ec', -c.d / 2 + c.d * 0.18, c.w * 0.22, 'fabric');
+        // 푹신한 매트리스 침대 — 프레임 + 두툼한 매트리스(둥근 모서리) + 부푼 이불 + 통통한 베개
+        const H = c.h;
+        const frameH = H * 0.22, matH = H * 0.42;                 // 낮은 프레임 위 두꺼운 매트리스
+        const frameTop = frameH, matTop = frameTop + matH;
+        addBox(c.w, frameH, c.d, frameH / 2, '#6f5a3f', 0, 0, 'wood');   // 프레임(원목)
+        // 매트리스 — 모서리 둥글게, 푹신해 보이게
+        addRounded(c.w * 0.97, matH, c.d * 0.97, frameTop + matH / 2, c.color, 0, 0, 'fabric', matH * 0.42);
+        // 이불 — 두툼하게 부풀려 발치(+z)쪽 2/3 를 덮음
+        const duvH = H * 0.3;
+        addRounded(c.w * 0.99, duvH, c.d * 0.66, matTop + duvH / 2 - matH * 0.12, '#ece4d8', c.d * 0.15, 0, 'fabric', duvH * 0.45);
+        // 이불 접힌 윗단(살짝 걷은 느낌)
+        addRounded(c.w * 0.99, H * 0.16, c.d * 0.16, matTop + H * 0.06, '#f4efe4', -c.d * 0.08, 0, 'fabric', H * 0.07);
+        // 헤드보드 — 천 쿠션(둥근) 느낌
+        addRounded(c.w, H * 1.0, c.d * 0.1, frameTop + H * 0.5, '#b6a17e', -c.d / 2 + c.d * 0.05, 0, 'fabric', 90);
+        // 베개 2개 — 통통하게(머리쪽 -z)
+        const pillW = c.w * 0.4, pillH = H * 0.22, pillD = c.d * 0.2;
+        addRounded(pillW, pillH, pillD, matTop + pillH * 0.45, -c.d / 2 + c.d * 0.17, -c.w * 0.22, '#f7f3ec', 'fabric', pillH * 0.48);
+        addRounded(pillW, pillH, pillD, matTop + pillH * 0.45, -c.d / 2 + c.d * 0.17, c.w * 0.22, '#f7f3ec', 'fabric', pillH * 0.48);
         break;
       }
       case 'table': {

@@ -1786,9 +1786,11 @@ export class Viewer3D {
 
     // Shift+클릭 = 다중 선택 토글 (건물 통째 이동/회전)
     if (e.shiftKey && roomId) {
+      // 먼저 단일 선택해 둔 방도 그룹에 포함 (A 클릭 후 Shift+B → A·B 둘 다 선택)
+      if (store.selectedRoom && !this.selRooms.has(store.selectedRoom)) this.selRooms.add(store.selectedRoom);
       if (this.selRooms.has(roomId)) {
         this.selRooms.delete(roomId);
-        store.selectedRoom = this.selRooms.values().next().value || roomId;
+        store.selectedRoom = this.selRooms.values().next().value || null;
       } else {
         this.selRooms.add(roomId);
         store.selectedRoom = roomId;

@@ -1160,6 +1160,8 @@ export class Editor2D {
     if (e.shiftKey) {
       const rm = this._hitRoom(px, py);
       if (rm) {
+        // 먼저 단일 선택해 둔 방도 그룹에 포함 (A 클릭 후 Shift+B → A·B 둘 다 선택)
+        if (store.selectedRoom && !this.selRooms.has(store.selectedRoom)) this.selRooms.add(store.selectedRoom);
         if (this.selRooms.has(rm.id)) { this.selRooms.delete(rm.id); store.select(this.selRooms.values().next().value || null, null); }
         else { this.selRooms.add(rm.id); store.select(rm.id, null); }
         this.draw();

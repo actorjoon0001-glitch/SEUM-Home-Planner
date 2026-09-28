@@ -1058,8 +1058,12 @@ export class Editor2D {
       const [px, py] = this._pos(e);
       const dm = this._hitDim(px, py);        // 치수 더블클릭 → 값 편집(방 크기 변경)
       if (dm) { this._editDim(dm); return; }
-      const rl = this._hitRoomLabel(px, py);  // 방 이름 라벨 더블클릭 → 이름 수정
-      if (rl) { this._editRoomLabel(rl.roomId); return; }
+      const rl = this._hitRoomLabel(px, py);  // 방 라벨 더블클릭 → 이름/평수 줄 각각 수정
+      if (rl) {
+        if (rl.hasArea && (!rl.hasName || py >= rl.splitY)) this._editRoomArea(rl.roomId);
+        else this._editRoomLabel(rl.roomId);
+        return;
+      }
       const lb = this._hitLabel(px, py);      // 라벨 더블클릭 → 이름 수정
       if (lb) this._beginLabelEdit(lb);
     });
@@ -1857,14 +1861,21 @@ export class Editor2D {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     // 가독성: 흰 반투명 배경 깔기 (가구 위에서도 글씨가 보이게)
     const lines = [];
-    if (hasName) lines.push({ t: room.name, f: `600 ${big}px "Noto Sans KR", sans-serif`, c: '#33373d' });
-    if (showAreaHere) lines.push({ t: this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`, f: `${big * 0.8}px "Noto Sans KR", sans-serif`, c: '#6b7079' });
+    if (hasName) lines.push({ t: room.name, f: `600 ${big}px "Noto Sans KR", sans-serif`, c: '#33373d', kind: 'name' });
+    if (showAreaHere) {
+      // 평수는 자동 계산이지만, 사용자가 직접 고친 값(room.areaText)이 있으면 그걸 표시
+      const autoTxt = this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`;
+      lines.push({ t: (room.areaText != null && room.areaText !== '') ? room.areaText : autoTxt, f: `${big * 0.8}px "Noto Sans KR", sans-serif`, c: '#6b7079', kind: 'area' });
+    }
     let maxW = 0;
     for (const ln of lines) { ctx.font = ln.f; maxW = Math.max(maxW, ctx.measureText(ln.t).width); }
     const lineH = big * 1.15, totalH = lines.length * lineH;
     const padX = 6, padY = 3;
     const bx = cx - maxW / 2 - padX, by = cy - totalH / 2 - padY, bw = maxW + padX * 2, bh = totalH + padY * 2;
-    this._roomLabelHits.push({ roomId: room.id, x: bx, y: by, w: bw, h: bh });
+    // 이름/평수 줄을 구분해 더블클릭 시 해당 줄을 편집 (splitY 아래 = 평수 줄)
+    const hasArea = showAreaHere;
+    const splitY = by + padY + (hasName ? lineH : 0);
+    this._roomLabelHits.push({ roomId: room.id, x: bx, y: by, w: bw, h: bh, hasName, hasArea, splitY });
     ctx.fillStyle = 'rgba(255,255,255,0.72)';
     ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 5); ctx.fill();
     let ly = cy - totalH / 2 + lineH / 2;
@@ -1878,6 +1889,17 @@ export class Editor2D {
     const v = prompt('방 이름 (비우면 이름 숨김 · 평수 숨기기는 오른쪽 속성창에서)', room.name || '');
     if (v === null) return;
     store.commit(() => { room.name = v.trim(); });
+  }
+
+  // 평수(면적) 줄 더블클릭 편집 — 직접 입력한 값으로 표시(비우면 자동 계산값으로 복원)
+  _editRoomArea(roomId) {
+    const room = store.design.rooms.find((r) => r.id === roomId); if (!room) return;
+    const area = (room.w * room.d) / 1e6;
+    const autoTxt = this.showDims ? `${(area / 3.305).toFixed(1)}평 · ${area.toFixed(1)}m²` : `${(area / 3.305).toFixed(1)}평`;
+    const cur = (room.areaText != null && room.areaText !== '') ? room.areaText : autoTxt;
+    const v = prompt('평수 표시 (비우면 자동 계산값으로 복원 · 완전히 숨기려면 속성창의 평수 숨기기)', cur);
+    if (v === null) return;
+    store.commit(() => { const t = v.trim(); if (!t || t === autoTxt) delete room.areaText; else room.areaText = t; });
   }
 
   _hitRoomLabel(px, py) {

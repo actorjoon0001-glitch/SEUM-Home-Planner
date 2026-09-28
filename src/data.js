@@ -110,6 +110,7 @@ export const WINDOW_TYPES = {
   pocketDoor:{ label: '포켓도어',       w: 900,  h: 2100, sill: 0,   panes: 1, slide: true,  glass: false, pocket: true },
   pivotDoor: { label: '피벗도어',       w: 1100, h: 2300, sill: 0,   panes: 1, slide: false, glass: false, pivot: true },
   folding:   { label: '폴딩도어',       w: 3600, h: 2200, sill: 0,   panes: 4, slide: true,  glass: true, fold: true },
+  foldSwing: { label: '폴딩+여닫이문',  w: 4200, h: 2200, sill: 0,   panes: 4, slide: true,  glass: true, fold: true, combo: 'foldSwing', swingRatio: 0.28 },
 };
 
 // 창호 라이브러리 카드용 목록

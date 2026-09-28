@@ -16,6 +16,61 @@ import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
+let _clip = null;   // Ctrl+C 복사 클립보드 { kind:'furn'|'room'|'op', data }
+
+// 선택 항목 복사 (가구 우선, 방·창호도 지원) — Ctrl+C
+function copySelection() {
+  const d = store.design;
+  if (store.selectedFurniture) {
+    const f = d.furniture.find((x) => x.id === store.selectedFurniture);
+    if (f) { _clip = { kind: 'furn', data: JSON.parse(JSON.stringify(f)) }; return true; }
+  } else if (store.selectedRoom) {
+    const r = d.rooms.find((x) => x.id === store.selectedRoom);
+    if (r) { _clip = { kind: 'room', data: JSON.parse(JSON.stringify(r)) }; return true; }
+  } else if (store.selectedOpening) {
+    const o = (d.openings || []).find((x) => x.id === store.selectedOpening);
+    if (o) { _clip = { kind: 'op', data: JSON.parse(JSON.stringify(o)) }; return true; }
+  }
+  return false;
+}
+
+// 복사한 항목을 바로 옆에 붙여넣기 — Ctrl+V (연속 붙여넣기 시 계속 옆으로)
+function pasteClip() {
+  if (!_clip) return false;
+  const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  if (_clip.kind === 'furn') {
+    const src = _clip.data;
+    const cat = catalogOf(src.catalogId) || {};
+    const gap = (src.w || cat.w || 500) + 100;   // 원본 너비만큼 오른쪽으로 → 바로 옆
+    store.commit((d) => {
+      const f = { ...src, id: uid('f'), x: (src.x || 0) + gap, y: src.y || 0 };
+      d.furniture.push(f); store.select(null, f.id);
+      _clip.data = JSON.parse(JSON.stringify(f));   // 다음 붙여넣기는 또 그 옆으로
+    });
+    return true;
+  }
+  if (_clip.kind === 'room') {
+    const src = _clip.data;
+    store.commit((d) => {
+      const r = { ...src, id: uid('r'), x: (src.x || 0) + (src.w || 1000) + 200, y: src.y || 0 };
+      if (Array.isArray(src.open)) r.open = src.open.slice();
+      d.rooms.push(r); store.selectedRoom = r.id; store.selectedFurniture = null; store.selectedOpening = null;
+      if (d.outline) syncOutlineToRooms(d);
+      _clip.data = JSON.parse(JSON.stringify(r));
+    });
+    return true;
+  }
+  if (_clip.kind === 'op') {
+    const src = _clip.data;
+    store.commit((d) => {
+      const o = { ...src, id: uid('o'), pos: (src.pos || 0) + (src.w || 900) + 200 };
+      (d.openings = d.openings || []).push(o); store.select(null, null, o.id);
+      _clip.data = JSON.parse(JSON.stringify(o));
+    });
+    return true;
+  }
+  return false;
+}
 
 export function buildUI({ editor, viewer, onModeChange }) {
   _editor = editor;
@@ -1721,6 +1776,8 @@ function buildToolbar({ editor, viewer, onModeChange }) {
     // 물리 키(e.code)로 판정 → 한글 입력모드에서도 Ctrl+Z 동작 (e.key 는 'ㅋ' 이 되어 실패)
     if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); }
     else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') { e.preventDefault(); store.redo(); }
+    else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC') { if (copySelection()) e.preventDefault(); }
+    else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') { if (pasteClip()) e.preventDefault(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') {
       if (store.selectedRoom) store.commit((d) => { d.rooms = d.rooms.filter((r) => r.id !== store.selectedRoom); store.selectedRoom = null; });
       else if (store.selectedFurniture) store.commit((d) => { d.furniture = d.furniture.filter((f) => f.id !== store.selectedFurniture); store.selectedFurniture = null; });

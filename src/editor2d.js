@@ -1856,7 +1856,7 @@ export class Editor2D {
     const cx = x + w / 2 + (off.dx || 0) * this.scale;
     const cy = y + h / 2 + (off.dy || 0) * this.scale;
     const area = (room.w * room.d) / 1e6;
-    const big = Math.min(16, Math.max(10, w / 8));
+    const big = Math.min(16, Math.max(10, w / 8)) * (room.labelScale || 1);   // 방별 글씨 크기 배율
     ctx.save();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     // 가독성: 흰 반투명 배경 깔기 (가구 위에서도 글씨가 보이게)

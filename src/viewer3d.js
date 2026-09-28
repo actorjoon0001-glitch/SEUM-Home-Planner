@@ -10,7 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
-import { rotateRoomsInDesign, moveRoomsInDesign } from './roomops.js';
+import { rotateRoomsInDesign, moveRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 import * as TEX from './textures.js';
 TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 (2D UI 는 three 의존 제거됨)
 
@@ -1865,7 +1865,15 @@ export class Viewer3D {
       else this._facePaintBand(fd.key, Math.min(fd.u0, fd.u1), Math.max(fd.u0, fd.u1)); // 드래그 → 폭만큼 띠
       return;
     }
-    if (this._edrag) { this._edrag = null; store.liveEnd(); this.controls.enabled = true; return; }
+    if (this._edrag) {
+      const mode = this._edrag.mode; const moved = this._edrag.snapped;
+      this._edrag = null;
+      // 방을 옮기거나 크기조절했으면 외곽선(지붕·외장)을 몸통에 맞춰 다시 계산
+      if (moved && (mode === 'move' || mode === 'group' || mode === 'resize')) {
+        syncOutlineToRooms(store.design); store.emit();
+      }
+      store.liveEnd(); this.controls.enabled = true; return;
+    }
     // 클릭(거의 안 움직임) 판정 → 집 선택 / 빈 곳이면 선택 해제
     if (this._gesture) {
       const gs = this._gesture; this._gesture = null;

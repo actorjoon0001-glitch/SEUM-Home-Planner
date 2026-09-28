@@ -2,6 +2,7 @@
 // 방 추가/이동/크기조절, 가구 배치/이동/회전, 팬/줌, 치수 표시
 import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, openingOutline, outlinePoints, outlineShape, outlineShapes } from './data.js';
+import { syncOutlineToRooms } from './roomops.js';
 
 const GRID = 100;          // 스냅 단위 (mm)
 const HANDLE = 8;          // 핸들 픽셀 크기
@@ -182,6 +183,7 @@ export class Editor2D {
     const ctx = this.ctx, d = store.design;
     ctx.clearRect(0, 0, this.cssW, this.cssH);
     this._dimHits = [];   // 이번 프레임의 치수 라벨 클릭영역(더블클릭 편집용)
+    this._summaryRect = null;   // 이번 프레임의 평수 요약 알약 히트박스(드래그 이동용)
     this._drawGrid();
 
     // 밑그림(참조 도면) + 외벽(벽체) + 방을 하나의 레이어 스택(z)으로 정렬해 그림
@@ -275,18 +277,23 @@ export class Editor2D {
     // 상단 치수선과 겹치지 않게 요약 알약을 그 위로 올림
     //   (치수 토글=전체 외곽 치수 위 / 방 선택=빨간 치수 위 / 둘 다 아니면 기본)
     const selAny = store.selectedRoom != null || store.selectedOutline != null;
-    const y = this.showDims ? (yTop - 61 - fs)
+    let y = this.showDims ? (yTop - 61 - fs)
       : selAny ? (yTop - 35 - fs)
         : (yTop - fs * 2.2);
+    // 사용자가 드래그로 옮긴 위치 오프셋(mm) 반영 — 캡처 시 글씨 위치 조정용
+    const off = d.summaryOffset || { dx: 0, dy: 0 };
+    let cxD = cx + (off.dx || 0) * this.scale;
+    y += (off.dy || 0) * this.scale;
     // 배경 알약
     const padX = fs * 0.9, h = fs * 2;
     ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.strokeStyle = '#e2e4e8'; ctx.lineWidth = 1;
-    const bx = cx - total / 2 - padX, bw = total + padX * 2, r = h / 2;
+    const bx = cxD - total / 2 - padX, bw = total + padX * 2, r = h / 2;
+    this._summaryRect = { x: bx, y: y - h / 2, w: bw, h };   // 드래그 이동용 히트박스
     ctx.beginPath();
     ctx.moveTo(bx + r, y - h / 2); ctx.arcTo(bx + bw, y - h / 2, bx + bw, y + h / 2, r); ctx.arcTo(bx + bw, y + h / 2, bx, y + h / 2, r);
     ctx.arcTo(bx, y + h / 2, bx, y - h / 2, r); ctx.arcTo(bx, y - h / 2, bx + bw, y - h / 2, r); ctx.closePath();
     ctx.fill(); ctx.stroke();
-    let x = cx - total / 2;
+    let x = cxD - total / 2;
     parts.forEach((p, i) => {
       ctx.textAlign = 'left';
       ctx.font = fontOf(p); ctx.fillStyle = p.strong ? '#c8102e' : '#2a2d33';
@@ -1101,6 +1108,14 @@ export class Editor2D {
       return;
     }
 
+    // 평수 요약 알약 클릭 → 드래그로 위치 이동 (캡처 시 글씨 위치 조정)
+    if (!this.drawOutline && !this.eraseMode && !this.measureMode && !this.labelMode && this._hitSummary(px, py)) {
+      const [mx, my] = this.toMm(px, py);
+      const off = store.design.summaryOffset || { dx: 0, dy: 0 };
+      this.drag = { mode: 'movesummary', sx: mx, sy: my, ox: off.dx || 0, oy: off.dy || 0 };
+      return;
+    }
+
     // 치수 라벨 위 클릭 → 선택 유지(더블클릭 편집 대기, 방 선택 해제 방지)
     if (!this.drawOutline && !this.eraseMode && !this.measureMode && !this.labelMode && this._hitDim(px, py)) return;
 
@@ -1293,6 +1308,13 @@ export class Editor2D {
 
     const [mx, my] = this.toMm(px, py);
 
+    // 평수 요약 알약 이동 (mm 오프셋 저장) — 스냅샷 없이 라이브 갱신
+    if (drag.mode === 'movesummary') {
+      const dx = drag.ox + (mx - drag.sx), dy = drag.oy + (my - drag.sy);
+      store.liveUpdate(() => { store.design.summaryOffset = { dx: Math.round(dx), dy: Math.round(dy) }; });
+      return;
+    }
+
     // 실제 편집이 시작되는 첫 이동에서만 되돌리기 스냅샷 기록
     if (!drag.snapped) { store.snapshot(); drag.snapped = true; }
 
@@ -1371,8 +1393,15 @@ export class Editor2D {
 
   _up() {
     if (this.drag && this.drag.mode === 'drawnew') { this._finishDraw(this.drag); this.drag = null; return; }
+    if (this.drag && this.drag.mode === 'movesummary') { store.liveEnd(); this.drag = null; return; }
     if (this.drag && ['mover', 'movef', 'resize', 'rotate', 'moveo', 'moveoutline', 'resizeoutline', 'resizef'].includes(this.drag.mode)) {
+      // 방을 옮기거나 크기조절했으면 외곽선(3D 지붕·외벽)을 몸통에 맞춰 다시 계산.
+      //   (외곽선을 직접 편집하는 moveoutline/resizeoutline 은 제외 — 사용자 편집 보존)
+      if ((this.drag.mode === 'mover' || this.drag.mode === 'resize') && store.design.outline) {
+        syncOutlineToRooms(store.design);
+      }
       store.liveEnd();
+      this.draw();
     }
     this.drag = null;
   }
@@ -2024,6 +2053,13 @@ export class Editor2D {
     return null;
   }
 
+  // 평수 요약 알약 클릭 판정 (드래그로 위치 이동)
+  _hitSummary(px, py) {
+    const r = this._summaryRect;
+    if (!r) return false;
+    return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+  }
+
   _editDim(hit) {
     const raw = prompt(`${hit.label}`, hit.cur);
     if (raw == null) return;
@@ -2178,7 +2214,8 @@ export class Editor2D {
     const selRoom = d.rooms.find((r) => r.id === store.selectedRoom);
     const RC = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
     let cur = 'default';
-    if (selRoom) {
+    if (this._hitSummary(px, py)) cur = 'move';   // 평수 요약 알약 → 이동 커서
+    if (cur === 'default' && selRoom) {
       const hk = this._hitHandle(selRoom, px, py);
       if (hk) cur = RC[hk];
     }

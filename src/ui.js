@@ -1105,6 +1105,10 @@ function buildFinish() {
     <div class="swatches" id="fin-rf-sw"></div>
     <div class="tool-group-label" style="margin-top:12px">지붕 테두리·두께 색 (파사드)</div>
     <div class="swatches" id="fin-fascia-sw"></div>
+    <div id="fin-gable-wrap">
+      <div class="tool-group-label" style="margin-top:12px">박공(삼각) 벽 색상</div>
+      <div class="swatches" id="fin-gable-sw"></div>
+    </div>
     <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>`;
   const qi = wrap.querySelector('#fin-q');
   qi.oninput = () => { query = qi.value.trim(); renderCards(); };
@@ -1193,6 +1197,21 @@ function buildFinish() {
       faSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
         writeRoof((r) => { r.fascia = b.dataset.same ? (r.color || effRoof.color || '#3a3f44') : b.dataset.c; }); showRoof();
       });
+    }
+    // 박공(삼각) 벽 색상 — 박공/비대칭박공/외쪽 지붕에만 노출. '외장과 동일'(기본) + 색 선택
+    const gableWrap = wrap.querySelector('#fin-gable-wrap');
+    const gableSw = wrap.querySelector('#fin-gable-sw');
+    if (gableWrap && gableSw) {
+      const hasGable = ['gable', 'asymGable', 'shed'].includes(effRoof.type || 'gable');
+      gableWrap.classList.toggle('hidden', !hasGable);
+      if (hasGable) {
+        const gColors = [...new Set([...EXTERIOR_PALETTE, ...ROOF_PALETTE])];
+        gableSw.innerHTML = `<button class="sw ${!effRoof.gableColor ? 'on' : ''}" style="background:linear-gradient(135deg,${ex.color || '#c9c3b8'} 50%,#fff 50%);font-size:9px" data-same="1" title="외장재와 동일(기본)">＝</button>`
+          + gColors.map((c) => `<button class="sw ${effRoof.gableColor === c ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
+        gableSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
+          writeRoof((r) => { if (b.dataset.same) delete r.gableColor; else r.gableColor = b.dataset.c; }); showRoof();
+        });
+      }
     }
     // 지붕 경사(높이)·두께 슬라이더 — 입력 중 라벨만 갱신, 놓으면 적용(undo 1회)
     const defRise = (ROOF_TYPES[effRoof.type] || ROOF_TYPES.gable || {}).rise || 1200;

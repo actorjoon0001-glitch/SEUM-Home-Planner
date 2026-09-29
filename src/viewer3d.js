@@ -989,6 +989,12 @@ export class Viewer3D {
     const fillMat = (len, h) => this.showExterior
       ? TEX.exteriorMaterial(ex.material || 'cement', ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness, ex.dir)
       : this._wallMat();
+    // 박공 삼각면 재질 — 지붕별 gableColor 지정 시 그 색으로(외장재 질감 유지), 없으면 외장과 동일
+    const gableCol = roof.gableColor || null;
+    const gableMat = (len, h) => {
+      if (this.showExterior) return TEX.exteriorMaterial(ex.material || 'cement', gableCol || ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness, ex.dir);
+      return gableCol ? new THREE.MeshStandardMaterial({ color: gableCol, roughness: 0.85 }) : this._wallMat();
+    };
     // 박공 끝(z = ±Sz) 에 다각형 벽면 — pts: [x, y] (y 는 plate 기준)
     const gableFill = (pts) => {
       const sh = new THREE.Shape();
@@ -999,7 +1005,7 @@ export class Viewer3D {
         const geo = new THREE.ExtrudeGeometry(sh, { depth: 120, bevelEnabled: false });
         geo.translate(0, 0, -60);
         this._planarUV(geo, 2 * Sx, hMax);
-        const m = add(new THREE.Mesh(geo, fillMat(2 * Sx, hMax)));
+        const m = add(new THREE.Mesh(geo, gableMat(2 * Sx, hMax)));
         m.position.z = zs * (Sz - 60);
       }
     };

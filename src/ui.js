@@ -89,7 +89,7 @@ export function buildUI({ editor, viewer, onModeChange }) {
   renderProperties(editor);
   handleShareLink();
   initAiChat({ flash, onShowRoof: showRoof, onShowExterior: showExterior, onAutoOutline: () => editor.autoOutline() });   // 🤖 AI 도면 편집 채팅 (우하단 버튼)
-  initFacePaint({ viewer, flash, onShowExterior: showExterior, onNeed3D: () => { if (!viewer.active) onModeChange('3d'); } });   // 🎨 면별 외장재
+  // 면별 외장재(🎨)는 마감재 패널(buildFinish) 안에 인라인으로 들어간다
 }
 
 // ---------------------------------------------------------------------------
@@ -1086,8 +1086,9 @@ function buildFinish() {
     </div>
     <div class="tool-group-label" style="margin-top:12px">외장 색상</div>
     <div class="swatches" id="fin-ex-sw"></div>
-    <button type="button" class="mini" id="fin-2color" style="margin-top:10px;width:100%;background:#faf3ec">🎨 2색·부분 시공 (면·띠 색 지정)</button>
-    <p class="panel-sub small" style="margin-top:4px">벽마다 다른 색·재질, 또는 한 벽에 색 2개(포인트 띠)를 넣을 때. 켜고 재질·색 고른 뒤 3D에서 면 클릭(전체)·드래그(띠).</p>
+    <div class="tool-group-label" style="margin-top:12px">2색·부분 시공 (면·띠 색 지정)</div>
+    <p class="panel-sub small" style="margin-top:2px;margin-bottom:6px">벽마다 다른 색·재질, 또는 한 벽에 색 2개(포인트 띠)를 넣을 때.</p>
+    <div id="fin-2color-panel"></div>
     <div class="tool-group-label" style="margin-top:14px">지붕</div>
     <div id="fin-roof-target" class="seg hidden" style="flex-wrap:wrap;margin-bottom:8px"></div>
     <div class="mat-grid" id="fin-roof"></div>
@@ -1107,9 +1108,13 @@ function buildFinish() {
     <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>`;
   const qi = wrap.querySelector('#fin-q');
   qi.oninput = () => { query = qi.value.trim(); renderCards(); };
-  // 2색·부분 시공 → 면별 외장재 도구(🎨) 열기 (3D로 전환됨)
-  const c2 = wrap.querySelector('#fin-2color');
-  if (c2) c2.onclick = () => { const b = document.getElementById('fp-btn'); if (b && !document.getElementById('fp-bar')?.classList.contains('on')) b.click(); else if (b) { /* 이미 켜져 있으면 그대로 */ } };
+  // 면별 외장재(2색·부분 시공) UI 를 이 패널 안(#fin-2color-panel)에 인라인으로 생성
+  if (_viewer) initFacePaint({
+    viewer: _viewer, flash,
+    mount: wrap.querySelector('#fin-2color-panel'),
+    onShowExterior: showExterior,
+    onNeed3D: () => { if (!_viewer.active && _dash && _dash.onModeChange) _dash.onModeChange('3d'); },
+  });
 
   function renderCards() {
     const d = store.design, ex = d.exterior || {}, roof = d.roof || {};

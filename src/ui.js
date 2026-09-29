@@ -877,6 +877,11 @@ function renderProperties(editor) {
   const foVal = d.floorOpacity != null ? d.floorOpacity : (_viewer ? _viewer.floorOpacity : 1);
   panel.innerHTML = `
     <div class="prop-empty">
+      <p class="ph" style="margin-top:0">📝 건축주 요청사항 (메모)</p>
+      <textarea id="p-note" rows="8" placeholder="예) 주방 상부장 추가, 데크 확장, 콘센트 위치, 마감 색상 협의 내용 등"
+        style="width:100%;min-height:150px;resize:vertical;font:inherit;padding:10px 11px;border:1px solid var(--line,#e0e0e0);border-radius:9px;box-sizing:border-box;line-height:1.55">${esc(d.note || '')}</textarea>
+      <p class="hint" style="margin-bottom:14px">· 저장하면 도면과 함께 저장되고, <b>계약서로 보내기</b> 시 전자계약서 메모로 전달됩니다.</p>
+
       <div class="mini-wrap">
         <div class="mini-label">미니맵</div>
         <canvas id="mini-cv" class="minimap-cv" width="248" height="150"></canvas>
@@ -906,12 +911,6 @@ function renderProperties(editor) {
         <input id="fo-range" type="range" min="0" max="1" step="0.05" value="${foVal}"></label>
 
       <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${ops.length}</b></div>
-
-      <p class="ph mt">📝 건축주 요청사항 (메모)</p>
-      <textarea id="p-note" rows="5" placeholder="예) 주방 상부장 추가, 데크 확장, 콘센트 위치, 마감 색상 협의 내용 등"
-        style="width:100%;min-height:96px;resize:vertical;font:inherit;padding:9px 10px;border:1px solid var(--line,#e0e0e0);border-radius:9px;box-sizing:border-box;line-height:1.5">${esc(d.note || '')}</textarea>
-      <p class="hint">· 저장하면 도면과 함께 저장되고, <b>계약서로 보내기</b> 시 전자계약서 메모로 전달됩니다.</p>
-
       <p class="hint">· 외장재·지붕 마감은 좌측 <b>마감재</b> 패널에서 고르세요.<br>· 슬래브 두께는 구조 정보용으로 저장됩니다.</p>
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);

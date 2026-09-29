@@ -880,6 +880,7 @@ function renderProperties(editor) {
       <p class="ph" style="margin-top:0">📝 건축주 요청사항 (메모)</p>
       <textarea id="p-note" rows="8" placeholder="예) 주방 상부장 추가, 데크 확장, 콘센트 위치, 마감 색상 협의 내용 등"
         style="width:100%;min-height:150px;resize:vertical;font:inherit;padding:10px 11px;border:1px solid var(--line,#e0e0e0);border-radius:9px;box-sizing:border-box;line-height:1.55">${esc(d.note || '')}</textarea>
+      <button id="p-note-save" class="wide-btn" style="margin-top:8px;background:#c8102e;color:#fff;border-color:#c8102e;font-weight:700">💾 메모 저장</button>
       <p class="hint" style="margin-bottom:14px">· 저장하면 도면과 함께 저장되고, <b>계약서로 보내기</b> 시 전자계약서 메모로 전달됩니다.</p>
 
       <div class="mini-wrap">
@@ -918,6 +919,10 @@ function renderProperties(editor) {
   document.getElementById('p-found').onchange = (e) => store.commit((dd) => { dd.foundationHeight = Math.max(0, Math.min(1500, Math.round(+e.target.value || 0))); });
   document.getElementById('p-slab').onchange = (e) => store.commit((dd) => dd.slabThickness = Math.max(0, +e.target.value || 0));
   { const nt = document.getElementById('p-note'); if (nt) nt.onchange = (e) => store.commit((dd) => dd.note = e.target.value); }
+  { const nb = document.getElementById('p-note-save'); if (nb) nb.onclick = () => {
+      const nt = document.getElementById('p-note'); if (nt) store.commit((dd) => dd.note = nt.value);   // 입력값 먼저 반영
+      const sv = document.getElementById('tb-save'); if (sv) sv.click(); else flash('메모가 반영됐습니다 — 상단 저장으로 보관하세요');   // 도면과 함께 저장
+    }; }
   const afterFloorChange = () => { if (_editor) _editor.applyInitialView(); if (_viewer) _viewer.dirty = true; };
   document.getElementById('p-floor').onchange = (e) => { store.switchFloor(+e.target.value); afterFloorChange(); };
   document.getElementById('p-addfloor').onclick = () => {

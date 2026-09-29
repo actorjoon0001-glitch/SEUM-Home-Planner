@@ -906,12 +906,19 @@ function renderProperties(editor) {
         <input id="fo-range" type="range" min="0" max="1" step="0.05" value="${foVal}"></label>
 
       <div class="info-row"><span>공간 · 가구 · 창호</span><b>${d.rooms.length} · ${d.furniture.length} · ${ops.length}</b></div>
+
+      <p class="ph mt">📝 건축주 요청사항 (메모)</p>
+      <textarea id="p-note" rows="5" placeholder="예) 주방 상부장 추가, 데크 확장, 콘센트 위치, 마감 색상 협의 내용 등"
+        style="width:100%;min-height:96px;resize:vertical;font:inherit;padding:9px 10px;border:1px solid var(--line,#e0e0e0);border-radius:9px;box-sizing:border-box;line-height:1.5">${esc(d.note || '')}</textarea>
+      <p class="hint">· 저장하면 도면과 함께 저장되고, <b>계약서로 보내기</b> 시 전자계약서 메모로 전달됩니다.</p>
+
       <p class="hint">· 외장재·지붕 마감은 좌측 <b>마감재</b> 패널에서 고르세요.<br>· 슬래브 두께는 구조 정보용으로 저장됩니다.</p>
     </div>`;
   document.getElementById('p-name').onchange = (e) => store.commit((dd) => dd.name = e.target.value);
   document.getElementById('p-ceil').onchange = (e) => store.commit((dd) => dd.ceilingHeight = +e.target.value || 2400);
   document.getElementById('p-found').onchange = (e) => store.commit((dd) => { dd.foundationHeight = Math.max(0, Math.min(1500, Math.round(+e.target.value || 0))); });
   document.getElementById('p-slab').onchange = (e) => store.commit((dd) => dd.slabThickness = Math.max(0, +e.target.value || 0));
+  { const nt = document.getElementById('p-note'); if (nt) nt.onchange = (e) => store.commit((dd) => dd.note = e.target.value); }
   const afterFloorChange = () => { if (_editor) _editor.applyInitialView(); if (_viewer) _viewer.dirty = true; };
   document.getElementById('p-floor').onchange = (e) => { store.switchFloor(+e.target.value); afterFloorChange(); };
   document.getElementById('p-addfloor').onclick = () => {
@@ -1772,11 +1779,11 @@ function buildToolbar({ editor, viewer, onModeChange }) {
         let planImage = '', view3d = '';
         try { planImage = editor.toImage(1600, 1100, 'image/jpeg', 0.85); } catch (e) { /* noop */ }
         try { view3d = viewer.toImage(); } catch (e) { /* noop */ }
-        const msg = { type: 'SEUM_DESIGN', cid, name: store.design.name || '무제 도면', planImage, view3d, ts: Date.now() };
+        const msg = { type: 'SEUM_DESIGN', cid, name: store.design.name || '무제 도면', note: store.design.note || '', planImage, view3d, ts: Date.now() };
         let sent = false;
         try { if (window.opener && !window.opener.closed) { window.opener.postMessage(msg, targetOrigin); sent = true; } } catch (e) { /* noop */ }
         try { if (!sent && window.parent && window.parent !== window) { window.parent.postMessage(msg, targetOrigin); sent = true; } } catch (e) { /* noop */ }
-        flash(sent ? '📄 계약서로 전송했습니다 — 계약서 창에서 협의도면 첨부를 확인하세요'
+        flash(sent ? '📄 계약서로 전송했습니다 — 도면·메모가 계약서 창으로 전달됐어요 (협의도면 첨부 확인)'
                    : '계약서 창을 찾지 못했습니다. 계약서의 "3D도면 만들기" 버튼으로 열어야 전송됩니다.');
       };
     }

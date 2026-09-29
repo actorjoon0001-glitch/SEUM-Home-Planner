@@ -320,6 +320,7 @@ export function normalize(design) {
   if (!('underlay' in design)) design.underlay = null;           // 밑그림(PDF/이미지) 참조 도면
   if (!('outline' in design)) design.outline = null;             // 집 외곽(외벽) {x,y,w,d}
   if (typeof design.slabThickness !== 'number') design.slabThickness = 0; // 슬래브 두께(mm, 구조 정보)
+  if (typeof design.note !== 'string') design.note = '';         // 건축주 요청사항 메모(저장·전자계약서 전달)
   if (typeof design.wallThickness !== 'number') design.wallThickness = 150; // 외벽 두께(mm)
   if (!Array.isArray(design.labels)) design.labels = [];         // 텍스트 라벨 [{id,x,y,text}]
   if (!('view' in design)) design.view = null;                   // 위치 고정 화면 {scale,ox,oy} (없으면 자동 맞춤)

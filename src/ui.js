@@ -330,8 +330,7 @@ async function renderDash() {
     }
   } else if (_dashView === 'templates') {
     title.textContent = '전시장 도면';
-    sub.textContent = admin ? '전시장별 기본 도면입니다. 카드를 드래그해 다른 전시장으로 옮길 수 있어요.' : '전시장별 기본 도면입니다. 현재 도면을 전시장에 추가할 수 있어요.';
-    grid.appendChild(actionCard('현재 도면을 전시장에 추가', addCurrentAsShowroom));
+    sub.textContent = admin ? '전시장별 기본 도면입니다. 카드를 드래그해 다른 전시장으로 옮길 수 있어요.' : '전시장별 기본 도면입니다.';
     if (admin) grid.appendChild(actionCard('＋ 전시장 만들기 (예: 마곡 박람회)', async () => {
       const name = prompt('새 전시장 이름 (예: 마곡 박람회)', '');
       if (name == null || !name.trim()) return;

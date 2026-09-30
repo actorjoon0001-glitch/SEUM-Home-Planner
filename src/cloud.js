@@ -109,6 +109,45 @@ export const cloud = {
   },
   async signOut() { if (client) await client.auth.signOut(); },
 
+  // --- 접속/활동 기록 (관리자 전용 조회) ---
+  //   로그인·도면 저장/삭제 등을 seum_activity_log 에 남긴다. 실패해도 앱 흐름엔 영향 없음(베스트에포트).
+  async _clientIp() {
+    if (this._ip !== undefined) return this._ip;
+    this._ip = null;
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 2500);
+      const r = await fetch('https://api.ipify.org?format=json', { signal: ctrl.signal });
+      clearTimeout(t);
+      const j = await r.json(); this._ip = j && j.ip ? String(j.ip) : null;
+    } catch { this._ip = null; }
+    return this._ip;
+  },
+  async logEvent({ kind = 'activity', action = '', detail = '' } = {}) {
+    try {
+      await this.init();
+      if (!client || !this.user) return;
+      const u = this.user;
+      const nm = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || '';
+      const ip = await this._clientIp();
+      await client.from('seum_activity_log').insert({
+        user_id: u.id, email: u.email || '', name: nm || u.email || '',
+        kind, action, detail,
+        ip, ua: (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '',
+      });
+    } catch { /* 기록 실패는 무시 */ }
+  },
+  async fetchActivityLog(kind) {
+    await this.init();
+    if (!client) return [];
+    let q = client.from('seum_activity_log')
+      .select('at,email,name,kind,action,detail,ip,ua')
+      .order('at', { ascending: false }).limit(300);
+    if (kind === 'login' || kind === 'activity') q = q.eq('kind', kind);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  },
+
   // --- 도면 CRUD ---
   // 새로 저장(또는 기존 id 업데이트). data 는 도면 JSON.
   async saveDesign({ id, name, data, isShared = false, isTemplate = false }) {

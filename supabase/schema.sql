@@ -63,3 +63,33 @@ begin new.updated_at = now(); return new; end; $$;
 drop trigger if exists designs_touch on public.designs;
 create trigger designs_touch before update on public.designs
   for each row execute function public.touch_updated_at();
+
+-- 4) 접속·활동 기록 (관리자 전용 조회) ---------------------------------------
+-- 세움 OS와 통합된 프로젝트에서 홈플래너 로그인/작업 내역을 남깁니다.
+-- (세움 OS의 econtract_ 로그와 충돌 피하려 seum_ 접두어 사용)
+create table if not exists public.seum_activity_log (
+  id       bigint generated always as identity primary key,
+  at       timestamptz not null default now(),
+  user_id  uuid references auth.users(id) on delete set null,
+  email    text,
+  name     text,
+  kind     text not null default 'activity',   -- 'login' | 'activity'
+  action   text,                               -- '로그인' | '도면 저장' | '삭제' 등
+  detail   text,                               -- '자동 로그인' | 도면 이름 등
+  ip       text,
+  ua       text
+);
+create index if not exists seum_log_at_idx on public.seum_activity_log(at desc);
+create index if not exists seum_log_kind_idx on public.seum_activity_log(kind, at desc);
+
+alter table public.seum_activity_log enable row level security;
+
+-- 로그인 사용자는 '자기 이벤트'만 기록(insert) 가능
+drop policy if exists "seum log insert (self)" on public.seum_activity_log;
+create policy "seum log insert (self)" on public.seum_activity_log
+  for insert to authenticated with check (auth.uid() = user_id);
+
+-- 관리자만 전체 기록 조회 (is_seum_admin() 은 위 designs 섹션에서 정의됨)
+drop policy if exists "seum log read (admin)" on public.seum_activity_log;
+create policy "seum log read (admin)" on public.seum_activity_log
+  for select to authenticated using (public.is_seum_admin());

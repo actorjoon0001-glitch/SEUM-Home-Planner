@@ -535,18 +535,6 @@ function buildRoomPalette() {
       { ic: '🪟', label: '창', action: () => openWindows('창문') },
       { ic: '🚪', label: '문', action: () => openWindows('문') },
     ] },
-    { label: '보조선 그리기', items: [
-      { ic: '📏', label: '보조선 그리기', key: 'E', soon: true },
-      { ic: '📐', label: '측정', key: 'M', mode: 'measure' },
-    ] },
-    { label: '도면 반전', items: [
-      { ic: '◧', label: '좌우 반전', action: () => transformDesign('flipH', '좌우 반전') },
-      { ic: '⬍', label: '상하 반전', action: () => transformDesign('flipV', '상하 반전') },
-    ] },
-    { label: '도면 회전', items: [
-      { ic: '↺', label: '반시계 방향 회전', action: () => transformDesign('rotCCW', '반시계 90° 회전') },
-      { ic: '↻', label: '시계 방향 회전', action: () => transformDesign('rotCW', '시계 90° 회전') },
-    ] },
     { label: '일반', items: [
       { ic: '🖱️', label: '선택 / 이동', key: 'Esc', mode: 'select' },
       { ic: '🏷️', label: '이름표(라벨)', key: 'T', mode: 'label' },
@@ -1598,6 +1586,7 @@ function furnForm(f) {
       <label class="fld"><span>X 위치</span><input id="f-x" type="number" step="50" value="${f.x}"></label>
       <label class="fld"><span>Y 위치</span><input id="f-y" type="number" step="50" value="${f.y}"></label>
     </div>
+    ${c.kind === 'tarp' ? `<label class="ck"><input type="checkbox" id="f-nopoles"${f.noPoles ? ' checked' : ''}> 지지 봉 없이 (건물 사이에 매달기)</label>` : ''}
     <label class="ck"><input type="checkbox" id="f-cross"${f.cross ? ' checked' : ''}> ✕ 표시 (박스+대각선 — 냉장고·세탁기 등)</label>
     <label class="ck"><input type="checkbox" id="f-showname"${f.showName ? ' checked' : ''}> 이름 표시</label>
     <div class="btn-row">
@@ -1619,6 +1608,7 @@ function bindFurnForm(f) {
   const elevEl = document.getElementById('f-elev');
   if (elevEl) elevEl.onchange = (e) => upd(() => f.elev = Math.max(0, +e.target.value || 0));
   document.querySelectorAll('#f-steps button').forEach((b) => b.onclick = () => upd(() => { const n = +b.dataset.n; if (n) f.steps = n; else delete f.steps; }));
+  { const np = document.getElementById('f-nopoles'); if (np) np.onchange = (e) => upd(() => { if (e.target.checked) f.noPoles = true; else delete f.noPoles; }); }
   document.getElementById('f-size-reset').onclick = () => upd(() => { delete f.w; delete f.d; delete f.h; delete f.elev; });
   document.getElementById('f-color-reset').onclick = () => upd(() => { delete f.color; });
   document.getElementById('f-rot').onchange = (e) => upd(() => f.rotation = ((+e.target.value % 360) + 360) % 360);

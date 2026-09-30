@@ -1584,12 +1584,14 @@ export class Viewer3D {
         sail([-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], 120);
         // 세일2: 좌하(낮)–좌상(높)–우상(낮), 조금 위로 겹치게 (대각선을 공유해 X자로 겹침)
         sail([-hw, -hd, lo + 70], [-hw, hd, hi + 40], [hw, hd, lo + 70], 120);
-        // 네 모서리 지지 기둥 (바닥까지)
-        const postH = (f.elev != null ? f.elev : (c.elev || 2400));
-        const postMat = new THREE.MeshStandardMaterial({ color: '#9aa0a8', metalness: 0.45, roughness: 0.5 });
-        for (const [sx, sz, ph] of [[-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], [-hw, hd, hi]]) {
-          const pole = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, postH + ph, 10), postMat);
-          pole.position.set(sx, (ph - postH) / 2, sz); pole.castShadow = true; g.add(pole);
+        // 네 모서리 지지 기둥 (바닥까지) — 건물 사이에 봉 없이 매다는 경우(f.noPoles)엔 생략
+        if (!f.noPoles) {
+          const postH = (f.elev != null ? f.elev : (c.elev || 2400));
+          const postMat = new THREE.MeshStandardMaterial({ color: '#9aa0a8', metalness: 0.45, roughness: 0.5 });
+          for (const [sx, sz, ph] of [[-hw, -hd, hi], [hw, -hd, lo], [hw, hd, hi], [-hw, hd, hi]]) {
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, postH + ph, 10), postMat);
+            pole.position.set(sx, (ph - postH) / 2, sz); pole.castShadow = true; g.add(pole);
+          }
         }
         break;
       }

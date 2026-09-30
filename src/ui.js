@@ -111,6 +111,8 @@ function showSection(sec) {
 // ---------------------------------------------------------------------------
 let _dash = null;                 // { editor, onModeChange }
 let _dashView = 'mine';
+let _accessTab = 'all';           // 접속 기록 탭: 'all' | 'login' | 'activity'
+let _dragTpl = null;              // 전시장 도면 드래그 이동 중인 항목
 export function showDashboard() {
   const el = document.getElementById('dashboard'); if (!el) return;
   el.classList.remove('hidden');
@@ -285,9 +287,11 @@ async function renderDash() {
   const admin = cloud.configured() && cloud.isAdmin();
   const navAll = document.getElementById('dash-nav-all');
   const navTrash = document.getElementById('dash-nav-trash');
+  const navAccess = document.getElementById('dash-nav-access');
   if (navAll) navAll.classList.toggle('hidden', !admin);
   if (navTrash) navTrash.classList.toggle('hidden', !admin);
-  if (!admin && (_dashView === 'all' || _dashView === 'trash')) { _dashView = 'mine'; setActiveNav('mine'); }
+  if (navAccess) navAccess.classList.toggle('hidden', !admin);
+  if (!admin && (_dashView === 'all' || _dashView === 'trash' || _dashView === 'access')) { _dashView = 'mine'; setActiveNav('mine'); }
   if (!grid) return;
   grid.innerHTML = '';
   if (_dashView === 'mine') {
@@ -317,7 +321,7 @@ async function renderDash() {
     }
   } else if (_dashView === 'templates') {
     title.textContent = '전시장 도면';
-    sub.textContent = '전시장별 기본 도면입니다. 현재 도면을 전시장에 추가할 수 있어요.';
+    sub.textContent = admin ? '전시장별 기본 도면입니다. 카드를 드래그해 다른 전시장으로 옮길 수 있어요.' : '전시장별 기본 도면입니다. 현재 도면을 전시장에 추가할 수 있어요.';
     grid.appendChild(actionCard('현재 도면을 전시장에 추가', addCurrentAsShowroom));
     if (admin) grid.appendChild(actionCard('＋ 전시장 만들기 (예: 마곡 박람회)', async () => {
       const name = prompt('새 전시장 이름 (예: 마곡 박람회)', '');
@@ -331,14 +335,20 @@ async function renderDash() {
     const hidden = await builtinHidden();
     const overrides = await builtinShowroomMap();     // 내장 템플릿 전시장 이동 override
     const known = await knownShowrooms();             // 사용자가 만든 전시장(빈 전시장도 표시)
-    // 전시장 이동 공통 핸들러 — 기존 전시장 목록을 안내하며 이름 입력받아 이동
-    const moveTo = async (apply) => {
+    // 도면을 특정 전시장으로 이동 실행 (apply 는 항목별 저장 함수) — 드래그·버튼 공용
+    const doMove = async (apply, room, curRoom) => {
+      const target = (room || '').trim();
+      if ((target || '') === (curRoom || '')) return;   // 같은 전시장이면 무시
+      try { await apply(target); flash(target ? `'${target}' 전시장으로 옮겼어요` : '분류를 비웠어요'); renderDash(); }
+      catch (e) { alert('이동 실패: ' + (e.message || e)); }
+    };
+    // 이름 입력식 이동(폴백) — 드래그가 어려운 환경 대비
+    const moveByPrompt = async (apply, curRoom) => {
       const opts = Array.from(new Set([...known, ...items.map((x) => x.showroom).filter(Boolean)])).sort();
       const hint = opts.length ? `\n\n기존 전시장: ${opts.join(', ')}` : '';
-      const name = prompt('옮길 전시장 이름 (예: 마곡 박람회). 비우면 분류 없음(기타).' + hint, '');
+      const name = prompt('옮길 전시장 이름 (예: 마곡 박람회). 비우면 분류 없음(기타).' + hint, curRoom || '');
       if (name == null) return;
-      try { await apply(name.trim()); flash(name.trim() ? `'${name.trim()}' 전시장으로 옮겼어요` : '분류를 비웠어요'); renderDash(); }
-      catch (e) { alert('이동 실패: ' + (e.message || e)); }
+      doMove(apply, name, curRoom);
     };
     for (const t of listTemplates()) {
       if (hidden.has(t.id)) continue;
@@ -346,9 +356,9 @@ async function renderDash() {
       const sr = (overrides[t.id] != null ? overrides[t.id] : (t.showroom || '')).trim();
       items.push({
         title: t.title, showroom: sr, data: d,
+        apply: (room) => setBuiltinShowroom(t.id, room),
         open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }),
         del: admin ? () => adminAct(() => trashBuiltin(t.id), '휴지통으로 보냈어요') : null,
-        move: admin ? () => moveTo((room) => setBuiltinShowroom(t.id, room)) : null,
       });
     }
     if (cloud.configured() && cloud.user) {
@@ -356,20 +366,46 @@ async function renderDash() {
         const rows = await cloud.listTemplates();
         for (const r of rows) items.push({
           title: r.name, showroom: (r.data && r.data.showroom || '').trim(), data: r.data,
+          apply: (room) => cloud.setTemplateShowroom(r, room),
           open: () => enterEditor(() => store.loadInto(r.data)),
           del: admin ? () => adminAct(() => cloud.setTrashed(r, true), '휴지통으로 보냈어요') : null,   // 삭제는 관리자만
-          move: admin ? () => moveTo((room) => cloud.setTemplateShowroom(r, room)) : null,
         });
       } catch (e) { /* 클라우드 미가용 → 내장만 */ }
     }
     // 전시장별 그룹핑 — 카드가 있는 전시장 + 사용자가 만든 빈 전시장까지 모두 노출
+    // 각 전시장은 드롭 영역(section) → 카드를 끌어다 놓으면 그 전시장으로 이동
     const groups = {};
     for (const it of items) { const k = it.showroom || '기타'; (groups[k] = groups[k] || []).push(it); }
     for (const k of known) { if (!(k in groups)) groups[k] = []; }   // 빈 전시장도 표시(이동 대상)
+    const dropInto = async (room) => {
+      const it = _dragTpl; if (!it || !admin) return;
+      const target = room === '기타' ? '' : room;
+      await doMove(it.apply, target, it.showroom);
+    };
     for (const room of Object.keys(groups).sort()) {
-      grid.insertAdjacentHTML('beforeend', `<h3 class="dash-group">🏢 ${esc(room)}</h3>`);
-      if (!groups[room].length) { grid.insertAdjacentHTML('beforeend', `<p class="dash-empty" style="grid-column:1/-1">이 전시장은 비어 있어요. 다른 카드의 <b>🏢 전시장 이동</b>으로 도면을 옮기세요.</p>`); continue; }
-      for (const it of groups[room]) grid.appendChild(projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del, { onMove: it.move }));
+      const sec = document.createElement('section');
+      sec.className = 'showroom-group'; sec.dataset.room = room;
+      sec.innerHTML = `<h3 class="dash-group">🏢 ${esc(room)}${admin ? ' <small class="sg-drop">여기로 도면을 끌어다 놓기</small>' : ''}</h3>`;
+      const cards = document.createElement('div'); cards.className = 'sg-cards';
+      if (!groups[room].length) cards.innerHTML = `<p class="dash-empty" style="grid-column:1/-1">이 전시장은 비어 있어요. ${admin ? '카드를 여기로 <b>드래그</b>해 옮기세요.' : ''}</p>`;
+      for (const it of groups[room]) {
+        const card = projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del, {
+          onMove: admin ? () => moveByPrompt(it.apply, it.showroom) : null,
+        });
+        if (admin) {
+          card.draggable = true;
+          card.addEventListener('dragstart', (e) => { _dragTpl = it; card.classList.add('dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', it.title); } catch { /* noop */ } });
+          card.addEventListener('dragend', () => { _dragTpl = null; card.classList.remove('dragging'); document.querySelectorAll('.showroom-group.drop-hot').forEach((s) => s.classList.remove('drop-hot')); });
+        }
+        cards.appendChild(card);
+      }
+      sec.appendChild(cards);
+      if (admin) {
+        sec.addEventListener('dragover', (e) => { if (_dragTpl) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; sec.classList.add('drop-hot'); } });
+        sec.addEventListener('dragleave', (e) => { if (!sec.contains(e.relatedTarget)) sec.classList.remove('drop-hot'); });
+        sec.addEventListener('drop', (e) => { e.preventDefault(); sec.classList.remove('drop-hot'); dropInto(room); });
+      }
+      grid.appendChild(sec);
     }
   } else if (_dashView === 'shared') {
     title.textContent = '공유 프로젝트';
@@ -449,7 +485,72 @@ async function renderDash() {
           () => adminAct(() => cloud.removeDesign(r.id), '영구 삭제했어요')));
       }
     } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
+  } else if (_dashView === 'access') {
+    title.textContent = '접속 기록 (관리자)';
+    sub.textContent = '최근 로그인·작업 기록입니다. (최근 300건)';
+    if (!admin) { grid.innerHTML = '<p class="dash-empty">관리자 계정으로 로그인해야 볼 수 있습니다.</p>'; return; }
+    const kind = _accessTab === 'login' ? 'login' : _accessTab === 'activity' ? 'activity' : undefined;
+    grid.innerHTML = `
+      <div class="log-wrap" style="grid-column:1/-1">
+        <div class="log-bar">
+          <div class="log-tabs">
+            ${[['all', '전체'], ['login', '로그인 기록'], ['activity', '작업 내역']].map(([k, t]) =>
+              `<button class="log-tab ${_accessTab === k ? 'active' : ''}" data-tab="${k}">${t}</button>`).join('')}
+          </div>
+          <input id="log-q" class="log-q" type="text" placeholder="이름 / 작업 / 상세 검색">
+        </div>
+        <div id="log-body"><p class="dash-empty">불러오는 중…</p></div>
+      </div>`;
+    grid.querySelectorAll('.log-tab').forEach((b) => b.onclick = () => { _accessTab = b.dataset.tab; renderDash(); });
+    const body = grid.querySelector('#log-body');
+    const qEl = grid.querySelector('#log-q');
+    let rows = [];
+    const draw = () => {
+      const q = (qEl.value || '').trim().toLowerCase();
+      const list = !q ? rows : rows.filter((r) => [r.name, r.email, r.action, r.detail, r.ip].some((v) => String(v || '').toLowerCase().includes(q)));
+      if (!list.length) { body.innerHTML = '<p class="dash-empty">기록이 없습니다.</p>'; return; }
+      body.innerHTML = `
+        <table class="log-table"><thead><tr>
+          <th>시각(KST)</th><th>이름</th><th>작업</th><th>기기 / 접속 IP</th><th>상세</th>
+        </tr></thead><tbody>
+        ${list.map((r) => {
+          const isLogin = r.kind === 'login';
+          const badge = `<span class="log-badge ${isLogin ? 'login' : 'act'}">${esc(r.action || (isLogin ? '로그인' : '작업'))}</span>`;
+          return `<tr>
+            <td class="log-when">${esc(fmtKST(r.at))}</td>
+            <td>${esc(r.name || '')} <span class="log-mail">${esc(r.email || '')}</span></td>
+            <td>${badge}</td>
+            <td>${esc(deviceLabel(r.ua))}<br><span class="log-ip">${esc(r.ip || '')}</span></td>
+            <td>${esc(r.detail || '')}</td>
+          </tr>`;
+        }).join('')}
+        </tbody></table>`;
+    };
+    qEl.oninput = draw;
+    try {
+      rows = await cloud.fetchActivityLog(kind);
+      draw();
+    } catch (e) {
+      body.innerHTML = `<p class="dash-empty">기록을 불러오지 못했습니다: ${esc(e.message || String(e))}<br><span class="muted small">Supabase에 <code>seum_activity_log</code> 테이블이 필요합니다. (supabase/schema.sql 실행)</span></p>`;
+    }
   }
+}
+
+// 접속 기록 — 시각(KST) 포맷 + 기기(UA) 라벨
+function fmtKST(iso) {
+  try { return new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\.\s?/g, '-').replace(/-(\d\d:\d\d)$/, ' $1').replace(/-\s*$/, ''); }
+  catch { return String(iso || ''); }
+}
+function deviceLabel(ua) {
+  const s = String(ua || '');
+  if (!s) return '알 수 없음';
+  let os = 'PC';
+  if (/iPhone|iPad|iPod/i.test(s)) os = '📱 iOS';
+  else if (/Android/i.test(s)) os = '📱 Android';
+  else if (/Windows/i.test(s)) os = '💻 PC · Windows';
+  else if (/Macintosh|Mac OS/i.test(s)) os = '💻 Mac';
+  else if (/Linux/i.test(s)) os = '💻 Linux';
+  return os;
 }
 
 // --- 내장(코드) 전시장 도면 휴지통 — 앱 설정 행에 숨김 목록으로 보관 ---

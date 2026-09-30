@@ -511,3 +511,30 @@ body {
 .dc-act:hover { border-color: var(--seum-red); color: var(--seum-red); }
 .dc-act.danger { color: #c8102e; border-color: #e6b3ba; }
 .dc-act.danger:hover { background: #fdf2f3; border-color: #c8102e; }
+
+/* 접속 기록 (관리자) */
+.log-wrap { background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; padding: 14px 16px; }
+.log-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.log-tabs { display: flex; gap: 6px; }
+.log-tab { border: 1px solid #dfe3e8; background: #f7f8fa; color: #4a5560; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.log-tab.active { background: #3b5bdb; border-color: #3b5bdb; color: #fff; }
+.log-q { flex: 0 1 260px; border: 1px solid #dfe3e8; border-radius: 8px; padding: 7px 11px; font: inherit; }
+.log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.log-table th { text-align: left; color: #8a929c; font-weight: 600; font-size: 12px; padding: 8px 10px; border-bottom: 1px solid #eef0f3; }
+.log-table td { padding: 10px; border-bottom: 1px solid #f2f4f6; color: #2b333c; vertical-align: top; }
+.log-table tr:hover td { background: #fafbfc; }
+.log-when { white-space: nowrap; color: #4a5560; }
+.log-mail { color: #8a929c; font-size: 12px; }
+.log-ip { color: #8a929c; font-size: 11.5px; }
+.log-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.log-badge.login { background: #e6f4ea; color: #1e7d43; }
+.log-badge.act { background: #eef1fb; color: #3b5bdb; }
+
+/* 전시장 그룹 — 드래그 앤 드롭 이동 */
+.showroom-group { grid-column: 1 / -1; border-radius: 12px; padding: 4px; transition: background .12s, box-shadow .12s; }
+.showroom-group .sg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; margin-top: 12px; }
+.showroom-group .sg-drop { font-size: 11.5px; font-weight: 600; color: #b6bcc4; }
+.showroom-group.drop-hot { background: #f0f5ff; box-shadow: inset 0 0 0 2px #3b5bdb; }
+.showroom-group.drop-hot .sg-drop { color: #3b5bdb; }
+.dash-card[draggable="true"] { cursor: grab; }
+.dash-card.dragging { opacity: .45; }

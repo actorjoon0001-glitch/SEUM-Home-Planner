@@ -297,6 +297,69 @@ const T = [
     },
   },
   {
+    // 세움 고천리 모델하우스 10평 (33㎡, A동) — 실시공 도면(작업 26.04.16~) 참고
+    //  · 외곽 약 7,930×6,230 중 실내 33㎡(10평): 욕실 / 주방·다이닝(아일랜드) / 거실(ㄱ자 간접등) / 방
+    //  · 남측 폴딩도어+출입문 → 합성데크 포치(철제난간 H800·태양광 데크등) · 골조 케노피 4,400×1,000
+    //  · 지붕 230T 징크(처마없음/평지붕) 럭스틸밤색 · 외장 루버강판믹스 네츄럴우드 · 창호 전체 검정/브론즈
+    id: 'seum-gocheonri-10',
+    title: '세움 고천리 10평 (33㎡, A동)',
+    category: '주택',
+    showroom: '고천리 모델하우스',
+    tags: ['세움도면', '고천리', '10평', '33㎡', '모델하우스', '폴딩도어', '데크', '루버강판'],
+    base: {
+      name: '세움 고천리 10평 (33㎡, A동)',
+      productType: '주택',
+      ceilingHeight: 2400,
+      foundationHeight: 300,
+      exterior: { material: 'wood', color: '#9c7244', dir: 'v' },   // 루버강판믹스 네츄럴우드(세로)
+      roof: { type: 'flat', color: '#3a2e26', fascia: '#3a2e26' },  // 처마없는 평지붕/럭스틸밤색
+      rooms: [
+        // 상단 — 욕실 / 주방·다이닝(개방)
+        { key: 'bath', type: 'bath',    name: '욕실',       x: 0,    y: 0,    w: 2000, d: 2100 },
+        { key: 'kit',  type: 'kitchen', name: '주방·다이닝', x: 2000, y: 0,    w: 5000, d: 2100, open: ['s'] },
+        // 하단 — 방 / 거실(개방, 남측 데크로 폴딩도어)
+        { key: 'bed',  type: 'bedroom', name: '방',         x: 0,    y: 2100, w: 2600, d: 2500 },
+        { key: 'liv',  type: 'living',  name: '거실',       x: 2600, y: 2100, w: 4400, d: 2500, open: ['n', 's'] },
+        // 남측 합성데크 포치 (면적 별도) — 폴딩도어·출입문·태양광 난간등
+        { key: 'porch', type: 'porch',  name: '데크(포치)',  x: 0,    y: 4600, w: 7000, d: 1800 },
+      ],
+      openings: [
+        // 거실 남측 — 폴딩도어 + 출입문(콤보) → 데크
+        { roomKey: 'liv',  side: 's', pos: 2200, winType: 'foldSwing', w: 3400, h: 2100, color: '#1c1f24' },
+        // 주방 — 북측 픽스창 2개 + 동측 이중창
+        { roomKey: 'kit',  side: 'n', pos: 1400, winType: 'fixed',  w: 1200, h: 900,  sill: 1100, color: '#1c1f24' },
+        { roomKey: 'kit',  side: 'n', pos: 3400, winType: 'fixed',  w: 1400, h: 1000, sill: 1000, color: '#1c1f24' },
+        { roomKey: 'kit',  side: 'e', pos: 1050, winType: 'double', w: 2000, h: 1200, sill: 900,  color: '#1c1f24' },
+        // 욕실 — 북측 작은 환기창 + 실내측 포켓(미닫이)도어
+        { roomKey: 'bath', side: 'n', pos: 1000, winType: 'double',    w: 600, h: 500,  sill: 1600, color: '#1c1f24' },
+        { roomKey: 'bath', side: 's', pos: 1000, winType: 'slideDoor', w: 800, h: 2100, color: '#1c1f24' },
+        // 방 — 서측 이중창 + 거실측 문
+        { roomKey: 'bed',  side: 'w', pos: 1250, winType: 'double',    w: 1400, h: 1000, sill: 1000, color: '#1c1f24' },
+        { roomKey: 'bed',  side: 'e', pos: 1250, winType: 'swingDoor', w: 900,  h: 2100, color: '#1c1f24' },
+        // 거실 서측 픽스창(방 옆 벽)
+        { roomKey: 'liv',  side: 'w', pos: 700,  winType: 'fixed',  w: 1200, h: 900, sill: 1100, color: '#1c1f24' },
+      ],
+      furniture: [
+        // 욕실
+        { catalogId: 'toilet', x: 1050, y: 500,  rotation: 0 },
+        { catalogId: 'basin',  x: 400,  y: 1550, rotation: 0 },
+        // 주방·다이닝 (냉장고 우측·싱크·아일랜드 식탁)
+        { catalogId: 'sink',    x: 2700, y: 400,  rotation: 0 },
+        { catalogId: 'fridge',  x: 6600, y: 500,  rotation: 0 },
+        { catalogId: 'dining4', x: 4600, y: 1300, rotation: 0 },
+        // 거실
+        { catalogId: 'sofa3', x: 3600, y: 3700, rotation: 0 },
+        { catalogId: 'tv',    x: 5600, y: 4400, rotation: 180 },
+        // 방
+        { catalogId: 'bedQ',  x: 1050, y: 3400, rotation: 0 },
+        // 외부 — 벽등(간접등) 2개 + 데크 계단
+        { catalogId: 'sconce', x: 1400, y: 4600, rotation: 0, wallNormal: [0, 1] },
+        { catalogId: 'sconce', x: 5400, y: 4600, rotation: 0, wallNormal: [0, 1] },
+        { catalogId: 'decksteps', x: 3500, y: 6400, rotation: 0 },
+      ],
+    },
+  },
+  {
     // 세움 쌍둥이 10평 (6평동 + 중앙 데크 + 4평동) — 브리즈웨이(중앙 데크 연결)형
     //  · 6평동: 6.2×3.2M 농막(S-1500) 개방형 원룸(거실·침실)
     //  · 4평동: 거실·주방 + 욕실 + 현관 (외곽 4,100×3,200 ≈ 13.1㎡)

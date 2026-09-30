@@ -99,7 +99,13 @@ body {
 .dash-group { grid-column: 1 / -1; margin: 10px 0 -2px; font-size: 13.5px; font-weight: 800; color: var(--ink); display: flex; align-items: center; gap: 10px; }
 .dash-group::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 /* 사이드바: 관리자 메뉴는 구분선으로 분리 */
-.dash-navb#dash-nav-all:not(.hidden) { margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--line); }
+/* 관리자 메뉴 묶음 — '관리자' 토글 + 하위 메뉴 접기/펼치기 */
+.dash-adm-toggle:not(.hidden) { margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--line); }
+.dash-adm-toggle .adm-caret { margin-left: auto; font-size: 11px; color: var(--muted); transition: transform .15s; }
+.dash-adm-toggle.open .adm-caret { transform: rotate(180deg); }
+.dash-admin-sub { display: flex; flex-direction: column; gap: 2px; padding-left: 12px; margin-left: 6px; border-left: 2px solid var(--line); }
+.dash-admin-sub.hidden { display: none; }
+.dash-admin-sub .dash-navb { font-size: 13.5px; padding: 9px 10px; }
 /* 작은 화면: 줄바꿈 대신 가로 스크롤 → 버튼 글씨가 잘리지 않음 */
 .tb-group {
   display: flex; align-items: center; gap: 4px; margin-left: 8px;

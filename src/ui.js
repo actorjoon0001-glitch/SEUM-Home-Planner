@@ -129,10 +129,18 @@ function buildDashboard(deps) {
   _dash = deps;
   const el = document.getElementById('dashboard'); if (!el) return;
   el.querySelectorAll('.dash-navb').forEach((b) => b.onclick = () => {
+    if (!b.dataset.view) return;   // 관리자 토글 버튼은 아래에서 별도 처리
     _dashView = b.dataset.view;
-    el.querySelectorAll('.dash-navb').forEach((x) => x.classList.toggle('active', x === b));
+    el.querySelectorAll('.dash-navb').forEach((x) => x.classList.toggle('active', x === b && !!x.dataset.view));
     renderDash();
   });
+  // 관리자 메뉴 접기/펼치기 (전체 도면·접속 기록·휴지통을 하나로 묶음)
+  const admT = el.querySelector('#dash-admin-toggle');
+  const admSub = el.querySelector('#dash-admin-sub');
+  if (admT && admSub) admT.onclick = () => {
+    const open = admSub.classList.toggle('hidden') === false;
+    admT.classList.toggle('open', open);
+  };
   const lo = el.querySelector('#dash-logout');
   if (lo) lo.onclick = async () => { try { await cloud.signOut(); } catch (e) { /* noop */ } };
   // 로그인/로그아웃 시 대시보드가 열려 있으면 다시 그림(관리자 탭 노출 갱신 포함)
@@ -285,12 +293,13 @@ async function renderDash() {
   }
   // 관리자 계정일 때만 '전체 도면' 탭 노출
   const admin = cloud.configured() && cloud.isAdmin();
-  const navAll = document.getElementById('dash-nav-all');
-  const navTrash = document.getElementById('dash-nav-trash');
-  const navAccess = document.getElementById('dash-nav-access');
-  if (navAll) navAll.classList.toggle('hidden', !admin);
-  if (navTrash) navTrash.classList.toggle('hidden', !admin);
-  if (navAccess) navAccess.classList.toggle('hidden', !admin);
+  // 관리자 메뉴(전체 도면·접속 기록·휴지통)는 '관리자' 토글 아래로 묶음 — 관리자만 노출
+  const admToggle = document.getElementById('dash-admin-toggle');
+  const admSub = document.getElementById('dash-admin-sub');
+  if (admToggle) admToggle.classList.toggle('hidden', !admin);
+  if (!admin && admSub) { admSub.classList.add('hidden'); admToggle && admToggle.classList.remove('open'); }
+  // 관리자 하위 메뉴가 선택돼 있으면 펼친 상태 유지(강조)
+  if (admin && admSub && ['all', 'trash', 'access'].includes(_dashView)) { admSub.classList.remove('hidden'); admToggle && admToggle.classList.add('open'); }
   if (!admin && (_dashView === 'all' || _dashView === 'trash' || _dashView === 'access')) { _dashView = 'mine'; setActiveNav('mine'); }
   if (!grid) return;
   grid.innerHTML = '';

@@ -202,6 +202,16 @@ export const cloud = {
     if (error) throw error;
   },
 
+  // 전시장(showroom) 분류 변경 — 클라우드 전시장 도면을 다른 전시장으로 이동
+  async setTemplateShowroom(row, room) {
+    await this.init();
+    if (!this.isAdmin()) throw new Error('관리자만 전시장을 변경할 수 있습니다.');
+    const data = { ...(row.data || {}), showroom: String(room || '').trim() };
+    if (!data.showroom) delete data.showroom;
+    const { error } = await client.from('designs').update({ data }).eq('id', row.id);
+    if (error) throw error;
+  },
+
   // 휴지통 목록 — 관리자: 모든 직원의 휴지통 도면
   async listTrash() {
     await this.init();

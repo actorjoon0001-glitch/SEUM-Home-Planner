@@ -89,6 +89,9 @@ body {
 .dash-card .dc-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .dash-card .dc-del { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 6px; border: 0; background: rgba(0,0,0,.5); color: #fff; cursor: pointer; font-size: 13px; opacity: 0; line-height: 1; }
 .dash-card:hover .dc-del { opacity: 1; }
+.dash-card .dc-move { position: absolute; top: 8px; left: 8px; height: 24px; padding: 0 8px; border-radius: 6px; border: 0; background: rgba(0,0,0,.5); color: #fff; cursor: pointer; font-size: 11px; opacity: 0; line-height: 24px; }
+.dash-card:hover .dc-move { opacity: 1; }
+.dash-card .dc-move:hover { background: var(--seum-red); }
 .dash-card.dc-new { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; min-height: 210px; border: 2px dashed #cdd3da; color: var(--seum-red); font-size: 15px; font-weight: 600; }
 .dash-card.dc-new:hover { border-color: var(--seum-red); background: #fff7f6; }
 .dash-card.dc-new .dc-plus { font-size: 30px; line-height: 1; }

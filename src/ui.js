@@ -194,7 +194,7 @@ function enterEditor(loadFn) {
   if (_dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.applyInitialView(); }, 0);
 }
 // onDelete: 휴지통으로 보내기(관리자) — { hard: true } 면 이 기기 저장처럼 바로 삭제
-function projectCard(name, design, meta, onOpen, onDelete, { hard = false } = {}) {
+function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null } = {}) {
   const card = document.createElement('div');
   card.className = 'dash-card';
   const cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.className = 'dc-thumb';
@@ -204,6 +204,11 @@ function projectCard(name, design, meta, onOpen, onDelete, { hard = false } = {}
   body.innerHTML = `<div class="dc-name">${esc(name)}</div><div class="dc-meta">${esc(meta || '')}</div>`;
   card.appendChild(body);
   card.onclick = () => onOpen();
+  if (onMove) {
+    const mv = document.createElement('button'); mv.className = 'dc-move'; mv.textContent = '🏢 전시장 이동'; mv.title = '다른 전시장으로 옮기기 (관리자)';
+    mv.onclick = (e) => { e.stopPropagation(); onMove(); };
+    card.appendChild(mv);
+  }
   if (onDelete) {
     const del = document.createElement('button'); del.className = 'dc-del';
     del.textContent = hard ? '✕' : '🗑'; del.title = hard ? '삭제' : '휴지통으로 보내기 (관리자)';
@@ -314,17 +319,36 @@ async function renderDash() {
     title.textContent = '전시장 도면';
     sub.textContent = '전시장별 기본 도면입니다. 현재 도면을 전시장에 추가할 수 있어요.';
     grid.appendChild(actionCard('현재 도면을 전시장에 추가', addCurrentAsShowroom));
+    if (admin) grid.appendChild(actionCard('＋ 전시장 만들기 (예: 마곡 박람회)', async () => {
+      const name = prompt('새 전시장 이름 (예: 마곡 박람회)', '');
+      if (name == null || !name.trim()) return;
+      try { await addKnownShowroom(name.trim()); flash(`'${name.trim()}' 전시장을 만들었어요 — 카드의 '전시장 이동'으로 도면을 옮기세요`); renderDash(); }
+      catch (e) { alert('전시장 만들기 실패: ' + (e.message || e)); }
+    }));
     // 항목 수집: 내장 템플릿 + 클라우드 전시장 도면(공용) → 전시장(showroom)별 그룹
     //   관리자가 휴지통에 넣은 내장 템플릿은 숨김 (설정 행의 trashedBuiltin / deletedBuiltin)
     const items = [];
     const hidden = await builtinHidden();
+    const overrides = await builtinShowroomMap();     // 내장 템플릿 전시장 이동 override
+    const known = await knownShowrooms();             // 사용자가 만든 전시장(빈 전시장도 표시)
+    // 전시장 이동 공통 핸들러 — 기존 전시장 목록을 안내하며 이름 입력받아 이동
+    const moveTo = async (apply) => {
+      const opts = Array.from(new Set([...known, ...items.map((x) => x.showroom).filter(Boolean)])).sort();
+      const hint = opts.length ? `\n\n기존 전시장: ${opts.join(', ')}` : '';
+      const name = prompt('옮길 전시장 이름 (예: 마곡 박람회). 비우면 분류 없음(기타).' + hint, '');
+      if (name == null) return;
+      try { await apply(name.trim()); flash(name.trim() ? `'${name.trim()}' 전시장으로 옮겼어요` : '분류를 비웠어요'); renderDash(); }
+      catch (e) { alert('이동 실패: ' + (e.message || e)); }
+    };
     for (const t of listTemplates()) {
       if (hidden.has(t.id)) continue;
       let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
+      const sr = (overrides[t.id] != null ? overrides[t.id] : (t.showroom || '')).trim();
       items.push({
-        title: t.title, showroom: (t.showroom || '').trim(), data: d,
+        title: t.title, showroom: sr, data: d,
         open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }),
         del: admin ? () => adminAct(() => trashBuiltin(t.id), '휴지통으로 보냈어요') : null,
+        move: admin ? () => moveTo((room) => setBuiltinShowroom(t.id, room)) : null,
       });
     }
     if (cloud.configured() && cloud.user) {
@@ -334,15 +358,18 @@ async function renderDash() {
           title: r.name, showroom: (r.data && r.data.showroom || '').trim(), data: r.data,
           open: () => enterEditor(() => store.loadInto(r.data)),
           del: admin ? () => adminAct(() => cloud.setTrashed(r, true), '휴지통으로 보냈어요') : null,   // 삭제는 관리자만
+          move: admin ? () => moveTo((room) => cloud.setTemplateShowroom(r, room)) : null,
         });
       } catch (e) { /* 클라우드 미가용 → 내장만 */ }
     }
-    // 전시장별 그룹핑 (이름 없으면 '기타')
+    // 전시장별 그룹핑 — 카드가 있는 전시장 + 사용자가 만든 빈 전시장까지 모두 노출
     const groups = {};
     for (const it of items) { const k = it.showroom || '기타'; (groups[k] = groups[k] || []).push(it); }
+    for (const k of known) { if (!(k in groups)) groups[k] = []; }   // 빈 전시장도 표시(이동 대상)
     for (const room of Object.keys(groups).sort()) {
       grid.insertAdjacentHTML('beforeend', `<h3 class="dash-group">🏢 ${esc(room)}</h3>`);
-      for (const it of groups[room]) grid.appendChild(projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del));
+      if (!groups[room].length) { grid.insertAdjacentHTML('beforeend', `<p class="dash-empty" style="grid-column:1/-1">이 전시장은 비어 있어요. 다른 카드의 <b>🏢 전시장 이동</b>으로 도면을 옮기세요.</p>`); continue; }
+      for (const it of groups[room]) grid.appendChild(projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del, { onMove: it.move }));
     }
   } else if (_dashView === 'shared') {
     title.textContent = '공유 프로젝트';
@@ -438,6 +465,26 @@ async function trashBuiltin(id) {
   const { data } = await cloud.getSettings();
   const tb = { ...(data.trashedBuiltin || {}), [id]: { at: new Date().toISOString(), by: (cloud.user && cloud.user.email) || '' } };
   await cloud.saveSettings({ trashedBuiltin: tb });
+}
+// --- 전시장(showroom) 관리 — 내장 템플릿 분류 override + 사용자 정의 전시장 목록(빈 전시장도 표시) ---
+async function builtinShowroomMap() {
+  if (!(cloud.configured() && cloud.user)) return {};
+  try { const { data } = await cloud.getSettings(); return data.builtinShowroom || {}; } catch { return {}; }
+}
+async function setBuiltinShowroom(id, room) {
+  const { data } = await cloud.getSettings();
+  const m = { ...(data.builtinShowroom || {}) };
+  if (room) m[id] = room; else delete m[id];
+  await cloud.saveSettings({ builtinShowroom: m });
+}
+async function knownShowrooms() {
+  if (!(cloud.configured() && cloud.user)) return [];
+  try { const { data } = await cloud.getSettings(); return Array.isArray(data.showrooms) ? data.showrooms.filter(Boolean) : []; } catch { return []; }
+}
+async function addKnownShowroom(name) {
+  const { data } = await cloud.getSettings();
+  const list = Array.from(new Set([...(data.showrooms || []), String(name).trim()].filter(Boolean)));
+  await cloud.saveSettings({ showrooms: list });
 }
 async function restoreBuiltin(id) {
   const { data } = await cloud.getSettings();

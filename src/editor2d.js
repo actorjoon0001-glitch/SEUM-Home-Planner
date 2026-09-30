@@ -313,11 +313,8 @@ export class Editor2D {
       total += w; return w;
     });
     // 상단 치수선과 겹치지 않게 요약 알약을 그 위로 올림
-    //   (치수 토글=전체 외곽 치수 위 / 방 선택=빨간 치수 위 / 둘 다 아니면 기본)
-    const selAny = store.selectedRoom != null || store.selectedOutline != null;
-    let y = this.showDims ? (yTop - 61 - fs)
-      : selAny ? (yTop - 35 - fs)
-        : (yTop - fs * 2.2);
+    //   (치수 토글=전체 외곽 치수 위 / 그 외=항상 표시되는 방 치수 위)
+    let y = this.showDims ? (yTop - 61 - fs) : (yTop - 35 - fs);
     // 사용자가 드래그로 옮긴 위치 오프셋(mm) 반영 — 캡처 시 글씨 위치 조정용
     const off = d.summaryOffset || { dx: 0, dy: 0 };
     let cxD = cx + (off.dx || 0) * this.scale;
@@ -476,8 +473,9 @@ export class Editor2D {
 
     // 이름·면적 라벨은 가구에 가리지 않도록 별도 패스(_drawRoomLabel)에서 맨 위에 그림
 
-    // 치수선 — 선택 방은 빨강(더블클릭 편집) / '치수' 토글 시 모든 방 회색(편집 가능)
-    if (selected || this.showDims) this._roomDims(room, selected);
+    // 치수선 — 기본 치수는 항상 표시(회색·편집 가능), 선택 방은 빨강(더블클릭 편집)
+    //   ('치수' 토글은 전체 외곽 치수·㎡ 표기 등 상세 표시를 추가로 담당)
+    this._roomDims(room, selected);
   }
 
   _drawHandles(room) {

@@ -42,30 +42,10 @@ const authErr = document.getElementById('auth-err');
 const authSubmit = document.getElementById('auth-submit');
 const authEmail = document.getElementById('auth-email');
 const authPass = document.getElementById('auth-pass');
-const authName = document.getElementById('auth-name');
-const authNameFld = document.getElementById('auth-name-fld');
 const authKeep = document.getElementById('auth-keep');
-const authSub = document.getElementById('auth-sub');
-const authKeepFld = document.getElementById('auth-keep-fld');
-const authSwitchQ = document.getElementById('auth-switch-q');
-const authSwitchBtn = document.getElementById('auth-switch-btn');
 const logoutBtn = document.getElementById('tb-logout');
 
-// 로그인 / 회원가입 모드 전환 (새 홈플래너 프로젝트에 직접 계정 생성)
-let authMode = 'login';   // 'login' | 'signup'
-function setAuthMode(m) {
-  authMode = m;
-  const signup = m === 'signup';
-  authSub.textContent = signup ? '세움 홈플래너 계정을 만드세요' : '세움 직원 계정으로 로그인하세요';
-  authSubmit.textContent = signup ? '회원가입' : '로그인';
-  authPass.setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
-  if (authNameFld) authNameFld.classList.toggle('hidden', !signup);   // 이름 칸은 회원가입에서만
-  authKeepFld.classList.toggle('hidden', signup);
-  authSwitchQ.textContent = signup ? '이미 계정이 있으신가요?' : '계정이 없으신가요?';
-  authSwitchBtn.textContent = signup ? '로그인' : '회원가입';
-  authErr.textContent = '';
-}
-if (authSwitchBtn) authSwitchBtn.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
+// 로그인 전용 — 계정은 세움 OS(전자계약서)에서 발급된 직원 계정을 그대로 사용(회원가입/이름 없음)
 
 const KEEP_KEY = 'seum_keep_login';   // '0' 이면 자동 로그인 끔
 const EMAIL_KEY = 'seum_last_email';  // 마지막 로그인 이메일 (자동 채움)
@@ -101,31 +81,19 @@ authForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = authEmail.value.trim();
   const pass = authPass.value;
-  const name = authName ? authName.value.trim() : '';
   if (!email || !pass) { authErr.textContent = '이메일과 비밀번호를 모두 입력하세요.'; return; }
-  if (authMode === 'signup' && !name) { authErr.textContent = '이름을 입력하세요.'; return; }
   // 자동 로그인 유지 여부 + 이메일 저장
   const keep = authKeep ? authKeep.checked : true;
   try { localStorage.setItem(KEEP_KEY, keep ? '1' : '0'); localStorage.setItem(EMAIL_KEY, email); } catch { /* noop */ }
   authErr.textContent = '';
-  const signup = authMode === 'signup';
-  authSubmit.disabled = true; authSubmit.textContent = signup ? '가입 중…' : '로그인 중…';
+  authSubmit.disabled = true; authSubmit.textContent = '로그인 중…';
   try {
-    if (signup) {
-      await cloud.signUp(email, pass, name);
-      if (!cloud.user) {
-        // 이메일 인증이 필요한 프로젝트: 세션이 바로 생기지 않음
-        authErr.textContent = '가입 완료! 이메일 인증 메일을 확인한 뒤 로그인하세요.';
-        setAuthMode('login');
-      }
-      // 인증 자동확인(auto-confirm)이 켜져 있으면 cloud.user 가 채워지고 onChange→reflectAuth 가 게이트를 닫음
-    } else {
-      await cloud.signIn(email, pass);   // 성공 시 onChange→reflectAuth 가 게이트를 닫음
-    }
+    await cloud.signIn(email, pass);   // 성공 시 onChange→reflectAuth 가 게이트를 닫음
+    try { cloud.logEvent({ kind: 'login', action: '로그인', detail: '수동 로그인' }); } catch { /* noop */ }
   } catch (err) {
     authErr.textContent = authErrorText(err);
   } finally {
-    authSubmit.disabled = false; authSubmit.textContent = signup ? '회원가입' : '로그인';
+    authSubmit.disabled = false; authSubmit.textContent = '로그인';
   }
 });
 
@@ -144,6 +112,8 @@ async function initAuth() {
   authErr.textContent = '';
   // 자동 로그인 꺼짐 → 저장된 세션이 있어도 로그아웃해 매번 로그인하도록
   if (cloud.user && !keepLogin()) { try { await cloud.signOut(); } catch { /* noop */ } }
+  // 세션이 복원돼 자동 로그인된 경우 접속 기록 남김(수동 로그인은 submit 핸들러에서 기록)
+  if (cloud.user) { try { cloud.logEvent({ kind: 'login', action: '로그인', detail: '자동 로그인' }); } catch { /* noop */ } }
   reflectAuth();
   cloud.onChange(reflectAuth);   // 로그인/로그아웃 시 게이트 자동 표시·숨김
 }

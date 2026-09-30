@@ -508,6 +508,7 @@ export class Viewer3D {
     const pl = this._openingWorld(o); if (!pl) return;
     const t = WINDOW_TYPES[o.winType] || {};
     const isDoor = t.glass === false;
+    const sgn = o.flipH ? -1 : 1;   // 경첩(문 다는 쪽) 좌우 — 손잡이·여닫이 위치를 벽 방향으로 뒤집음
 
     // 벽면 중심 좌표 (3D) + 벽 방향에 맞춘 회전
     const [cx, cz] = this._p(pl.cx, pl.cy, b);
@@ -541,10 +542,10 @@ export class Viewer3D {
       // 패널 몰딩(문짝 표면 홈) — 살짝 들어간 판 2개
       const panel = (yy) => { const p = new THREE.Mesh(new THREE.BoxGeometry(leafW * 0.66, leafH * 0.34, 8), new THREE.MeshStandardMaterial({ color: '#7a5d3f', roughness: 0.7 })); p.position.set(0, -FT / 2 + yy, (WALL_T - 20) / 2); g.add(p); };
       panel(leafH * 0.22); panel(-leafH * 0.22);
-      // 손잡이(양면)
+      // 손잡이(양면) — 경첩 좌우(flipH)에 따라 손잡이 쪽도 뒤집힘
       for (const zz of [(WALL_T - 20) / 2 + 12, -(WALL_T - 20) / 2 - 12]) {
         const kn = new THREE.Mesh(new THREE.SphereGeometry(28, 12, 10), new THREE.MeshStandardMaterial({ color: '#c9ccd0', metalness: 0.6, roughness: 0.3 }));
-        kn.position.set(leafW / 2 - 70, -FT / 2, zz); g.add(kn);
+        kn.position.set(sgn * (leafW / 2 - 70), -FT / 2, zz); g.add(kn);
       }
     } else {
       // 유리 — 환경광을 반사하는 반투명 유리 (하늘·실내가 비쳐 보이고, 안쪽도 은은히 보임)
@@ -557,24 +558,26 @@ export class Viewer3D {
       glass.renderOrder = 2;
       g.add(glass);
       if (t.combo === 'foldSwing') {
-        // 폴딩(왼쪽) + 여닫이(오른쪽) 복합 도어
+        // 폴딩 + 여닫이 복합 도어 — 경첩 좌우(flipH)에 따라 여닫이/폴딩 방향을 뒤집음
+        //   sgn=+1: 폴딩(왼쪽) + 여닫이(오른쪽) / sgn=-1: 여닫이(왼쪽) + 폴딩(오른쪽)
         const sr = t.swingRatio || 0.28;
-        const xSplit = -W / 2 + W * (1 - sr);
+        const foldStart = sgn * (-W / 2);           // 폴딩이 시작되는 벽 끝
+        const xSplit = sgn * (W * (0.5 - sr));       // 폴딩/여닫이 구분 위치
         // 구분 세로틀(굵게)
         const div = new THREE.Mesh(new THREE.BoxGeometry(FT, Hh - FT * 2, WALL_T), frameMat);
         div.position.set(xSplit, 0, 0); g.add(div);
-        // 왼쪽 폴딩 세로 살
+        // 폴딩 세로 살 (foldStart → xSplit, 방향은 부호로 자동 처리)
         const nFold = Math.max(2, t.panes || 4);
-        const foldW = xSplit - (-W / 2);
+        const foldW = xSplit - foldStart;
         for (let i = 1; i < nFold; i++) {
-          const x = -W / 2 + (foldW * i) / nFold;
+          const x = foldStart + (foldW * i) / nFold;
           const m = new THREE.Mesh(new THREE.BoxGeometry(FT * 0.7, Hh - FT * 2, WALL_T), frameMat);
           m.position.set(x, 0, 0); g.add(m);
         }
-        // 오른쪽 여닫이 문 손잡이 (구분틀 옆)
+        // 여닫이 문 손잡이 (구분틀에서 여닫이 쪽으로)
         const kn = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 200, 12),
           new THREE.MeshStandardMaterial({ color: '#c9ccd0', metalness: 0.6, roughness: 0.3 }));
-        kn.rotation.x = Math.PI / 2; kn.position.set(xSplit + FT * 1.3, 0, WALL_T / 2 + 20); g.add(kn);
+        kn.rotation.x = Math.PI / 2; kn.position.set(xSplit + sgn * FT * 1.3, 0, WALL_T / 2 + 20); g.add(kn);
       } else {
         // 세로 분할 프레임(멀리언)
         const panes = Math.max(1, t.panes || 1);

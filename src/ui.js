@@ -402,6 +402,8 @@ async function renderDash() {
         });
         if (admin) {
           card.draggable = true;
+          // 내부 캔버스·버튼이 드래그를 가로채지 않도록(이미지 드래그 방지)
+          card.querySelectorAll('canvas, img, button').forEach((el) => { el.setAttribute('draggable', 'false'); el.draggable = false; });
           card.addEventListener('dragstart', (e) => { _dragTpl = it; card.classList.add('dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', it.title); } catch { /* noop */ } });
           card.addEventListener('dragend', () => { _dragTpl = null; card.classList.remove('dragging'); document.querySelectorAll('.showroom-group.drop-hot').forEach((s) => s.classList.remove('drop-hot')); });
         }
@@ -409,7 +411,9 @@ async function renderDash() {
       }
       sec.appendChild(cards);
       if (admin) {
-        sec.addEventListener('dragover', (e) => { if (_dragTpl) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; sec.classList.add('drop-hot'); } });
+        // dragover/dragenter 에서 preventDefault 를 항상 호출해야 drop 이 발생함(브라우저 규칙)
+        sec.addEventListener('dragenter', (e) => { e.preventDefault(); if (_dragTpl) sec.classList.add('drop-hot'); });
+        sec.addEventListener('dragover', (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch { /* noop */ } if (_dragTpl) sec.classList.add('drop-hot'); });
         sec.addEventListener('dragleave', (e) => { if (!sec.contains(e.relatedTarget)) sec.classList.remove('drop-hot'); });
         sec.addEventListener('drop', (e) => { e.preventDefault(); sec.classList.remove('drop-hot'); dropInto(room); });
       }

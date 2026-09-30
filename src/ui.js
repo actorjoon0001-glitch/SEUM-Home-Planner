@@ -17,6 +17,7 @@ import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
 let _clip = null;   // Ctrl+C 복사 클립보드 { kind:'furn'|'room'|'op', data }
+let _winSelectTab = null;   // 창호 패널 탭 선택 함수 (창문/문) — 도구 버튼에서 호출
 
 // 선택 항목 복사 (가구 우선, 방·창호도 지원) — Ctrl+C
 function copySelection() {
@@ -513,7 +514,7 @@ function buildRoomPalette() {
 
   // --- 액션들 ---
   const soon = (name) => flash(`'${name}'은(는) 곧 추가됩니다`);
-  const openWindows = () => showSection('win');
+  const openWindows = (tab) => { showSection('win'); if (tab && _winSelectTab) _winSelectTab(tab); };
   const transformDesign = (kind, name) => {
     const ok = _editor.transformDesign(kind);
     flash(ok ? `도면을 ${name}했습니다` : '변환할 도면이 없습니다 (먼저 방/외벽을 그리세요)');
@@ -531,7 +532,8 @@ function buildRoomPalette() {
       { ic: '🗑️', label: '삭제', key: 'D', mode: 'erase' },
     ] },
     { label: '구조물 그리기', items: [
-      { ic: '🚪', label: '개구부(창·문)', action: openWindows },
+      { ic: '🪟', label: '창', action: () => openWindows('창문') },
+      { ic: '🚪', label: '문', action: () => openWindows('문') },
     ] },
     { label: '보조선 그리기', items: [
       { ic: '📏', label: '보조선 그리기', key: 'E', soon: true },
@@ -800,17 +802,20 @@ function buildWindows() {
     }
   };
 
+  const selectTab = (name) => {
+    if (!WIN_TABS.includes(name)) return;
+    active = name;
+    [...tabs.children].forEach((c) => c.classList.toggle('active', c.textContent === name));
+    render();
+  };
   for (const name of WIN_TABS) {
     const t = document.createElement('button');
     t.className = 'lib-tab' + (name === active ? ' active' : '');
     t.textContent = name;
-    t.onclick = () => {
-      active = name;
-      [...tabs.children].forEach((c) => c.classList.toggle('active', c.textContent === name));
-      render();
-    };
+    t.onclick = () => selectTab(name);
     tabs.appendChild(t);
   }
+  _winSelectTab = selectTab;   // 도구 버튼(창/문)에서 탭 전환할 수 있게 노출
   render();
 }
 

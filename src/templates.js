@@ -246,53 +246,60 @@ const T = [
     },
   },
   {
-    // 세움 체류형 쉼터 10평 (32.80㎡, 본점 전시장 모델) — 농지법 체류형 쉼터
-    //  · 본채 8,200×5,600 중 약 32.8㎡: 욕실/주방/현관/침실 + 중앙 거실(개방)
-    //  · 좌·우 데크 2평씩(합성데크) 별도. 벽체 200t, 지붕 100T 징크(처마 없음=평지붕)
-    //  · 외장 전면 세라믹 + 3면 메탈사이딩(가로시공), 강화마루
+    // 세움 체류형 쉼터 10평 (33㎡, 마곡 박람회 전시 모델) — 고천리 실시공 도면(작업 26.04.16~) 기준
+    //  · 외곽 약 7,930×6,230 중 실내 33㎡(10평): 욕실 / 주방·다이닝(아일랜드) / 거실(ㄱ자 간접등) / 방
+    //  · 남측 폴딩도어+출입문 → 합성데크 포치(철제난간·태양광 데크등) · 지붕 평지붕(처마없음) 럭스틸밤색
+    //  · 외장 루버강판 네츄럴우드(세로) · 창호 전체 검정/브론즈 · 데크 진밤색
     id: 'seum-shelter-10',
-    title: '세움 체류형 쉼터 10평 (32.8㎡)',
+    title: '세움 체류형 쉼터 10평 (33㎡)',
     category: '체류형 쉼터',
-    showroom: '본점',
-    tags: ['세움도면', '체류형쉼터', '10평', '32.8㎡', '농지', '데크', '본점'],
+    showroom: '마곡 박람회',
+    tags: ['세움도면', '체류형쉼터', '10평', '33㎡', '마곡박람회', '폴딩도어', '데크', '루버강판'],
     base: {
-      name: '세움 체류형 쉼터 10평 (32.8㎡)',
+      name: '세움 체류형 쉼터 10평 (33㎡)',
       productType: '체류형 쉼터',
       ceilingHeight: 2400,
-      exterior: { material: 'metal', color: '#3d4651', dir: 'h' },
-      roof: { type: 'flat', color: '#4a4a4a' },
+      foundationHeight: 300,
+      exterior: { material: 'wood', color: '#9c7244', dir: 'v' },   // 루버강판믹스 네츄럴우드(세로)
+      roof: { type: 'flat', color: '#3a2e26', fascia: '#3a2e26' },  // 처마없는 평지붕/럭스틸밤색
       rooms: [
-        // 상단 밴드 — 욕실 / 주방 / 현관 / 침실
-        { key: 'bath', type: 'bath',     name: '욕실', x: 0,    y: 0,    w: 1800, d: 2000 },
-        { key: 'kit',  type: 'kitchen',  name: '주방', x: 1800, y: 0,    w: 2000, d: 2000, open: ['s'] },
-        { key: 'ent',  type: 'entrance', name: '현관', x: 3800, y: 0,    w: 1200, d: 2000 },
-        { key: 'bed',  type: 'bedroom',  name: '침실', x: 5000, y: 0,    w: 3200, d: 2000 },
-        // 중앙 거실(개방)
-        { key: 'liv',  type: 'living',   name: '거실', x: 1800, y: 2000, w: 4600, d: 3600, open: ['n'] },
-        // 좌·우 데크 2평 (면적 별도)
-        { key: 'deckL', type: 'deck', name: '데크', x: 0,    y: 2000, w: 1800, d: 3600 },
-        { key: 'deckR', type: 'deck', name: '데크', x: 6400, y: 2000, w: 1800, d: 3600 },
+        // 상단 — 욕실 / 주방·다이닝(개방)
+        { key: 'bath', type: 'bath',    name: '욕실',       x: 0,    y: 0,    w: 2000, d: 2100 },
+        { key: 'kit',  type: 'kitchen', name: '주방·다이닝', x: 2000, y: 0,    w: 5000, d: 2100, open: ['s'] },
+        // 하단 — 방 / 거실(개방, 남측 데크로 폴딩도어)
+        { key: 'bed',  type: 'bedroom', name: '방',         x: 0,    y: 2100, w: 2600, d: 2500 },
+        { key: 'liv',  type: 'living',  name: '거실',       x: 2600, y: 2100, w: 4400, d: 2500, open: ['n', 's'] },
+        // 남측 합성데크 포치 (면적 별도)
+        { key: 'porch', type: 'porch',  name: '데크(포치)',  x: 0,    y: 4600, w: 7000, d: 1800 },
       ],
       openings: [
-        { roomKey: 'bath', side: 'n', pos: 900,  winType: 'double', w: 600,  h: 500,  sill: 1600 },
-        { roomKey: 'kit',  side: 'n', pos: 1000, winType: 'double', w: 1500, h: 900,  sill: 1200 },
-        { roomKey: 'bed',  side: 'n', pos: 900,  winType: 'fixed',  w: 1000, h: 900,  sill: 1200 },
-        { roomKey: 'bed',  side: 'n', pos: 2200, winType: 'double', w: 1500, h: 900,  sill: 1200 },
-        { roomKey: 'bed',  side: 'e', pos: 1000, winType: 'double', w: 1500, h: 900,  sill: 1200 },
-        { roomKey: 'liv',  side: 's', pos: 2500, winType: 'sliding',   w: 2500, h: 2100, sill: 100 },
-        { roomKey: 'ent',  side: 's', pos: 600,  winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'liv',  side: 'w', pos: 1800, winType: 'swingDoor', w: 900,  h: 2100 },  // 좌 데크
-        { roomKey: 'liv',  side: 'e', pos: 1800, winType: 'swingDoor', w: 900,  h: 2100 },  // 우 데크
+        // 거실 남측 — 폴딩도어 + 출입문(콤보) → 데크
+        { roomKey: 'liv',  side: 's', pos: 2200, winType: 'foldSwing', w: 3400, h: 2100, color: '#1c1f24' },
+        // 주방 — 북측 픽스창 2개 + 동측 이중창
+        { roomKey: 'kit',  side: 'n', pos: 1400, winType: 'fixed',  w: 1200, h: 900,  sill: 1100, color: '#1c1f24' },
+        { roomKey: 'kit',  side: 'n', pos: 3400, winType: 'fixed',  w: 1400, h: 1000, sill: 1000, color: '#1c1f24' },
+        { roomKey: 'kit',  side: 'e', pos: 1050, winType: 'double', w: 2000, h: 1200, sill: 900,  color: '#1c1f24' },
+        // 욕실 — 북측 작은 환기창 + 실내측 포켓(미닫이)도어
+        { roomKey: 'bath', side: 'n', pos: 1000, winType: 'double',    w: 600, h: 500,  sill: 1600, color: '#1c1f24' },
+        { roomKey: 'bath', side: 's', pos: 1000, winType: 'slideDoor', w: 800, h: 2100, color: '#1c1f24' },
+        // 방 — 서측 이중창 + 거실측 문
+        { roomKey: 'bed',  side: 'w', pos: 1250, winType: 'double',    w: 1400, h: 1000, sill: 1000, color: '#1c1f24' },
+        { roomKey: 'bed',  side: 'e', pos: 1250, winType: 'swingDoor', w: 900,  h: 2100, color: '#1c1f24' },
+        // 거실 서측 픽스창
+        { roomKey: 'liv',  side: 'w', pos: 700,  winType: 'fixed',  w: 1200, h: 900, sill: 1100, color: '#1c1f24' },
       ],
       furniture: [
-        { catalogId: 'toilet',  x: 900,  y: 500,  rotation: 0 },
-        { catalogId: 'basin',   x: 400,  y: 1500, rotation: 0 },
-        { catalogId: 'sink',    x: 2000, y: 400,  rotation: 0 },
-        { catalogId: 'fridge',  x: 3500, y: 450,  rotation: 0 },
-        { catalogId: 'dining4', x: 2800, y: 2600, rotation: 0 },
-        { catalogId: 'sofa3',   x: 3600, y: 4600, rotation: 0 },
-        { catalogId: 'tv',      x: 4000, y: 5400, rotation: 180 },
-        { catalogId: 'bedQ',    x: 6700, y: 1000, rotation: 0 },
+        { catalogId: 'toilet', x: 1050, y: 500,  rotation: 0 },
+        { catalogId: 'basin',  x: 400,  y: 1550, rotation: 0 },
+        { catalogId: 'sink',    x: 2700, y: 400,  rotation: 0 },
+        { catalogId: 'fridge',  x: 6600, y: 500,  rotation: 0 },
+        { catalogId: 'dining4', x: 4600, y: 1300, rotation: 0 },
+        { catalogId: 'sofa3', x: 3600, y: 3700, rotation: 0 },
+        { catalogId: 'tv',    x: 5600, y: 4400, rotation: 180 },
+        { catalogId: 'bedQ',  x: 1050, y: 3400, rotation: 0 },
+        { catalogId: 'sconce', x: 1400, y: 4600, rotation: 0, wallNormal: [0, 1] },
+        { catalogId: 'sconce', x: 5400, y: 4600, rotation: 0, wallNormal: [0, 1] },
+        { catalogId: 'decksteps', x: 3500, y: 6400, rotation: 0 },
       ],
     },
   },

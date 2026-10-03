@@ -262,45 +262,51 @@ const T = [
       foundationHeight: 300,
       exterior: { material: 'wood', color: '#9c7244', dir: 'v' },   // 루버강판믹스 네츄럴우드(세로)
       roof: { type: 'flat', color: '#3a2e26', fascia: '#3a2e26' },  // 처마없는 평지붕/럭스틸밤색
-      // 외곽 ~7,700×6,200 (PDF 전체 치수). 실내(욕실+주방+방+거실) 33.1㎡=10.0평, 데크 별도
+      // PDF 실시공 도면 배치: 외곽 7,930×6,230
+      //  상단 3실 → 방(좌 2,300) · 욕실(중 2,160) · 주방·다이닝(우 3,470)
+      //  하단 2실 → 데크(좌 4,460, 계단) · 거실(우 3,470) — 사이 폴딩도어, 거실 남측 2m 이동창
       rooms: [
-        // 상단 — 욕실 / 주방·다이닝(개방)
-        { key: 'bath', type: 'bath',    name: '욕실',       x: 0,    y: 0,    w: 2100, d: 2000 },
-        { key: 'kit',  type: 'kitchen', name: '주방·다이닝', x: 2100, y: 0,    w: 5600, d: 2000, open: ['s'] },
-        // 하단 — 방 / 거실(개방, 남측 데크로 폴딩도어)
-        { key: 'bed',  type: 'bedroom', name: '방',         x: 0,    y: 2000, w: 2800, d: 2300 },
-        { key: 'liv',  type: 'living',  name: '거실',       x: 2800, y: 2000, w: 4900, d: 2300, open: ['n', 's'] },
-        // 남측 합성데크 포치 (면적 별도)
-        { key: 'porch', type: 'porch',  name: '데크(포치)',  x: 0,    y: 4300, w: 7700, d: 1900 },
+        // 상단 — 방 / 욕실 / 주방·다이닝(남측 거실로 개방)
+        { key: 'bed',  type: 'bedroom', name: '방',         x: 0,    y: 0,    w: 2300, d: 2770 },
+        { key: 'bath', type: 'bath',    name: '욕실',       x: 2300, y: 0,    w: 2160, d: 2770 },
+        { key: 'kit',  type: 'kitchen', name: '주방·다이닝', x: 4460, y: 0,    w: 3470, d: 2770, open: ['s'] },
+        // 하단 — 데크(좌, 계단) / 거실(우, 주방과 개방연결 + 폴딩도어로 데크)
+        { key: 'porch', type: 'porch',  name: '데크(포치)',  x: 0,    y: 2770, w: 4460, d: 3460, rail: ['s', 'w'] },
+        { key: 'liv',   type: 'living',  name: '거실',       x: 4460, y: 2770, w: 3470, d: 3460, open: ['n'] },
       ],
       openings: [
-        // 거실 남측 — 폴딩도어 + 출입문(콤보) → 데크
-        { roomKey: 'liv',  side: 's', pos: 2200, winType: 'foldSwing', w: 3400, h: 2100, color: '#1c1f24' },
-        // 주방 — 북측 픽스창 2개 + 동측 이중창
-        { roomKey: 'kit',  side: 'n', pos: 1400, winType: 'fixed',  w: 1200, h: 900,  sill: 1100, color: '#1c1f24' },
-        { roomKey: 'kit',  side: 'n', pos: 3400, winType: 'fixed',  w: 1400, h: 1000, sill: 1000, color: '#1c1f24' },
-        { roomKey: 'kit',  side: 'e', pos: 1000, winType: 'double', w: 1600, h: 1100, sill: 900,  color: '#1c1f24' },
-        // 욕실 — 북측 작은 환기창 + 실내측 포켓(미닫이)도어
-        { roomKey: 'bath', side: 'n', pos: 1050, winType: 'double',    w: 600, h: 500,  sill: 1600, color: '#1c1f24' },
-        { roomKey: 'bath', side: 's', pos: 1050, winType: 'slideDoor', w: 800, h: 2100, color: '#1c1f24' },
-        // 방 — 서측 이중창 + 거실측 문
-        { roomKey: 'bed',  side: 'w', pos: 1150, winType: 'double',    w: 1400, h: 1000, sill: 1000, color: '#1c1f24' },
-        { roomKey: 'bed',  side: 'e', pos: 1150, winType: 'swingDoor', w: 900,  h: 2100, color: '#1c1f24' },
-        // 거실 서측 픽스창
-        { roomKey: 'liv',  side: 'w', pos: 1150, winType: 'fixed',  w: 1200, h: 900, sill: 1100, color: '#1c1f24' },
+        // 거실 서측 — 데크로 통하는 폴딩도어(OPEN) + 남측 2m 이동창(마당) + 동측 픽스창
+        { roomKey: 'liv',  side: 'w', pos: 1730, winType: 'foldSwing', w: 3400, h: 2100, color: '#1c1f24' },
+        { roomKey: 'liv',  side: 's', pos: 1735, winType: 'slide',     w: 2000, h: 2100, color: '#1c1f24' },
+        { roomKey: 'liv',  side: 'e', pos: 1730, winType: 'fixed',  w: 1500, h: 1100, sill: 900, color: '#1c1f24' },
+        // 주방·다이닝 — 북측 픽스창 + 동측 이동창(1000+600+900)
+        { roomKey: 'kit',  side: 'n', pos: 1735, winType: 'fixed',  w: 1400, h: 900,  sill: 1100, color: '#1c1f24' },
+        { roomKey: 'kit',  side: 'e', pos: 1385, winType: 'double', w: 1600, h: 1100, sill: 900,  color: '#1c1f24' },
+        // 욕실 — 북측 환기창 + 남측(데크측) 출입문 700×2100
+        { roomKey: 'bath', side: 'n', pos: 1080, winType: 'fixed',     w: 600, h: 500,  sill: 1600, color: '#1c1f24' },
+        { roomKey: 'bath', side: 's', pos: 1080, winType: 'swingDoor', w: 700, h: 2100, color: '#1c1f24' },
+        // 방 — 서측 이중창(1400×1000) + 북측 창 + 남측(데크측) 출입문
+        { roomKey: 'bed',  side: 'w', pos: 1385, winType: 'double',    w: 1400, h: 1000, sill: 1000, color: '#1c1f24' },
+        { roomKey: 'bed',  side: 'n', pos: 1150, winType: 'double',    w: 1200, h: 1000, sill: 1000, color: '#1c1f24' },
+        { roomKey: 'bed',  side: 's', pos: 1150, winType: 'swingDoor', w: 900,  h: 2100, color: '#1c1f24' },
       ],
       furniture: [
-        { catalogId: 'toilet', x: 1050, y: 500,  rotation: 0 },
-        { catalogId: 'basin',  x: 400,  y: 1500, rotation: 0 },
-        { catalogId: 'sink',    x: 2800, y: 380,  rotation: 0 },
-        { catalogId: 'fridge',  x: 7000, y: 500,  rotation: 0 },
-        { catalogId: 'dining4', x: 4700, y: 1250, rotation: 0 },
-        { catalogId: 'sofa3', x: 5000, y: 3500, rotation: 0 },
-        { catalogId: 'tv',    x: 5000, y: 4050, rotation: 180 },
-        { catalogId: 'bedQ',  x: 1100, y: 3100, rotation: 0 },
-        { catalogId: 'sconce', x: 1400, y: 4300, rotation: 0, wallNormal: [0, 1] },
-        { catalogId: 'sconce', x: 7200, y: 4300, rotation: 0, wallNormal: [0, 1] },
-        { catalogId: 'decksteps', x: 3800, y: 6200, rotation: 0 },
+        // 방(좌상)
+        { catalogId: 'bedQ',  x: 1100, y: 1600, rotation: 0 },
+        // 욕실(중상)
+        { catalogId: 'toilet', x: 3900, y: 700,  rotation: 0 },
+        { catalogId: 'basin',  x: 2650, y: 700,  rotation: 0 },
+        // 주방·다이닝(우상)
+        { catalogId: 'sink',    x: 5000, y: 380,  rotation: 0 },
+        { catalogId: 'fridge',  x: 7600, y: 600,  rotation: 0 },
+        { catalogId: 'dining4', x: 6300, y: 1900, rotation: 0 },
+        // 거실(우하)
+        { catalogId: 'sofa3', x: 6200, y: 4900, rotation: 0 },
+        { catalogId: 'tv',    x: 6200, y: 3150, rotation: 180 },
+        // 데크(좌하) — 벽등 2개 + 남서측 계단
+        { catalogId: 'sconce', x: 1150, y: 2770, rotation: 0, wallNormal: [0, 1] },
+        { catalogId: 'sconce', x: 3380, y: 2770, rotation: 0, wallNormal: [0, 1] },
+        { catalogId: 'decksteps', x: 780, y: 6230, rotation: 0 },
       ],
     },
   },

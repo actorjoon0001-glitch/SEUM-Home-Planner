@@ -16,6 +16,7 @@ import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
 let _viewer = null; // 외장/지붕 자동 표시용
+let _refreshFinish = null; // 마감재 패널 다시 그리기 (실물 모델 상태 변화 시)
 let _clip = null;   // Ctrl+C 복사 클립보드 { kind:'furn'|'room'|'op', data }
 let _winSelectTab = null;   // 창호 패널 탭 선택 함수 (창문/문) — 도구 버튼에서 호출
 
@@ -1238,6 +1239,8 @@ function buildFinish() {
   let query = '';
   let roofTarget = 'all';   // 지붕 적용 대상: 'all'(전체 공통) 또는 외곽선 경로(건물) index
   wrap.innerHTML = `
+    <div id="fin-product" class="hidden"></div>
+    <div id="fin-generic">
     <div class="fin-search"><input id="fin-q" type="text" placeholder="🔍 마감재 검색 (예: 벽돌, 목재)"></div>
     <div class="tool-group-label">외장재 (벽 마감)</div>
     <div class="mat-grid" id="fin-ext"></div>
@@ -1273,7 +1276,8 @@ function buildFinish() {
       <div class="tool-group-label" style="margin-top:12px">박공(삼각) 벽 색상</div>
       <div class="swatches" id="fin-gable-sw"></div>
     </div>
-    <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>`;
+    <p class="panel-sub small" style="margin-top:12px">재질·색상을 고르면 3D에서 외관이 자동으로 켜집니다.</p>
+    </div>`;
   const qi = wrap.querySelector('#fin-q');
   qi.oninput = () => { query = qi.value.trim(); renderCards(); };
   // 면별 외장재(2색·부분 시공) UI 를 이 패널 안(#fin-2color-panel)에 인라인으로 생성
@@ -1286,6 +1290,33 @@ function buildFinish() {
 
   function renderCards() {
     const d = store.design, ex = d.exterior || {}, roof = d.roof || {};
+    // 실물 모델(블렌더) 제품이 3D에 떠 있으면 공용 마감재 대신 '제품 옵션'만 — 질감은 블렌더 그대로, 색만 바뀜
+    const m3 = d.model3d, prodOn = !!(m3 && m3.optionSets && m3.optionSets.length && _viewer && _viewer.usingModel3d);
+    const prodEl = wrap.querySelector('#fin-product');
+    prodEl.classList.toggle('hidden', !prodOn);
+    wrap.querySelector('#fin-generic').classList.toggle('hidden', prodOn);
+    if (prodOn) {
+      const sel = m3.options || {};
+      const sw = (c) => c.swatch || c.color || `linear-gradient(135deg, ${c.dark} 0%, ${c.light} 100%)`;
+      prodEl.innerHTML = `
+        <div class="po-head">🏠 제품 옵션${m3.label ? ` <small>${esc(m3.label)}</small>` : ''}</div>
+        <p class="panel-sub small" style="margin:2px 0 10px">블렌더 실물 모델의 질감(나뭇결·이음)은 그대로, 색만 바뀌어요.</p>
+        ${m3.optionSets.map((set) => {
+          const cur = set.choices.find((c) => c.id === sel[set.key]) || set.choices[0];
+          return `<div class="tool-group-label" style="margin-top:10px">${esc(set.label)} <small class="muted">${esc(cur.label)}</small></div>
+            <div class="po-row">${set.choices.map((c) => `<button type="button" class="po-chip ${c.id === cur.id ? 'on' : ''}" data-k="${esc(set.key)}" data-id="${esc(c.id)}" title="${esc(c.label)}">
+              <span class="po-sw" style="background:${sw(c)}"></span><span class="po-lb">${esc(c.label)}</span></button>`).join('')}</div>`;
+        }).join('')}
+        <button type="button" class="po-free" id="po-free" title="실물 모델을 끄고 홈플래너 공용 마감재로 자유롭게 (자동 생성 모델)">공용 마감재로 자유롭게 바꾸기 →</button>`;
+      prodEl.querySelectorAll('.po-chip').forEach((b) => b.onclick = () => {
+        store.commit((dd) => { if (dd.model3d) dd.model3d.options = { ...(dd.model3d.options || {}), [b.dataset.k]: b.dataset.id }; });
+      });
+      prodEl.querySelector('#po-free').onclick = () => {
+        _viewer.showModel3d = false; _viewer.dirty = true;
+        flash('자동 생성 모델로 바꿨어요 — 3D 위쪽 🏠 실물 모델 버튼으로 다시 켤 수 있어요');
+      };
+      return;
+    }
     const match = (label) => !query || label.includes(query);
 
     const extEl = wrap.querySelector('#fin-ext');
@@ -1398,6 +1429,7 @@ function buildFinish() {
   }
   renderCards();
   store.subscribe(renderCards);
+  _refreshFinish = renderCards;   // 실물 모델 켜짐/꺼짐이 바뀌면 다시 그림
 }
 
 function openingForm(o) {
@@ -2007,6 +2039,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
       if (m3dPrev && m3dPrev.using && s.mismatch && !m3dPrev.mismatch) {
         flash(`자동 생성 모델로 보여드려요 (${s.reason} 변경) — 실물 모델은 원래 형태일 때만 표시돼요. 되돌리기: Ctrl+Z`);
       }
+      if (_refreshFinish && (!m3dPrev || m3dPrev.using !== s.using)) _refreshFinish();
       m3dPrev = s;
     };
   }

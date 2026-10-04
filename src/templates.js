@@ -176,19 +176,51 @@ const T = [
       roof: { type: 'gable', color: '#3b3837' },
       // 3D 실물 모델 — 블렌더에서 만든 GLB(미터, 도면 원점 = 본체 북서쪽 모서리)
       //   fit·roofType·ridge·창문배치가 그대로일 때만 실물로 표시 (바꾸면 자동 생성 모델)
-      //   parts: 마감재 패널 값을 칠할 GLB 부품(노드 이름) / finish: 실물 모델 원래 마감 (이 값과 다를 때만 덧칠)
+      //   optionSets: 제품 옵션 — parts(GLB 노드 이름)에 고른 색을 입힘. 첫 항목(orig)=블렌더 원래 마감
+      //     remap: 블렌더에서 구운 질감의 명암(나뭇결·이음)은 살리고 색만 dark→light 로 / color: 단색 부품
       model3d: {
         url: 'models/seum-hwangto.glb', fit: [3000, 5900], label: '계획안-B', roofType: 'gable', ridge: 'z',
-        parts: {
-          wall: ['우드톤_강판사이딩_X', '우드톤_강판사이딩_Y'],
-          gable: ['지붕_우드톤_강판사이딩_X'],
-          roof: ['지붕_징크_차콜'],
-          fascia: ['지붕_차콜메탈'],
-          window: ['PVC창틀_백색'],
-          door: ['현관문_블랙'],
-          rail: ['각관_분체도장_차콜', '지붕_각관_분체도장_차콜'],
-        },
-        finish: { exterior: { material: 'wood', color: '#975227', dir: 'v' }, roof: '#3b3837', window: '#ececec', door: '#2b2b2b' },
+        optionSets: [
+          { key: 'wall', label: '외장 (우드패턴 강판)', parts: ['우드톤_강판사이딩_X', '우드톤_강판사이딩_Y', '지붕_우드톤_강판사이딩_X'], choices: [
+            { id: 'orig', label: '우드톤', swatch: '#975227' },
+            { id: 'oak', label: '내추럴 오크', dark: '#7a5a3a', light: '#d9b98b' },
+            { id: 'walnut', label: '월넛', dark: '#2b1a12', light: '#704b33' },
+            { id: 'white', label: '화이트', dark: '#bfbab0', light: '#f5f3ee' },
+            { id: 'gray', label: '그레이', dark: '#4b4f54', light: '#a0a5ab' },
+            { id: 'charcoal', label: '차콜', dark: '#17181a', light: '#46494e' },
+          ] },
+          { key: 'accent', label: '포인트 띠', parts: ['흰색_가로사이딩', '흰색사이딩_판'], choices: [
+            { id: 'orig', label: '화이트', swatch: '#e4e3de' },
+            { id: 'ivory', label: '아이보리', dark: '#cbc2ae', light: '#f0e9d8' },
+            { id: 'gray', label: '그레이', dark: '#6b6f75', light: '#a9adb2' },
+            { id: 'charcoal', label: '차콜', dark: '#1d1e21', light: '#4b4d52' },
+          ] },
+          { key: 'roof', label: '지붕 (징크)', parts: ['지붕_징크_차콜', '지붕_차콜메탈'], choices: [
+            { id: 'orig', label: '차콜', swatch: '#3b3837' },
+            { id: 'black', label: '블랙', color: '#18181a' },
+            { id: 'gray', label: '그레이', color: '#6f7377' },
+            { id: 'brown', label: '브라운', color: '#4b3a2f' },
+            { id: 'red', label: '레드', color: '#6e2a22' },
+          ] },
+          { key: 'frame', label: '난간·프레임', parts: ['각관_분체도장_차콜', '지붕_각관_분체도장_차콜'], choices: [
+            { id: 'orig', label: '차콜', swatch: '#333336' },
+            { id: 'black', label: '블랙', color: '#141416' },
+            { id: 'white', label: '화이트', color: '#e8e8e5' },
+            { id: 'bronze', label: '브론즈', color: '#4a3a2c' },
+          ] },
+          { key: 'window', label: '창틀', parts: ['PVC창틀_백색'], choices: [
+            { id: 'orig', label: '화이트', swatch: '#ececec' },
+            { id: 'black', label: '블랙', color: '#1c1d20' },
+            { id: 'gray', label: '그레이', color: '#5f6368' },
+            { id: 'brown', label: '브라운', color: '#4b3628' },
+          ] },
+          { key: 'deck', label: '데크', parts: ['합성데크'], choices: [
+            { id: 'orig', label: '다크브라운', swatch: '#55493e' },
+            { id: 'teak', label: '티크', dark: '#6b4a2f', light: '#b98a5c' },
+            { id: 'gray', label: '그레이', dark: '#4d4c4a', light: '#8f8c86' },
+            { id: 'charcoal', label: '차콜', dark: '#222222', light: '#4d4b48' },
+          ] },
+        ],
       },
       rooms: [
         { key: 'jjim',  type: 'room',  name: '황토찜질방', x: 0, y: 0,    w: 3000, d: 4000 },

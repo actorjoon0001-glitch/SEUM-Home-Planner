@@ -322,7 +322,7 @@ export class Viewer3D {
         // GLB 원점 = 도면 원점(방들의 북서쪽 모서리) → 방을 통째로 옮기면 모델도 따라감. 지면(0)에 바로 놓임
         m3dNode.position.set(m3d.ox - b.cx, -F, m3d.oy - b.cz);
         m3dNode.traverse((o) => { if (o.userData && o.userData.roof) o.visible = this.showRoof; });   // 지붕·천장 토글
-        this._applyModel3dFinish(m3dNode, d);   // 외장재·지붕·창문·난간 색을 마감재 패널 값대로
+        this._applyModel3dOptions(m3dNode, d);  // 제품 옵션(외장·띠·지붕·프레임·창틀·데크 색)
         house.add(m3dNode);
         for (const f of d.furniture) this._buildFurniture(f, b, H);   // 상담 중 추가한 가구는 실물 모델 안에 함께
         if (store.selectedRoom) this._buildEditHandles(d, b);
@@ -374,59 +374,65 @@ export class Viewer3D {
     return { available: !reason, mismatch: !!reason, reason, url: m.url, label: m.label || '', ox: x0, oy: y0 };
   }
 
-  // 마감재 패널 값을 실물 모델 부품에 덧칠 — 원래 마감(finish)과 다른 항목만. 같으면 블렌더 원래 질감 그대로
-  _applyModel3dFinish(node, d) {
-    const m = d.model3d, P = m.parts || {}, F0 = m.finish || {};
-    const ex = d.exterior || {}, ex0 = F0.exterior || {}, roof = d.roof || {};
-    const exChanged = !!ex.material && (ex.material !== ex0.material || (ex.color || '') !== (ex0.color || '') || (ex.dir || 'h') !== (ex0.dir || 'h'));
-    const exDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.metal;
-    const extMat = (color) => this._m3dCached('ex|' + ex.material + '|' + color + '|' + (ex.dir || 'h'),
-      () => TEX.exteriorMaterial(ex.material || 'metal', color, 1, 1, exDef.roughness, exDef.metalness, ex.dir));   // UV(mm) × 1/무늬크기
-    const isDoor = (o) => (WINDOW_TYPES[o.winType] || {}).sill === 0;
-    const winCol = ((d.openings || []).find((o) => !isDoor(o)) || {}).color;
-    const doorCol = ((d.openings || []).find(isDoor) || {}).color;
-    const railCol = (d.rooms.find((r) => r.railColor) || {}).railColor;
-    const tintIf = (part, color, base) => (color && color !== base) ? [part, color] : null;
-    const tints = [tintIf('roof', roof.color, F0.roof), tintIf('fascia', roof.fascia), tintIf('window', winCol, F0.window),
-      tintIf('door', doorCol, F0.door), tintIf('rail', railCol)].filter(Boolean);
-    const has = (part, o) => (P[part] || []).includes(o.name);
+  // 제품 옵션(model3d.optionSets) → 실물 모델 부품에 적용. 고른 게 없으면(orig) 블렌더 원래 마감 그대로
+  _applyModel3dOptions(node, d) {
+    const m = d.model3d, sel = m.options || {}, byPart = new Map();
+    for (const set of m.optionSets || []) {
+      const ch = set.choices.find((c) => c.id === sel[set.key]) || set.choices[0];
+      for (const part of set.parts) byPart.set(part, { set, ch });
+    }
     node.traverse((o) => {
       if (!o.isMesh) return;
       const u = o.userData;
-      if (!u.m3dOrig) u.m3dOrig = { mat: o.material, uv: o.geometry.attributes.uv };
-      let mat = u.m3dOrig.mat, boxUV = false;
-      if (has('wall', o) && exChanged) { mat = extMat(ex.color || exDef.color); boxUV = true; }
-      else if (has('gable', o) && (roof.gableColor || exChanged)) { mat = extMat(roof.gableColor || ex.color || exDef.color); boxUV = true; }
-      else {
-        const t = tints.find(([part]) => has(part, o));
-        if (t) mat = this._m3dCached('tint|' + mat.uuid + '|' + t[1], () => { const c = u.m3dOrig.mat.clone(); c.color.set(t[1]); return c; });
-      }
-      o.material = mat;
-      const uv = boxUV ? this._m3dBoxUV(o) : u.m3dOrig.uv;
-      if (uv && o.geometry.attributes.uv !== uv) o.geometry.setAttribute('uv', uv);
+      if (!u.m3dOrig) u.m3dOrig = o.material;
+      const hit = byPart.get(o.name);
+      o.material = (!hit || hit.ch.id === 'orig') ? u.m3dOrig
+        : this._m3dCached(u.m3dOrig.uuid + '|' + hit.set.key + '|' + hit.ch.id, () => this._m3dVariant(u.m3dOrig, hit.ch));
     });
+  }
+  _m3dVariant(orig, ch) {
+    const m = orig.clone();
+    if (ch.dark && ch.light && orig.map) { m.map = this._m3dRemapTex(orig.map, ch.dark, ch.light); m.color.set('#ffffff'); }
+    else if (ch.dark && ch.light) m.color.set(ch.dark).lerp(new THREE.Color(ch.light), 0.6);   // 무늬 없는 단색 부품은 중간~밝은 톤
+    else if (ch.color) m.color.set(ch.color);
+    if (ch.roughness != null) m.roughness = ch.roughness;
+    if (ch.metalness != null) m.metalness = ch.metalness;
+    return m;
+  }
+  // 구운 질감의 밝기(나뭇결·판재 이음·그늘)는 그대로 두고 색만 dark→light 계열로 바꾼 새 질감
+  _m3dRemapTex(tex, dark, light) {
+    const img = tex.image, w = img.width, h = img.height;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, w, h), px = data.data;
+    const EMPTY = 6;                          // 아틀라스의 빈 곳(검정)은 그대로
+    const hist = new Uint32Array(256); let n = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const L = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) | 0;
+      if (L > EMPTY) { hist[L]++; n++; }
+    }
+    const pct = (q) => { let acc = 0; for (let k = 0; k < 256; k++) { acc += hist[k]; if (acc >= n * q) return k; } return 255; };
+    let lo = pct(0.02), hi = pct(0.98);
+    if (hi - lo < 24) { const mid = (hi + lo) / 2; lo = mid - 12; hi = mid + 12; }   // 거의 단색인 질감은 과하게 늘리지 않음
+    const hex = (c) => [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16));
+    const A = hex(dark), B = hex(light), span = hi - lo;
+    for (let i = 0; i < px.length; i += 4) {
+      const L = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
+      if (L <= EMPTY) continue;
+      const t = Math.min(1, Math.max(0, (L - lo) / span));
+      px[i] = A[0] + (B[0] - A[0]) * t; px[i + 1] = A[1] + (B[1] - A[1]) * t; px[i + 2] = A[2] + (B[2] - A[2]) * t;
+    }
+    ctx.putImageData(data, 0, 0);
+    const out = new THREE.CanvasTexture(cv);
+    for (const k of ['flipY', 'colorSpace', 'wrapS', 'wrapT', 'anisotropy', 'channel', 'minFilter', 'magFilter']) out[k] = tex[k];
+    out.needsUpdate = true;
+    return out;
   }
   _m3dCached(key, make) {
     const c = this._m3dMats || (this._m3dMats = new Map());
     if (!c.has(key)) c.set(key, make());
     return c.get(key);
-  }
-  // 외장재 질감용 UV — 벽이 향한 방향으로 투영한 mm 좌표 (가로=벽 길이 방향, 세로=높이)
-  _m3dBoxUV(o) {
-    const u = o.userData;
-    if (u.m3dBoxUV) return u.m3dBoxUV;
-    const g = o.geometry, pos = g.attributes.position;
-    if (!g.attributes.normal) g.computeVertexNormals();
-    const nor = g.attributes.normal, M = u.m3dToRoot, N = new THREE.Matrix3().getNormalMatrix(M);
-    const p = new THREE.Vector3(), n = new THREE.Vector3(), arr = new Float32Array(pos.count * 2);
-    for (let i = 0; i < pos.count; i++) {
-      p.fromBufferAttribute(pos, i).applyMatrix4(M); n.fromBufferAttribute(nor, i).applyMatrix3(N);
-      const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
-      if (ay >= ax && ay >= az) { arr[i * 2] = p.x; arr[i * 2 + 1] = p.z; }        // 윗면·밑면
-      else if (ax >= az) { arr[i * 2] = p.z; arr[i * 2 + 1] = p.y; }            // 좌우 벽
-      else { arr[i * 2] = p.x; arr[i * 2 + 1] = p.y; }                           // 앞뒤 벽·박공
-    }
-    return (u.m3dBoxUV = new THREE.BufferAttribute(arr, 2));
   }
 
   // 캐시된 실물 모델 노드 (없으면 백그라운드로 불러오기 시작하고 null → 다 받으면 다시 그림)
@@ -457,10 +463,8 @@ export class Viewer3D {
       node.name = 'model3d';
       gltf.scene.scale.setScalar(1000);   // m → mm
       node.add(gltf.scene);
-      node.updateMatrixWorld(true);
       gltf.scene.traverse((o) => {
         if (!o.isMesh) return;
-        o.userData.m3dToRoot = o.matrixWorld.clone();   // 메시 → 모델 원점(mm) — 외장재 UV 계산용
         o.castShadow = true; o.receiveShadow = true;
         const m = o.material;
         if (m.map) m.map.anisotropy = 8;

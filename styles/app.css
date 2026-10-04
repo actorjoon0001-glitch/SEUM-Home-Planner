@@ -544,3 +544,16 @@ body {
 .showroom-group.drop-hot .sg-drop { color: #3b5bdb; }
 .dash-card[draggable="true"] { cursor: grab; }
 .dash-card.dragging { opacity: .45; }
+
+/* 제품 옵션 (실물 모델) — 마감재 패널 */
+.po-head { font-weight: 700; font-size: 14px; color: #c8102e; }
+.po-head small { color: #8a9099; font-weight: 600; font-size: 11.5px; margin-left: 4px; }
+.po-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 7px; margin: 4px 0 2px; }
+.po-chip { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: 0; background: none; cursor: pointer; }
+.po-sw { width: 100%; height: 34px; border-radius: 8px; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); }
+.po-lb { font-size: 11px; line-height: 1.15; color: #5a6069; text-align: center; word-break: keep-all; }
+.po-chip:hover .po-sw { border-color: #c9ccd0; }
+.po-chip.on .po-sw { border-color: #c8102e; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1), 0 0 0 2px rgba(200,16,46,.15); }
+.po-chip.on .po-lb { color: #c8102e; font-weight: 700; }
+.po-free { margin-top: 16px; width: 100%; border: 1px dashed #c9ccd0; background: #fafafa; color: #5a6069; font-size: 12px; border-radius: 8px; padding: 8px; cursor: pointer; }
+.po-free:hover { border-color: #c8102e; color: #c8102e; }

@@ -3,6 +3,42 @@
 // rooms 는 key 로 식별하고, openings 가 roomKey 로 참조 → instantiate 시 실제 id 생성.
 import { normalize, rid, fid, WINDOW_TYPES, model3dSig } from './data.js';
 
+// ---------------------------------------------------------------------------
+// 실물 모델(블렌더) 제품 옵션 — tools/blender/plan_to_blend.py 로 만든 모델 공용
+//   parts = GLB 부품 이름(재질 이름, 천장 위 부품은 '지붕_' 접두). 첫 항목(orig)=블렌더 원래 마감
+//   remap(dark/light): 구운 질감 명암(나뭇결·판 이음·골)은 살리고 색만 / color: 단색 부품
+// ---------------------------------------------------------------------------
+const RM = (id, label, dark, light) => ({ id, label, dark, light });
+const CL = (id, label, color) => ({ id, label, color });
+const WALL_CHOICES = {
+  wood: [RM('oak', '내추럴 오크', '#7a5a3a', '#d9b98b'), RM('walnut', '월넛', '#2b1a12', '#704b33'), RM('white', '화이트', '#bfbab0', '#f5f3ee'),
+    RM('gray', '그레이', '#4b4f54', '#a0a5ab'), RM('charcoal', '차콜', '#17181a', '#46494e')],
+  metal: [RM('white', '화이트', '#b9b9b5', '#f2f2ef'), RM('beige', '베이지', '#9a8d77', '#e3d9c6'), RM('gray', '그레이', '#53575d', '#a7abb1'),
+    RM('navy', '네이비', '#1c2430', '#4d596c'), RM('charcoal', '차콜', '#1a1c1f', '#4a4d52'), RM('brown', '브라운', '#3b2a1f', '#7d5c45')],
+};
+const PAINT = { black: CL('black', '블랙', '#161618'), charcoal: CL('charcoal', '차콜', '#2f3033'), gray: CL('gray', '그레이', '#6b6f75'),
+  white: CL('white', '화이트', '#e9e9e6'), brown: CL('brown', '브라운', '#4b3628'), bronze: CL('bronze', '브론즈', '#4a3a2c'),
+  green: CL('green', '그린', '#2e3b30'), red: CL('red', '레드', '#6e2a22'), navy: CL('navy', '네이비', '#243044') };
+const pick = (orig, ids) => [{ id: 'orig', label: orig[0], swatch: orig[1] }, ...ids.map((k) => PAINT[k]).filter((c) => c.label !== orig[0])];
+function genOptionSets(o) {
+  const wall = WALL_CHOICES[o.wallKind].filter((c) => c.label !== o.wall[0]);
+  const sets = [
+    { key: 'wall', label: o.wallLabel, parts: ['외장_사이딩_X', '외장_사이딩_Y', '지붕_외장_사이딩_X', '지붕_외장_사이딩_Y'],
+      choices: [{ id: 'orig', label: o.wall[0], swatch: o.wall[1] }, ...wall] },
+    { key: 'trim', label: '코너·창 몰딩', parts: ['외장_코너', '지붕_외장_코너', '창몰딩', '지붕_창몰딩', '하부_스커트'],
+      choices: pick(o.trim || ['차콜', '#2a2b2e'], ['black', 'white', 'gray', 'bronze']) },
+    o.flat
+      ? { key: 'roof', label: '지붕 후레싱', parts: ['후레싱', '지붕_후레싱'], choices: pick(o.roof, ['black', 'charcoal', 'gray', 'white']) }
+      : { key: 'roof', label: '지붕 (징크)', parts: ['징크', '지붕_징크', '후레싱', '지붕_후레싱'], choices: pick(o.roof, ['charcoal', 'black', 'gray', 'brown', 'green', 'red']) },
+    { key: 'window', label: '창틀', parts: ['창틀'], choices: pick(o.window, ['black', 'white', 'gray', 'brown']) },
+    { key: 'door', label: '현관·방문', parts: ['문짝'], choices: pick(o.door, ['black', 'white', 'gray', 'brown']) },
+  ];
+  if (o.deck) sets.push({ key: 'deck', label: '데크', parts: ['데크'], choices: [{ id: 'orig', label: '다크브라운', swatch: '#55493e' },
+    RM('teak', '티크', '#6b4a2f', '#b98a5c'), RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] });
+  if (o.steel) sets.push({ key: 'steel', label: '난간·기둥', parts: ['철골', '기둥', '지붕_철골', '지붕_기둥'], choices: pick(o.steel, ['black', 'white', 'gray', 'bronze']) });
+  return sets;
+}
+
 const T = [
   {
     id: 'house-30',
@@ -250,6 +286,9 @@ const T = [
       ceilingHeight: 2400,
       exterior: { material: 'metal', color: '#3d4651' },
       roof: { type: 'gable', color: '#2e3b30' },
+      model3d: { url: 'models/seum-15.glb', fit: [8500, 9000], roofType: 'gable', ridge: 'z',
+        optionSets: genOptionSets({ wallKind: 'metal', wallLabel: '외장 (메탈사이딩)', wall: ['네이비', '#3d4651'],
+          roof: ['그린', '#2e3b30'], window: ['그레이', '#4a5560'], door: ['그레이', '#4a5560'], deck: true, steel: ['차콜', '#2f3033'] }) },
       rooms: [
         // 좌측 — 주방·다이닝(위) + 거실(아래) 개방형 LDK
         { key: 'kit', type: 'kitchen', name: '주방·다이닝', x: 0,    y: 0,    w: 4300, d: 2800, open: ['s'] },
@@ -309,6 +348,10 @@ const T = [
       foundationHeight: 300,
       exterior: { material: 'wood', color: '#9c7244', dir: 'v' },   // 루버강판믹스 네츄럴우드(세로)
       roof: { type: 'flat', color: '#3a2e26', fascia: '#3a2e26' },  // 처마없는 평지붕/럭스틸밤색
+      // 3D 실물 모델(블렌더) — tools/blender/plan_to_blend.py 로 생성
+      model3d: { url: 'models/seum-shelter-10.glb', fit: [7930, 6230], roofType: 'flat', ridge: 'z',
+        optionSets: genOptionSets({ wallKind: 'wood', wallLabel: '외장 (우드패턴 강판)', wall: ['우드톤', '#9c7244'], flat: true,
+          roof: ['밤색', '#3a2e26'], window: ['블랙', '#1c1f24'], door: ['블랙', '#1c1f24'], deck: true, steel: ['차콜', '#333336'] }) },
       // PDF 실시공 도면 배치: 외곽 7,930×6,230
       //  상단 3실 → 방(좌 2,300) · 욕실(중 2,160) · 주방·다이닝(우 3,470)
       //  하단 2실 → 데크(좌 4,460, 계단) · 거실(우 3,470) — 사이 폴딩도어, 거실 남측 2m 이동창
@@ -324,7 +367,7 @@ const T = [
       openings: [
         // 거실 서측 — 데크로 통하는 폴딩도어(OPEN) + 남측 2m 이동창(마당) + 동측 픽스창
         { roomKey: 'liv',  side: 'w', pos: 1730, winType: 'foldSwing', w: 3400, h: 2100, color: '#1c1f24' },
-        { roomKey: 'liv',  side: 's', pos: 1735, winType: 'slide',     w: 2000, h: 2100, color: '#1c1f24' },
+        { roomKey: 'liv',  side: 's', pos: 1735, winType: 'sliding',   w: 2000, h: 2100, sill: 0, color: '#1c1f24' },
         { roomKey: 'liv',  side: 'e', pos: 1730, winType: 'fixed',  w: 1500, h: 1100, sill: 900, color: '#1c1f24' },
         // 주방·다이닝 — 북측 픽스창 + 동측 이동창(1000+600+900)
         { roomKey: 'kit',  side: 'n', pos: 1735, winType: 'fixed',  w: 1400, h: 900,  sill: 1100, color: '#1c1f24' },
@@ -373,7 +416,10 @@ const T = [
       productType: '농막',
       ceilingHeight: 2400,
       exterior: { material: 'metal', color: '#3a3d42' },
-      roof: { type: 'gable', color: '#2e3b30' },
+      roof: { type: 'gable', color: '#2e3b30', ridge: 'x' },   // 긴 건물(12.9m) — 용마루 가로
+      model3d: { url: 'models/twin-10.glb', fit: [12900, 3200], roofType: 'gable', ridge: 'x',
+        optionSets: genOptionSets({ wallKind: 'metal', wallLabel: '외장 (메탈사이딩)', wall: ['차콜', '#3a3d42'],
+          roof: ['그린', '#2e3b30'], window: ['그레이', '#4a5560'], door: ['그레이', '#4a5560'], deck: true, steel: ['차콜', '#2f3033'] }) },
       rooms: [
         // 6평 동(좌) — 6,200×3,200 개방형 거실·침실
         { key: 'A_liv',  type: 'living',   name: '거실·침실(6평동)', x: 0,     y: 0,    w: 6200, d: 3200 },
@@ -481,6 +527,9 @@ const T = [
       //   시공 사진 기준: 차콜 처마 마감판·원목 처마 밑면, 회색 포치 기둥·난간, 포치 원목 루바 천장+다운라이트
       exterior: { material: 'metalV', color: '#b8773e', corner: '#2f3237' },
       roof: { type: 'gable', color: '#3a3f44', ridge: 'x', rise: 1100, fascia: '#34373c', soffit: 'wood', postColor: '#5b6167' },
+      model3d: { url: 'models/seum-bonjeom-19.glb', fit: [10500, 9500], roofType: 'gable', ridge: 'x',
+        optionSets: genOptionSets({ wallKind: 'metal', wallLabel: '외장 (골강판)', wall: ['코퍼', '#b8773e'], trim: ['차콜', '#2f3237'],
+          roof: ['차콜', '#3a3f44'], window: ['차콜', '#2b2e33'], door: ['차콜', '#34373c'], deck: true, steel: ['그레이', '#5b6167'] }) },
       foundationHeight: 450,   // 기초 높이 — 데크·포치도 같은 높이(하부 회색 판재 마감)
       rooms: [
         // 본채 9,000×7,000 (x 1500~10500). 치수는 평면도 치수선 그대로(벽 중심 기준, 외벽 280·내벽 120)

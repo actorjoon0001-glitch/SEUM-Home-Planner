@@ -292,6 +292,7 @@ export class Viewer3D {
       // (집 둘레 콘크리트 마당은 제거 — 잔디와 1mm 차이로 겹쳐 멀리서 보면 깜빡였음)
     }
     ground.receiveShadow = true;
+    ground.userData.isGround = true;   // 3D 내보내기(GLB)에서 제외 — 블렌더에선 자체 바닥 사용
     this.modelGroup.add(ground);
 
     // 기초 — 집 전체(벽·바닥·데크·포치·지붕)를 기초 높이만큼 올리고, 그 아래를 콘크리트 기초/데크 하부로 채움.
@@ -1471,8 +1472,8 @@ export class Viewer3D {
         addRounded(c.w, H * 1.0, c.d * 0.1, frameTop + H * 0.5, '#b6a17e', -c.d / 2 + c.d * 0.05, 0, 'fabric', 90);
         // 베개 2개 — 통통하게(머리쪽 -z)
         const pillW = c.w * 0.4, pillH = H * 0.22, pillD = c.d * 0.2;
-        addRounded(pillW, pillH, pillD, matTop + pillH * 0.45, -c.d / 2 + c.d * 0.17, -c.w * 0.22, '#f7f3ec', 'fabric', pillH * 0.48);
-        addRounded(pillW, pillH, pillD, matTop + pillH * 0.45, -c.d / 2 + c.d * 0.17, c.w * 0.22, '#f7f3ec', 'fabric', pillH * 0.48);
+        addRounded(pillW, pillH, pillD, matTop + pillH * 0.45, '#f7f3ec', -c.d / 2 + c.d * 0.17, -c.w * 0.22, 'fabric', pillH * 0.48);
+        addRounded(pillW, pillH, pillD, matTop + pillH * 0.45, '#f7f3ec', -c.d / 2 + c.d * 0.17, c.w * 0.22, 'fabric', pillH * 0.48);
         break;
       }
       case 'table': {
@@ -1664,6 +1665,24 @@ export class Viewer3D {
     const url = this.renderer.domElement.toDataURL('image/png');
     if (!wasActive) { this._appliedW = 0; this._resize(); }   // 캡처용 임시 크기 무효화 → 다음에 재적용
     return url;
+  }
+
+  // 🧊 블렌더용 3D 내보내기 — 현재 도면을 .glb(바이너리 glTF)로.
+  //   mm→m(1/1000)로 축소한 사본을 내보내 블렌더에서 실제 크기(미터)로 열린다.
+  //   블렌더 glTF 가져오기가 Y-up→Z-up을 자동 변환하므로 방향도 맞는다.
+  async exportGLB() {
+    if (!this.active || this.dirty) this.rebuild();   // 3D를 아직 안 열었거나 설정이 바뀌었으면 먼저 생성
+    const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+    const root = new THREE.Group();
+    root.name = (store.design && store.design.name) || 'SEUM';
+    const clone = this.modelGroup.clone(true);        // 지오메트리·재질은 참조 공유(원본 장면 영향 없음)
+    clone.children.filter((c) => c.userData.isGround).forEach((c) => clone.remove(c));   // 지평선까지 깔린 잔디 제외
+    clone.scale.multiplyScalar(0.001);                // mm → m
+    root.add(clone);
+    const buffer = await new Promise((resolve, reject) => {
+      new GLTFExporter().parse(root, resolve, reject, { binary: true, onlyVisible: true });
+    });
+    return new Blob([buffer], { type: 'model/gltf-binary' });
   }
 
   // 사진급 렌더용 HDR 환경(하늘 그라데이션 + '밝은 태양')을 equirect 텍스처로 생성.

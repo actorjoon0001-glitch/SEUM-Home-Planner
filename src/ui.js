@@ -2135,6 +2135,7 @@ function openExportDialog(editor) {
       <button class="m-opt" id="exp-png"><b>🖼️ PNG 이미지</b><span>화면·문서에 붙여넣기 좋음</span></button>
       <button class="m-opt" id="exp-pdf"><b>📄 PDF</b><span>인쇄·이메일 첨부용 (가로 한 장)</span></button>
       <button class="m-opt" id="exp-json"><b>🗂️ 도면 파일 (.json)</b><span>다시 불러와 편집 (백업/공유)</span></button>
+      <button class="m-opt" id="exp-glb"><b>🧊 블렌더용 3D (.glb)</b><span>블렌더·3D툴로 가져가 실사 렌더</span></button>
     </div>`;
   modal('내보내기', body);
   const W = 2480, H = 1754; // ≈ A4 가로(300dpi)
@@ -2154,6 +2155,21 @@ function openExportDialog(editor) {
   body.querySelector('#exp-json').onclick = () => {
     downloadBlob(new Blob([store.exportJSON()], { type: 'application/json' }), safeFileName() + '.json');
     closeModal();
+  };
+  const glbBtn = body.querySelector('#exp-glb');
+  if (glbBtn) glbBtn.onclick = async () => {
+    if (!_viewer || !_viewer.exportGLB) { alert('3D 내보내기를 사용할 수 없어요'); return; }
+    const prev = glbBtn.innerHTML;
+    glbBtn.disabled = true; glbBtn.innerHTML = '<b>🧊 3D 만드는 중…</b><span>잠시만요</span>';
+    try {
+      const blob = await _viewer.exportGLB();
+      downloadBlob(blob, safeFileName() + '.glb');
+      flash('블렌더용 3D(.glb)로 내보냈습니다 — 블렌더에서 파일 → 가져오기 → glTF 2.0');
+      closeModal();
+    } catch (e) {
+      glbBtn.disabled = false; glbBtn.innerHTML = prev;
+      alert('3D(GLB) 내보내기 실패: ' + (e.message || e));
+    }
   };
 }
 // data URL → Blob (PNG 다운로드용)

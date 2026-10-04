@@ -1988,6 +1988,21 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   // 외장재 / 지붕 표시 토글 (3D) — 패널 체크박스와 동기화
   $('view-ext').onclick = () => applyOuter('showExterior', !viewer.showExterior);
   $('view-roof').onclick = () => applyOuter('showRoof', !viewer.showRoof);
+  // 실물 모델(블렌더 GLB) ↔ 자동 생성 모델 — 도면에 실물 모델이 있을 때만 버튼 표시
+  const m3dBtn = $('view-model3d');
+  if (m3dBtn) {
+    m3dBtn.onclick = () => { viewer.showModel3d = !viewer.showModel3d; viewer.dirty = true; };
+    viewer.onModel3dState = (s) => {
+      m3dBtn.classList.toggle('hidden', !(s.available || s.mismatch));
+      m3dBtn.classList.toggle('on', s.using);
+      m3dBtn.disabled = !s.available;
+      m3dBtn.textContent = s.loading && viewer.showModel3d ? '🏠 실물 모델 불러오는 중…'
+        : s.failed ? '🏠 실물 모델 (불러오기 실패)' : `🏠 실물 모델${s.label ? ' · ' + s.label : ''}`;
+      m3dBtn.title = s.mismatch
+        ? '도면 크기를 바꿔서 자동 생성 모델로 보여주는 중이에요 — 원래 크기로 되돌리면 실물 모델이 다시 보여요'
+        : '블렌더로 만든 실물 3D 모델 ↔ 도면으로 자동 생성한 모델 전환';
+    };
+  }
 
   // 3D 고화질(구석 음영) 토글 — 느린 PC에서 자동으로 꺼지면 버튼도 따라 꺼짐
   // 3D 화면에 라이브러리(제품·창호·방) 끌어다 놓기 → 2D 편집기와 같은 배치 로직

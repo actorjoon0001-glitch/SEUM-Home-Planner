@@ -1306,15 +1306,10 @@ function buildFinish() {
           return `<div class="tool-group-label" style="margin-top:10px">${esc(set.label)} <small class="muted">${esc(cur.label)}</small></div>
             <div class="po-row">${set.choices.map((c) => `<button type="button" class="po-chip ${c.id === cur.id ? 'on' : ''}" data-k="${esc(set.key)}" data-id="${esc(c.id)}" title="${esc(c.label)}">
               <span class="po-sw" style="background:${sw(c)}"></span><span class="po-lb">${esc(c.label)}</span></button>`).join('')}</div>`;
-        }).join('')}
-        <button type="button" class="po-free" id="po-free" title="실물 모델을 끄고 홈플래너 공용 마감재로 자유롭게 (자동 생성 모델)">공용 마감재로 자유롭게 바꾸기 →</button>`;
+        }).join('')}`;
       prodEl.querySelectorAll('.po-chip').forEach((b) => b.onclick = () => {
         store.commit((dd) => { if (dd.model3d) dd.model3d.options = { ...(dd.model3d.options || {}), [b.dataset.k]: b.dataset.id }; });
       });
-      prodEl.querySelector('#po-free').onclick = () => {
-        _viewer.showModel3d = false; _viewer.dirty = true;
-        flash('자동 생성 모델로 바꿨어요 — 3D 위쪽 🏠 실물 모델 버튼으로 다시 켤 수 있어요');
-      };
       return;
     }
     const match = (label) => !query || label.includes(query);
@@ -2024,17 +2019,14 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   const m3dBtn = $('view-model3d');
   if (m3dBtn) {
     let m3dPrev = null;
-    m3dBtn.onclick = () => { viewer.showModel3d = !viewer.showModel3d; viewer.dirty = true; };
+    // 실물 모델 제품은 실물만 — 전환 버튼 대신 '불러오는 중/자동 모델로 표시 중' 상태만 알려줌
     viewer.onModel3dState = (s) => {
-      m3dBtn.classList.toggle('hidden', !(s.available || s.mismatch));
-      m3dBtn.classList.toggle('on', s.using);
-      m3dBtn.disabled = !s.available;
-      m3dBtn.textContent = s.mismatch ? `🏠 실물 모델 꺼짐 · ${s.reason} 변경`
-        : s.loading && viewer.showModel3d ? '🏠 실물 모델 불러오는 중…'
-        : s.failed ? '🏠 실물 모델 (불러오기 실패)' : `🏠 실물 모델${s.label ? ' · ' + s.label : ''}`;
-      m3dBtn.title = s.mismatch
-        ? `${s.reason} 변경 → 도면으로 자동 생성한 모델을 보여주는 중이에요. 되돌리면(Ctrl+Z) 실물 모델이 다시 보여요`
-        : '블렌더로 만든 실물 3D 모델 ↔ 도면으로 자동 생성한 모델 전환 (외장재·지붕·창문·난간 색은 실물 모델에도 적용)';
+      const loading = s.loading && !s.using;
+      m3dBtn.classList.toggle('hidden', !(loading || s.mismatch || s.failed));
+      m3dBtn.disabled = true;
+      m3dBtn.textContent = s.mismatch ? `🏠 ${s.reason} 변경 → 자동 모델로 표시 중`
+        : s.failed ? '🏠 실물 모델을 불러오지 못했어요' : '🏠 실물 모델 불러오는 중…';
+      m3dBtn.title = s.mismatch ? `${s.reason} 변경 → 실물 모델과 형태가 달라 도면으로 자동 생성한 모델을 보여주는 중이에요. 되돌리면(Ctrl+Z) 실물 모델이 다시 보여요` : '';
       // 편집 때문에 실물 → 자동 모델로 바뀌는 순간 한 번 알려줌
       if (m3dPrev && m3dPrev.using && s.mismatch && !m3dPrev.mismatch) {
         flash(`자동 생성 모델로 보여드려요 (${s.reason} 변경) — 실물 모델은 원래 형태일 때만 표시돼요. 되돌리기: Ctrl+Z`);

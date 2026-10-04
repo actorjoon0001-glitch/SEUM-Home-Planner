@@ -172,6 +172,7 @@ for (mname, roof), objs in groups.items():
 # 6) 원점 맞춤: 홈플래너 도면 (0,0) = 블렌더 (origin-x, origin-y)
 for o in bpy.data.objects:
     o.location.x -= A.origin_x; o.location.y -= A.origin_y
+vl.update()   # 이동한 위치를 행렬에 반영해야 아래 크기 리포트가 맞음
 # 크기 리포트
 mn = mathutils.Vector((1e9,)*3); mx = -mn; tri = 0
 for o in bpy.data.objects:

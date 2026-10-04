@@ -10,7 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES, model3dSig } from './data.js';
 import { rotateRoomsInDesign, moveRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 import * as TEX from './textures.js';
 TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 (2D UI 는 three 의존 제거됨)
@@ -322,6 +322,7 @@ export class Viewer3D {
         // GLB 원점 = 도면 원점(방들의 북서쪽 모서리) → 방을 통째로 옮기면 모델도 따라감. 지면(0)에 바로 놓임
         m3dNode.position.set(m3d.ox - b.cx, -F, m3d.oy - b.cz);
         m3dNode.traverse((o) => { if (o.userData && o.userData.roof) o.visible = this.showRoof; });   // 지붕·천장 토글
+        this._applyModel3dFinish(m3dNode, d);   // 외장재·지붕·창문·난간 색을 마감재 패널 값대로
         house.add(m3dNode);
         for (const f of d.furniture) this._buildFurniture(f, b, H);   // 상담 중 추가한 가구는 실물 모델 안에 함께
         if (store.selectedRoom) this._buildEditHandles(d, b);
@@ -348,7 +349,7 @@ export class Viewer3D {
     this.usingModel3d = !!m3dNode;
     if (this.onModel3dState) {
       const e = m3d.url && (this._m3dCache || {})[m3d.url];
-      this.onModel3dState({ available: m3d.available, mismatch: m3d.mismatch, using: !!m3dNode,
+      this.onModel3dState({ available: m3d.available, mismatch: m3d.mismatch, reason: m3d.reason || '', using: !!m3dNode,
         loading: !!(e && e.loading), failed: !!(e && e.failed), label: m3d.label });
     }
 
@@ -356,16 +357,76 @@ export class Viewer3D {
     else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
   }
 
-  // 실물 모델 사용 가능 여부 — 1층이고, 방들의 전체 크기가 모델 크기(fit)와 같을 때만
-  //   (2D에서 방 크기를 바꾸면 실물과 달라지므로 자동 생성 모델로 돌아감)
+  // 실물 모델 사용 가능 여부 — 1층이고, 실물이 표현하는 그대로일 때만 (크기·지붕 모양·창문 배치)
+  //   2D에서 이런 걸 바꾸면 실물과 달라지므로 자동 생성 모델로 돌아가고, reason 으로 이유를 알림
   _model3dSpec(d) {
     const m = d.model3d;
     if (!m || !m.url || (d.activeFloor || 0) !== 0 || !d.rooms.length) return { available: false };
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const r of d.rooms) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
-    const fit = Array.isArray(m.fit) ? m.fit : null;
-    const mismatch = !!fit && (Math.abs(x1 - x0 - fit[0]) > 60 || Math.abs(y1 - y0 - fit[1]) > 60);
-    return { available: !mismatch, mismatch, url: m.url, label: m.label || '', ox: x0, oy: y0 };
+    const fit = Array.isArray(m.fit) ? m.fit : null, roof = d.roof || {};
+    let reason = '';
+    if (fit && (Math.abs(x1 - x0 - fit[0]) > 60 || Math.abs(y1 - y0 - fit[1]) > 60)) reason = '도면 크기';
+    else if (m.roofType && roof.type !== m.roofType) reason = '지붕 모양';
+    else if (m.roofType && (roof.ridge === 'x' ? 'x' : 'z') !== (m.ridge || 'z')) reason = '용마루 방향';
+    else if (m.sig != null && model3dSig(d) !== m.sig) reason = '창·문 배치';
+    else if (this.faceMode || (d.exteriorFaces && Object.keys(d.exteriorFaces).length)) reason = '면별 외장재';
+    return { available: !reason, mismatch: !!reason, reason, url: m.url, label: m.label || '', ox: x0, oy: y0 };
+  }
+
+  // 마감재 패널 값을 실물 모델 부품에 덧칠 — 원래 마감(finish)과 다른 항목만. 같으면 블렌더 원래 질감 그대로
+  _applyModel3dFinish(node, d) {
+    const m = d.model3d, P = m.parts || {}, F0 = m.finish || {};
+    const ex = d.exterior || {}, ex0 = F0.exterior || {}, roof = d.roof || {};
+    const exChanged = !!ex.material && (ex.material !== ex0.material || (ex.color || '') !== (ex0.color || '') || (ex.dir || 'h') !== (ex0.dir || 'h'));
+    const exDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.metal;
+    const extMat = (color) => this._m3dCached('ex|' + ex.material + '|' + color + '|' + (ex.dir || 'h'),
+      () => TEX.exteriorMaterial(ex.material || 'metal', color, 1, 1, exDef.roughness, exDef.metalness, ex.dir));   // UV(mm) × 1/무늬크기
+    const isDoor = (o) => (WINDOW_TYPES[o.winType] || {}).sill === 0;
+    const winCol = ((d.openings || []).find((o) => !isDoor(o)) || {}).color;
+    const doorCol = ((d.openings || []).find(isDoor) || {}).color;
+    const railCol = (d.rooms.find((r) => r.railColor) || {}).railColor;
+    const tintIf = (part, color, base) => (color && color !== base) ? [part, color] : null;
+    const tints = [tintIf('roof', roof.color, F0.roof), tintIf('fascia', roof.fascia), tintIf('window', winCol, F0.window),
+      tintIf('door', doorCol, F0.door), tintIf('rail', railCol)].filter(Boolean);
+    const has = (part, o) => (P[part] || []).includes(o.name);
+    node.traverse((o) => {
+      if (!o.isMesh) return;
+      const u = o.userData;
+      if (!u.m3dOrig) u.m3dOrig = { mat: o.material, uv: o.geometry.attributes.uv };
+      let mat = u.m3dOrig.mat, boxUV = false;
+      if (has('wall', o) && exChanged) { mat = extMat(ex.color || exDef.color); boxUV = true; }
+      else if (has('gable', o) && (roof.gableColor || exChanged)) { mat = extMat(roof.gableColor || ex.color || exDef.color); boxUV = true; }
+      else {
+        const t = tints.find(([part]) => has(part, o));
+        if (t) mat = this._m3dCached('tint|' + mat.uuid + '|' + t[1], () => { const c = u.m3dOrig.mat.clone(); c.color.set(t[1]); return c; });
+      }
+      o.material = mat;
+      const uv = boxUV ? this._m3dBoxUV(o) : u.m3dOrig.uv;
+      if (uv && o.geometry.attributes.uv !== uv) o.geometry.setAttribute('uv', uv);
+    });
+  }
+  _m3dCached(key, make) {
+    const c = this._m3dMats || (this._m3dMats = new Map());
+    if (!c.has(key)) c.set(key, make());
+    return c.get(key);
+  }
+  // 외장재 질감용 UV — 벽이 향한 방향으로 투영한 mm 좌표 (가로=벽 길이 방향, 세로=높이)
+  _m3dBoxUV(o) {
+    const u = o.userData;
+    if (u.m3dBoxUV) return u.m3dBoxUV;
+    const g = o.geometry, pos = g.attributes.position;
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const nor = g.attributes.normal, M = u.m3dToRoot, N = new THREE.Matrix3().getNormalMatrix(M);
+    const p = new THREE.Vector3(), n = new THREE.Vector3(), arr = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i).applyMatrix4(M); n.fromBufferAttribute(nor, i).applyMatrix3(N);
+      const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+      if (ay >= ax && ay >= az) { arr[i * 2] = p.x; arr[i * 2 + 1] = p.z; }        // 윗면·밑면
+      else if (ax >= az) { arr[i * 2] = p.z; arr[i * 2 + 1] = p.y; }            // 좌우 벽
+      else { arr[i * 2] = p.x; arr[i * 2 + 1] = p.y; }                           // 앞뒤 벽·박공
+    }
+    return (u.m3dBoxUV = new THREE.BufferAttribute(arr, 2));
   }
 
   // 캐시된 실물 모델 노드 (없으면 백그라운드로 불러오기 시작하고 null → 다 받으면 다시 그림)
@@ -396,8 +457,10 @@ export class Viewer3D {
       node.name = 'model3d';
       gltf.scene.scale.setScalar(1000);   // m → mm
       node.add(gltf.scene);
+      node.updateMatrixWorld(true);
       gltf.scene.traverse((o) => {
         if (!o.isMesh) return;
+        o.userData.m3dToRoot = o.matrixWorld.clone();   // 메시 → 모델 원점(mm) — 외장재 UV 계산용
         o.castShadow = true; o.receiveShadow = true;
         const m = o.material;
         if (m.map) m.map.anisotropy = 8;
@@ -1878,7 +1941,7 @@ export class Viewer3D {
     this.dirty = true;
   }
   // 면별 외장재 모드 on/off
-  setFaceMode(on) { this.faceMode = !!on; if (!on) { this.faceBrush = null; this._clearFacePreview(); this._selBand = null; this._bandDrag = null; this.dirty = true; } }
+  setFaceMode(on) { this.faceMode = !!on; this.dirty = true; if (!on) { this.faceBrush = null; this._clearFacePreview(); this._selBand = null; this._bandDrag = null; this.dirty = true; } }
   // 면별 외장재 전체 초기화 — 모든 면·띠 오버라이드 제거(기본 외장재로 복귀)
   clearAllExteriorFaces() { store.commit((d) => { d.exteriorFaces = {}; }); }
   // 클릭한 외장 면(외곽선 변) 키 찾기

@@ -1,7 +1,7 @@
 // 세움 홈플래너 - 단지/평형 템플릿 라이브러리 (내장 프리셋)
 // 상담 시작 시 자주 쓰는 도면을 바로 불러올 수 있도록 미리 정의.
 // rooms 는 key 로 식별하고, openings 가 roomKey 로 참조 → instantiate 시 실제 id 생성.
-import { normalize, rid, fid, WINDOW_TYPES } from './data.js';
+import { normalize, rid, fid, WINDOW_TYPES, model3dSig } from './data.js';
 
 const T = [
   {
@@ -174,8 +174,22 @@ const T = [
       foundationHeight: 350,
       exterior: { material: 'wood', color: '#975227', dir: 'v' },
       roof: { type: 'gable', color: '#3b3837' },
-      // 3D 실물 모델 — 블렌더에서 만든 GLB(미터, 도면 원점 = 본체 북서쪽 모서리). fit: 이 크기일 때만 실물로 표시
-      model3d: { url: 'models/seum-hwangto.glb', fit: [3000, 5900], label: '계획안-B' },
+      // 3D 실물 모델 — 블렌더에서 만든 GLB(미터, 도면 원점 = 본체 북서쪽 모서리)
+      //   fit·roofType·ridge·창문배치가 그대로일 때만 실물로 표시 (바꾸면 자동 생성 모델)
+      //   parts: 마감재 패널 값을 칠할 GLB 부품(노드 이름) / finish: 실물 모델 원래 마감 (이 값과 다를 때만 덧칠)
+      model3d: {
+        url: 'models/seum-hwangto.glb', fit: [3000, 5900], label: '계획안-B', roofType: 'gable', ridge: 'z',
+        parts: {
+          wall: ['우드톤_강판사이딩_X', '우드톤_강판사이딩_Y'],
+          gable: ['지붕_우드톤_강판사이딩_X'],
+          roof: ['지붕_징크_차콜'],
+          fascia: ['지붕_차콜메탈'],
+          window: ['PVC창틀_백색'],
+          door: ['현관문_블랙'],
+          rail: ['각관_분체도장_차콜', '지붕_각관_분체도장_차콜'],
+        },
+        finish: { exterior: { material: 'wood', color: '#975227', dir: 'v' }, roof: '#3b3837', window: '#ececec', door: '#2b2b2b' },
+      },
       rooms: [
         { key: 'jjim',  type: 'room',  name: '황토찜질방', x: 0, y: 0,    w: 3000, d: 4000 },
         { key: 'porch', type: 'porch', name: '포치',       x: 0, y: 4000, w: 3000, d: 1900, rail: ['w', 'e'] },
@@ -535,16 +549,18 @@ export function instantiateTemplate(id) {
     for (const k of ['elev', 'color', 'w', 'd', 'h']) if (f[k] != null) o[k] = f[k];
     return o;
   });
-  return normalize({
+  const design = normalize({
     name: b.name,
     productType: b.productType || '',
     ceilingHeight: b.ceilingHeight,
     ...(b.foundationHeight ? { foundationHeight: b.foundationHeight } : {}),   // 기초 높이
     exterior: { ...b.exterior },
     roof: { ...b.roof },
-    ...(b.model3d ? { model3d: { ...b.model3d } } : {}),                        // 3D 실물 모델(블렌더 GLB)
+    ...(b.model3d ? { model3d: JSON.parse(JSON.stringify(b.model3d)) } : {}),   // 3D 실물 모델(블렌더 GLB)
     rooms, openings, furniture,
   });
+  if (design.model3d) design.model3d.sig = model3dSig(design);   // 원래 창·문 배치 기억 → 바꾸면 자동 모델
+  return design;
 }
 
 // 창호 기본 치수 채우기 (템플릿에 명시한 w/h/sill 우선, 없으면 WINDOW_TYPES 기본값)

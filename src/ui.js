@@ -1991,16 +1991,23 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   // 실물 모델(블렌더 GLB) ↔ 자동 생성 모델 — 도면에 실물 모델이 있을 때만 버튼 표시
   const m3dBtn = $('view-model3d');
   if (m3dBtn) {
+    let m3dPrev = null;
     m3dBtn.onclick = () => { viewer.showModel3d = !viewer.showModel3d; viewer.dirty = true; };
     viewer.onModel3dState = (s) => {
       m3dBtn.classList.toggle('hidden', !(s.available || s.mismatch));
       m3dBtn.classList.toggle('on', s.using);
       m3dBtn.disabled = !s.available;
-      m3dBtn.textContent = s.loading && viewer.showModel3d ? '🏠 실물 모델 불러오는 중…'
+      m3dBtn.textContent = s.mismatch ? `🏠 실물 모델 꺼짐 · ${s.reason} 변경`
+        : s.loading && viewer.showModel3d ? '🏠 실물 모델 불러오는 중…'
         : s.failed ? '🏠 실물 모델 (불러오기 실패)' : `🏠 실물 모델${s.label ? ' · ' + s.label : ''}`;
       m3dBtn.title = s.mismatch
-        ? '도면 크기를 바꿔서 자동 생성 모델로 보여주는 중이에요 — 원래 크기로 되돌리면 실물 모델이 다시 보여요'
-        : '블렌더로 만든 실물 3D 모델 ↔ 도면으로 자동 생성한 모델 전환';
+        ? `${s.reason} 변경 → 도면으로 자동 생성한 모델을 보여주는 중이에요. 되돌리면(Ctrl+Z) 실물 모델이 다시 보여요`
+        : '블렌더로 만든 실물 3D 모델 ↔ 도면으로 자동 생성한 모델 전환 (외장재·지붕·창문·난간 색은 실물 모델에도 적용)';
+      // 편집 때문에 실물 → 자동 모델로 바뀌는 순간 한 번 알려줌
+      if (m3dPrev && m3dPrev.using && s.mismatch && !m3dPrev.mismatch) {
+        flash(`자동 생성 모델로 보여드려요 (${s.reason} 변경) — 실물 모델은 원래 형태일 때만 표시돼요. 되돌리기: Ctrl+Z`);
+      }
+      m3dPrev = s;
     };
   }
 

@@ -308,6 +308,13 @@ export function openingOutline(pathIndex, edgeIndex, pos, winType = 'door') {
 }
 
 // 저장본/구버전 도면 보정 (새 필드 기본값 채움)
+// 실물 모델(GLB)이 표현하는 창·문 배치 서명 — 창·문을 추가·이동·크기변경하면 달라짐 (색은 제외: 실물에서도 바꿔 칠함)
+export function model3dSig(d) {
+  const idx = new Map((d.rooms || []).map((r, i) => [r.id, i]));
+  return (d.openings || []).map((o) => [idx.get(o.roomId), o.side, Math.round(o.pos / 10), o.winType,
+    Math.round(o.w || 0), Math.round(o.h || 0), Math.round(o.sill || 0)].join(':')).sort().join('|');
+}
+
 export function normalize(design) {
   if (!design.exterior) design.exterior = { material: 'metal', color: EXTERIOR_MATERIALS.metal.color };
   if (!design.roof) design.roof = { type: 'gable', color: '#3a3f44' };

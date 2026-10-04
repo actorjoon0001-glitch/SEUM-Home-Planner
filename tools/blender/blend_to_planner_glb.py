@@ -10,6 +10,7 @@
 #   --origin-x / --origin-y : 홈플래너 도면 원점(방들의 북서쪽 모서리)이 블렌더에서 어디인지(m).
 #       블렌더 -Y 쪽이 도면의 남쪽(아래)이 된다. 예) 황토찜질방: 본체 뒷벽이 y=5.9 → --origin-y 5.9
 #   --roof-z : 이 높이(m) 이상에만 있는 부품은 '지붕·천장'으로 표시 → 홈플래너의 지붕 끄기로 숨겨짐
+#             (오브젝트 커스텀 속성 roof=1 이 있으면 높이와 상관없이 지붕 — plan_to_blend.py 가 붙여 줌)
 #   결과: 출력폴더/<입력이름>.glb  (models/ 에 넣고 템플릿의 model3d.url 로 지정)
 import bpy
 _ = bpy.app.version
@@ -160,7 +161,7 @@ for o in bpy.data.objects:
     if not o.data.polygons:
         bpy.data.objects.remove(o, do_unlink=True); continue
     zs = [(o.matrix_world @ v.co).z for v in o.data.vertices]
-    roof = min(zs) >= A.roof_z      # 벽 윗선 근처 이상 = 지붕·천장·천장 조명
+    roof = min(zs) >= A.roof_z or bool(o.get('roof'))   # 벽 윗선 근처 이상(천장·조명) 또는 생성기가 지붕으로 표시한 부품
     mat = o.material_slots[0].material if o.material_slots else None
     groups[(mat.name if mat else "", roof)].append(o)
 for (mname, roof), objs in groups.items():

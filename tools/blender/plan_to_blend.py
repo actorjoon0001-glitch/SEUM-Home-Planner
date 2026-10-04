@@ -547,9 +547,12 @@ def deck(r):
 for r in outs: deck(r)
 
 # ---------------------------------------------------------------- 저장 + 미리보기
+# 지붕 부품 표시 — 박공 처마 끝은 천장보다 낮게 내려오므로 높이만으로는 못 가림 → 변환 도구가 이 표시도 지붕으로 처리
+ROOF_PREFIX = ('지붕_', '지붕면', '박공벽', '외벽_상부', '코너_상부')
 for o in col.objects:
     if o.type == 'MESH':
         for p in o.data.polygons: p.use_smooth = False
+        if o.name.startswith(ROOF_PREFIX): o['roof'] = 1
 bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(A.out))
 tris = 0
 for o in col.objects:

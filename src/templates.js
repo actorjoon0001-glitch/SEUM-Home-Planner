@@ -167,24 +167,25 @@ const T = [
     showroom: '본점',
     tags: ['세움도면', '황토찜질방', '찜질방', '3000x4000', '외쪽지붕', '포치', '본점'],
     base: {
+      // 계획안-B (블렌더 실물 모델): 캐스터+하부프레임 위 바닥 350 · 우드톤 강판사이딩 · 징크 박공지붕(용마루 앞뒤)
       name: '세움 황토찜질방 (3,000×4,000)',
       productType: '농막',
       ceilingHeight: 2400,
-      exterior: { material: 'cement', color: '#c2a173', dir: 'h' },
-      roof: { type: 'shed', color: '#b8bcc0' },
+      foundationHeight: 350,
+      exterior: { material: 'wood', color: '#975227', dir: 'v' },
+      roof: { type: 'gable', color: '#3b3837' },
+      // 3D 실물 모델 — 블렌더에서 만든 GLB(미터, 도면 원점 = 본체 북서쪽 모서리). fit: 이 크기일 때만 실물로 표시
+      model3d: { url: 'models/seum-hwangto.glb', fit: [3000, 5900], label: '계획안-B' },
       rooms: [
         { key: 'jjim',  type: 'room',  name: '황토찜질방', x: 0, y: 0,    w: 3000, d: 4000 },
-        { key: 'porch', type: 'porch', name: '포치',       x: 0, y: 4000, w: 3000, d: 1900 },
+        { key: 'porch', type: 'porch', name: '포치',       x: 0, y: 4000, w: 3000, d: 1900, rail: ['w', 'e'] },
       ],
       openings: [
-        { roomKey: 'jjim', side: 'w', pos: 2000, winType: 'double',    w: 1400, h: 800,  sill: 1100 },
-        { roomKey: 'jjim', side: 'e', pos: 2000, winType: 'double',    w: 1400, h: 800,  sill: 1100 },
-        { roomKey: 'jjim', side: 's', pos: 1500, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'jjim', side: 'w', pos: 2000, winType: 'double',    w: 1800, h: 900,  sill: 1000, color: '#ececec' },
+        { roomKey: 'jjim', side: 'e', pos: 2000, winType: 'double',    w: 1800, h: 900,  sill: 1000, color: '#ececec' },
+        { roomKey: 'jjim', side: 's', pos: 1500, winType: 'swingDoor', w: 900,  h: 2100, color: '#2b2b2b' },
       ],
-      furniture: [
-        { catalogId: 'tv',  x: 1500, y: 350,  rotation: 0 },
-        { catalogId: 'rug', x: 1500, y: 2100, rotation: 0 },
-      ],
+      furniture: [],
     },
   },
   {
@@ -541,6 +542,7 @@ export function instantiateTemplate(id) {
     ...(b.foundationHeight ? { foundationHeight: b.foundationHeight } : {}),   // 기초 높이
     exterior: { ...b.exterior },
     roof: { ...b.roof },
+    ...(b.model3d ? { model3d: { ...b.model3d } } : {}),                        // 3D 실물 모델(블렌더 GLB)
     rooms, openings, furniture,
   });
 }

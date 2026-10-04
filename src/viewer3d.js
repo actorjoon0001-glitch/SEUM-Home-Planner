@@ -18,6 +18,11 @@ TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 
 const WALL_T = 100; // 벽 두께 mm
 const SKY_TOP = '#a9c6e3', SKY_HORIZON = '#e8eef3';   // 하늘 그라데이션 (지평선색 = 안개색)
 const HQ_KEY = 'seum_3d_hq';                          // 고화질(구석 음영) 사용 여부 저장
+// 실물 모델(GLB) 압축 해제기 위치 — importmap 의 three 와 같은 곳에서 가져옴
+const DRACO_PATH = (() => {
+  try { return import.meta.resolve('three/addons/libs/draco/gltf/'); }
+  catch (e) { return 'https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/gltf/'; }
+})();
 
 export class Viewer3D {
   constructor(container) {
@@ -73,6 +78,8 @@ export class Viewer3D {
 
     this.showRoof = false;
     this.showExterior = false;
+    this.showModel3d = true;    // 도면에 실물 모델(블렌더 GLB)이 있으면 자동 생성 모델 대신 표시
+    this.onModel3dState = null; // (state) => UI 버튼 갱신 — { available, using, loading, failed, mismatch }
     this.wallOpacity = 1;       // 3D 벽 투명도 (1=불투명) — 내부 들여다보기
     this.floorOpacity = 1;      // 3D 바닥 투명도 (1=불투명)
 
@@ -257,6 +264,8 @@ export class Viewer3D {
   rebuild() {
     this.dirty = false;
     this._needsRender = true;
+    // 실물 모델은 캐시해서 계속 재사용 → 아래 일괄 해제에 휩쓸리지 않게 먼저 떼어냄
+    for (const e of Object.values(this._m3dCache || {})) if (e.node && e.node.parent) e.node.parent.remove(e.node);
     // 기존 제거 — 지오메트리는 매번 새로 만들므로 GPU 메모리도 함께 해제 (편집할수록 느려지는 것 방지)
     //   (재질·텍스처는 textures.js 캐시를 공유하므로 해제하지 않음)
     this.modelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -299,34 +308,104 @@ export class Viewer3D {
     //   건물 요소는 houseGroup 에 모아 한 번에 올림 (아래 build 함수들은 this.modelGroup 에 add 하므로 잠시 바꿔 끼움)
     const F = Math.max(0, +d.foundationHeight || 0);
     this._foundationH = F;
-    if (F > 0) this._buildFoundation(d, b, F);
+    // 실물 모델(블렌더 GLB) — 도면에 지정돼 있고 크기가 맞으면 자동 생성 모델 대신 사용 (불러오는 동안은 자동 모델)
+    const m3d = this._model3dSpec(d);
+    const m3dNode = m3d.available && this.showModel3d ? this._model3dNode(m3d.url) : null;
+    if (F > 0 && !m3dNode) this._buildFoundation(d, b, F);
     const root = this.modelGroup;
     const house = new THREE.Group();
     house.position.y = F;
     root.add(house);
     this.modelGroup = house;
     try {
-      if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
-      for (const room of d.rooms) this._buildRoom(room, b, H);
-      this._buildInteriorWalls(d, b, H);          // 방 벽(겹친 벽은 한 겹으로 합침)
-      for (const o of (d.openings || [])) this._buildOpening(o, b);
-      for (const f of d.furniture) this._buildFurniture(f, b, H);
-      this._buildRailings(d, b);                  // 데크·포치 난간 (room.rail 지정 시)
+      if (m3dNode) {
+        // GLB 원점 = 도면 원점(방들의 북서쪽 모서리) → 방을 통째로 옮기면 모델도 따라감. 지면(0)에 바로 놓임
+        m3dNode.position.set(m3d.ox - b.cx, -F, m3d.oy - b.cz);
+        m3dNode.traverse((o) => { if (o.userData && o.userData.roof) o.visible = this.showRoof; });   // 지붕·천장 토글
+        house.add(m3dNode);
+        for (const f of d.furniture) this._buildFurniture(f, b, H);   // 상담 중 추가한 가구는 실물 모델 안에 함께
+        if (store.selectedRoom) this._buildEditHandles(d, b);
+      } else {
+        if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
+        for (const room of d.rooms) this._buildRoom(room, b, H);
+        this._buildInteriorWalls(d, b, H);          // 방 벽(겹친 벽은 한 겹으로 합침)
+        for (const o of (d.openings || [])) this._buildOpening(o, b);
+        for (const f of d.furniture) this._buildFurniture(f, b, H);
+        this._buildRailings(d, b);                  // 데크·포치 난간 (room.rail 지정 시)
 
-      // 외장재 + 지붕 (토글)
-      if (this.showExterior) this._buildExterior(d, b, H);
-      if (this.showRoof) this._buildRoof(d, b, H);
+        // 외장재 + 지붕 (토글)
+        if (this.showExterior) this._buildExterior(d, b, H);
+        if (this.showRoof) this._buildRoof(d, b, H);
 
-      // 집을 클릭해 선택하면 이동·회전·크기조절 핸들 표시 (별도 편집 모드 불필요)
-      if (store.selectedRoom) this._buildEditHandles(d, b);
-      // 면별 외장재: 선택된 색 띠의 폭 조절 핸들
-      if (this.faceMode && this._selBand) this._buildBandHandles(d, b);
+        // 집을 클릭해 선택하면 이동·회전·크기조절 핸들 표시 (별도 편집 모드 불필요)
+        if (store.selectedRoom) this._buildEditHandles(d, b);
+        // 면별 외장재: 선택된 색 띠의 폭 조절 핸들
+        if (this.faceMode && this._selBand) this._buildBandHandles(d, b);
+      }
     } finally {
       this.modelGroup = root;
+    }
+    this.usingModel3d = !!m3dNode;
+    if (this.onModel3dState) {
+      const e = m3d.url && (this._m3dCache || {})[m3d.url];
+      this.onModel3dState({ available: m3d.available, mismatch: m3d.mismatch, using: !!m3dNode,
+        loading: !!(e && e.loading), failed: !!(e && e.failed), label: m3d.label });
     }
 
     if (this._firstFrame === undefined) { this._firstFrame = false; this.resetCamera(b); }
     else if (this._needCam) { this._needCam = false; this.resetCamera(b); }
+  }
+
+  // 실물 모델 사용 가능 여부 — 1층이고, 방들의 전체 크기가 모델 크기(fit)와 같을 때만
+  //   (2D에서 방 크기를 바꾸면 실물과 달라지므로 자동 생성 모델로 돌아감)
+  _model3dSpec(d) {
+    const m = d.model3d;
+    if (!m || !m.url || (d.activeFloor || 0) !== 0 || !d.rooms.length) return { available: false };
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const r of d.rooms) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
+    const fit = Array.isArray(m.fit) ? m.fit : null;
+    const mismatch = !!fit && (Math.abs(x1 - x0 - fit[0]) > 60 || Math.abs(y1 - y0 - fit[1]) > 60);
+    return { available: !mismatch, mismatch, url: m.url, label: m.label || '', ox: x0, oy: y0 };
+  }
+
+  // 캐시된 실물 모델 노드 (없으면 백그라운드로 불러오기 시작하고 null → 다 받으면 다시 그림)
+  _model3dNode(url) {
+    const cache = this._m3dCache || (this._m3dCache = {});
+    const e = cache[url];
+    if (e) return e.node || null;
+    cache[url] = { loading: true };
+    this._loadModel3d(url).then((node) => {
+      cache[url] = { node };
+      this.dirty = true; this._needsRender = true;
+    }).catch((err) => {
+      console.warn('[3D] 실물 모델을 불러오지 못했어요 — 자동 생성 모델로 표시합니다', err);
+      cache[url] = { failed: true };
+      this.dirty = true;
+    });
+    return null;
+  }
+
+  async _loadModel3d(url) {
+    const [{ GLTFLoader }, { DRACOLoader }] = await Promise.all([
+      import('three/addons/loaders/GLTFLoader.js'), import('three/addons/loaders/DRACOLoader.js')]);
+    const draco = new DRACOLoader(); draco.setDecoderPath(DRACO_PATH);
+    const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
+    try {
+      const gltf = await loader.loadAsync(url);
+      const node = new THREE.Group();
+      node.name = 'model3d';
+      gltf.scene.scale.setScalar(1000);   // m → mm
+      node.add(gltf.scene);
+      gltf.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = true; o.receiveShadow = true;
+        const m = o.material;
+        if (m.map) m.map.anisotropy = 8;
+        // 유리(투과)는 웹에선 무겁고 어둡게 나옴 → 가벼운 반투명 유리로
+        if (m.transmission > 0) { m.transmission = 0; m.transparent = true; m.opacity = 0.3; m.depthWrite = false; }
+      });
+      return node;
+    } finally { draco.dispose(); }
   }
 
   // 벽 재질 (투명도 < 1 이면 반투명 → 내부 들여다보기)
@@ -2019,8 +2098,12 @@ export class Viewer3D {
     const hits = this._raycaster.intersectObjects(this.modelGroup.children, true);
     for (const h of hits) { const u = h.object.userData || {}; if (u.handle) return u; }
     for (const h of hits) { const u = h.object.userData || {}; if (u.roomId) return u; }
+    // 실물 모델(GLB)을 누르면 집 전체 선택 → 드래그하면 모델째로 이동
+    const rooms = store.design.rooms;
+    if (this.usingModel3d && rooms.length && hits.some((h) => this._inModel3d(h.object))) return { roomId: rooms[0].id, model3d: true };
     return null;
   }
+  _inModel3d(o) { for (; o; o = o.parent) if (o.name === 'model3d') return true; return false; }
   _edDown(e) {
     // 면별 외장재 모드: 클릭=면 전체, 드래그=드래그한 폭만큼 자재 띠
     if (this.faceMode && e.button === 0) {
@@ -2116,7 +2199,7 @@ export class Viewer3D {
 
     // 그 외(선택 안 된 집 또는 빈 곳) → 클릭이면 선택/해제, 드래그면 화면 회전.
     //   컨트롤을 켜 둔 채 클릭·드래그를 구분(_edMove 에서 이동량으로 판정).
-    this._gesture = { x0: e.clientX, y0: e.clientY, roomId: roomId || null, moved: false };
+    this._gesture = { x0: e.clientX, y0: e.clientY, roomId: roomId || null, model3d: !!(pick && pick.model3d), moved: false };
   }
   _edMove(e) {
     if (this._bandDrag) {   // 선택한 띠의 한쪽 가장자리를 끌어 폭 조절
@@ -2203,7 +2286,10 @@ export class Viewer3D {
     if (this._gesture) {
       const gs = this._gesture; this._gesture = null;
       if (!gs.moved) {
-        if (gs.roomId) {
+        if (gs.model3d) {   // 실물 모델 클릭 → 모든 방을 그룹 선택 (이동·회전이 집 전체에 적용)
+          this.selRooms = new Set(store.design.rooms.map((r) => r.id));
+          store.selectedRoom = gs.roomId; store.selectedFurniture = null; store.selectedOpening = null; store.emit();
+        } else if (gs.roomId) {
           this.selRooms.clear();
           if (store.selectedRoom !== gs.roomId) {
             store.selectedRoom = gs.roomId; store.selectedFurniture = null; store.selectedOpening = null; store.emit();

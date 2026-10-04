@@ -308,10 +308,13 @@ export class Viewer3D {
     //   건물 요소는 houseGroup 에 모아 한 번에 올림 (아래 build 함수들은 this.modelGroup 에 add 하므로 잠시 바꿔 끼움)
     const F = Math.max(0, +d.foundationHeight || 0);
     this._foundationH = F;
-    // 실물 모델(블렌더 GLB) — 도면에 지정돼 있고 크기가 맞으면 자동 생성 모델 대신 사용 (불러오는 동안은 자동 모델)
+    // 실물 모델(블렌더 GLB) — 도면에 지정돼 있고 실물 형태 그대로면 자동 생성 모델 대신 사용
+    //   불러오는 동안엔 자동 모델을 잠깐 보여주지 않고 비워 둠 (불러오기 실패·구조 편집 시에만 자동 모델)
     const m3d = this._model3dSpec(d);
     const m3dNode = m3d.available && this.showModel3d ? this._model3dNode(m3d.url) : null;
-    if (F > 0 && !m3dNode) this._buildFoundation(d, b, F);
+    const m3dEntry = m3d.available && (this._m3dCache || {})[m3d.url];
+    const m3dWaiting = !m3dNode && !!(m3dEntry && m3dEntry.loading);
+    if (F > 0 && !m3dNode && !m3dWaiting) this._buildFoundation(d, b, F);
     const root = this.modelGroup;
     const house = new THREE.Group();
     house.position.y = F;
@@ -326,6 +329,8 @@ export class Viewer3D {
         house.add(m3dNode);
         for (const f of d.furniture) this._buildFurniture(f, b, H);   // 상담 중 추가한 가구는 실물 모델 안에 함께
         if (store.selectedRoom) this._buildEditHandles(d, b);
+      } else if (m3dWaiting) {
+        // 실물 모델 불러오는 중 — 다 받으면 다시 그림
       } else {
         if (d.outline) this._buildOutline(d, b, H); // 집 외벽(외곽)
         for (const room of d.rooms) this._buildRoom(room, b, H);

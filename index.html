@@ -161,6 +161,11 @@
           <span class="wt-hint">모서리 클릭으로 벽 잇기 · 길이 입력 후 Enter · 더블클릭/Enter로 마침 · Esc 취소</span>
         </div>
         <canvas id="canvas2d"></canvas>
+        <div id="compass2d" class="compass compass2d" title="방위 — 3D 햇빛·시간 패널에서 집 방향을 바꿀 수 있어요">
+          <svg viewBox="-50 -50 100 100" width="64" height="64" aria-label="방위"><circle r="44" class="cp-ring"/>
+            <g class="cp-rose"><path d="M0,-30 L7,0 L0,4 L-7,0Z" class="cp-n"/><path d="M0,30 L7,0 L0,-4 L-7,0Z" class="cp-s"/>
+            <text x="0" y="-34" class="cp-l">N</text><text x="38" y="4" class="cp-l">E</text><text x="0" y="43" class="cp-l">S</text><text x="-38" y="4" class="cp-l">W</text></g></svg>
+        </div>
         <input id="wall-len" class="wall-len hidden" type="text" inputmode="decimal" autocomplete="off" title="길이(mm) 입력 후 Enter">
         <input id="label-edit" class="label-edit hidden" type="text" autocomplete="off" placeholder="이름 입력 후 Enter" maxlength="24">
         <div class="stage-hint">마우스 휠: 확대/축소 · 빈 곳 드래그(또는 Alt): 화면 이동 · 핸들 드래그: 크기 조절</div>
@@ -177,8 +182,27 @@
           <button id="view-roof" class="vp">지붕</button>
           <button id="view-model3d" class="vp hidden" title="블렌더로 만든 실물 3D 모델 ↔ 도면으로 자동 생성한 모델 전환">🏠 실물 모델</button>
           <button id="tb-roof" class="vp">천장 보기</button>
+          <button id="view-under" class="vp" title="땅을 치우고 아래에서 올려다보기 — 기초·데크 하부 구조 확인 (다시 누르면 원래대로)">⬇️ 바닥 보기</button>
           <button id="view-photo" class="vp vp-photo" title="사진급 렌더 — 빛을 실제처럼 계산해 조감도·투시도 한 장을 만듭니다 (10~60초)">📸 사진급 렌더</button>
           <button id="view-hq" class="vp" title="고화질 3D — 벽 모서리·가구 밑 구석 음영 (느린 PC는 자동으로 꺼짐)">✨ 고화질</button>
+        </div>
+        <!-- ☀️ 햇빛·시간 — 계절·시각·집 방향에 따른 실제 해 위치, 밤엔 실내 조명 -->
+        <div id="sun-panel" class="sun-panel">
+          <div class="sun-row">
+            <button type="button" id="sun-play" class="sun-play" title="하루 해 움직임 재생">▶</button>
+            <input type="range" id="sun-hour" min="4" max="23" step="0.25" value="14" aria-label="시각">
+            <b id="sun-time" class="sun-time">14:00</b>
+          </div>
+          <div class="sun-row">
+            <div class="sun-seg" id="sun-season">
+              <button type="button" data-s="summer">여름</button><button type="button" data-s="equinox" class="on">봄·가을</button><button type="button" data-s="winter">겨울</button>
+            </div>
+            <select id="sun-face" title="집 정면(도면 아래쪽)이 향하는 방향">
+              <option value="180">정남향</option><option value="135">남동향</option><option value="225">남서향</option>
+              <option value="90">동향</option><option value="270">서향</option><option value="45">북동향</option><option value="315">북서향</option><option value="0">북향</option>
+            </select>
+          </div>
+          <div class="sun-info" id="sun-info"></div>
         </div>
         <div class="stage-hint">집 클릭: 선택 · Shift+클릭: 여러 채 함께 · 드래그: 이동 · 초록 핸들: 90° 회전 · 빈 곳 드래그: 화면 회전 · 휠: 줌</div>
       </div>

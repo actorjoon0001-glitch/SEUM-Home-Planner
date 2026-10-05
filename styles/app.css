@@ -337,6 +337,7 @@ body {
 }
 .vp:hover { background: #fff; border-color: var(--seum-red); }
 .vp.on { background: var(--seum-red); color: #fff; border-color: var(--seum-red); }
+.vp.hidden { display: none; }
 
 /* ---------- 속성 패널 ---------- */
 .prop-head { padding: 13px 16px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); background: #fafbfc; }
@@ -557,3 +558,25 @@ body {
 .po-chip.on .po-lb { color: #c8102e; font-weight: 700; }
 
 
+
+/* ☀️ 햇빛·시간 패널 (3D) */
+.sun-panel { position: absolute; left: 12px; bottom: 64px; z-index: 5; background: rgba(255,255,255,.92); border: 1px solid #e3e5e9;
+  border-radius: 12px; padding: 8px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.08); width: 268px; font-size: 12px; color: #3a4048; }
+.sun-row { display: flex; align-items: center; gap: 8px; }
+.sun-row + .sun-row { margin-top: 6px; }
+.sun-row input[type=range] { flex: 1; accent-color: #c8102e; }
+.sun-time { font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+.sun-play { width: 26px; height: 26px; border-radius: 50%; border: 1px solid #e0c3c3; background: #fff5f5; color: #c8102e; cursor: pointer; font-size: 11px; padding: 0; }
+.sun-seg { display: flex; border: 1px solid #e3e5e9; border-radius: 8px; overflow: hidden; }
+.sun-seg button { border: 0; background: #fff; padding: 4px 7px; font-size: 11.5px; cursor: pointer; color: #5a6069; }
+.sun-seg button.on { background: #c8102e; color: #fff; font-weight: 700; }
+#sun-face { flex: 1; border: 1px solid #e3e5e9; border-radius: 8px; padding: 4px; font-size: 12px; background: #fff; }
+.sun-info { margin-top: 6px; color: #8a9099; font-size: 11.5px; }
+/* 🧭 나침반 (2D·3D) */
+.compass { position: absolute; right: 16px; bottom: 64px; z-index: 5; pointer-events: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,.15)); }
+.compass2d { pointer-events: auto; }
+.compass .cp-ring { fill: rgba(255,255,255,.88); stroke: #d6d9de; stroke-width: 1.5; }
+.compass .cp-n { fill: #c8102e; }
+.compass .cp-s { fill: #9aa0a8; }
+.compass .cp-l { font: 700 12px sans-serif; text-anchor: middle; fill: #3a4048; }
+.compass .cp-l[data-k="N"], .compass2d .cp-l:first-of-type { fill: #c8102e; }

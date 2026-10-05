@@ -1177,6 +1177,47 @@ function drawMinimap(cv, editor) {
   }
 }
 
+// ☀️ 햇빛·시간 패널 + 🧭 방위 — 계절·시각은 보기 설정(이 기기에 기억), 집 방향은 도면에 저장
+const DIR8 = ['북', '북동', '동', '남동', '남', '남서', '서', '북서'];
+const dirName = (az) => DIR8[Math.round((((az % 360) + 360) % 360) / 45) % 8];
+function buildSunPanel(viewer) {
+  const $ = (id) => document.getElementById(id);
+  const hourEl = $('sun-hour'), timeEl = $('sun-time'), infoEl = $('sun-info'), faceEl = $('sun-face'), playEl = $('sun-play');
+  if (!hourEl) return;
+  try {
+    const sv = JSON.parse(localStorage.getItem('seum_sun') || 'null');
+    if (sv) { if (sv.hour >= 4 && sv.hour <= 23) viewer.sunHour = sv.hour; if (sv.season) viewer.season = sv.season; }
+  } catch (e) { /* noop */ }
+  const save = () => { try { localStorage.setItem('seum_sun', JSON.stringify({ hour: viewer.sunHour, season: viewer.season })); } catch (e) { /* noop */ } };
+  const fmt = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+  const syncUI = () => {
+    hourEl.value = viewer.sunHour; timeEl.textContent = fmt(viewer.sunHour);
+    document.querySelectorAll('#sun-season button').forEach((b) => b.classList.toggle('on', b.dataset.s === viewer.season));
+    const nd = ((store.design.northDeg || 0) % 360 + 360) % 360, front = ((180 - nd) % 360 + 360) % 360;
+    const opt = [...faceEl.options].find((o) => +o.value === front);
+    if (opt) faceEl.value = opt.value;
+    const c = document.querySelector('#compass2d .cp-rose'); if (c) c.setAttribute('transform', `rotate(${nd})`);
+  };
+  viewer.onDaylight = (st) => {
+    if (st.elDeg <= -1) infoEl.textContent = st.hour < 12 ? '🌙 해 뜨기 전 — 실내 조명' : '🌙 밤 — 실내 조명이 켜져 있어요';
+    else infoEl.textContent = `해 높이 ${Math.round(st.elDeg)}° · ${dirName(st.azDeg)}쪽에서 비춤`;
+  };
+  hourEl.oninput = () => { viewer.sunHour = +hourEl.value; timeEl.textContent = fmt(viewer.sunHour); viewer.applyDaylight(); save(); };
+  document.querySelectorAll('#sun-season button').forEach((b) => b.onclick = () => { viewer.season = b.dataset.s; syncUI(); viewer.applyDaylight(); save(); });
+  faceEl.onchange = () => { const front = +faceEl.value; store.commit((d) => { d.northDeg = (180 - front + 360) % 360; }); };
+  let timer = 0;
+  playEl.onclick = () => {
+    if (timer) { clearInterval(timer); timer = 0; playEl.textContent = '▶'; return; }
+    playEl.textContent = '❚❚';
+    timer = setInterval(() => {
+      viewer.sunHour = viewer.sunHour >= 22.5 ? 5 : +(viewer.sunHour + 0.25).toFixed(2);
+      syncUI(); viewer.applyDaylight();
+    }, 160);
+  };
+  store.subscribe(syncUI);
+  syncUI();
+}
+
 // 외장/지붕 표시 상태를 한 곳에서 제어 — 플로팅 버튼 + 패널 토글을 함께 동기화
 const OUTER_CTRL = { showExterior: ['view-ext', 'ex-show'], showRoof: ['view-roof', 'rf-show'] };
 function applyOuter(flag, on) {
@@ -2015,6 +2056,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   // 외장재 / 지붕 표시 토글 (3D) — 패널 체크박스와 동기화
   $('view-ext').onclick = () => applyOuter('showExterior', !viewer.showExterior);
   $('view-roof').onclick = () => applyOuter('showRoof', !viewer.showRoof);
+  buildSunPanel(viewer);
   // 실물 모델(블렌더 GLB) ↔ 자동 생성 모델 — 도면에 실물 모델이 있을 때만 버튼 표시
   const m3dBtn = $('view-model3d');
   if (m3dBtn) {
@@ -2054,10 +2096,14 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   } else if (photoBtn) photoBtn.classList.add('hidden');
 
   // 3D 카메라 프리셋
-  $('view-iso').onclick = () => viewer.view('iso');
-  $('view-top').onclick = () => viewer.view('top');
-  $('view-front').onclick = () => viewer.view('front');
-  if ($('view-inside')) $('view-inside').onclick = () => { if (!viewer.active) onModeChange('3d'); viewer.view('interior'); };
+  const underBtn = $('view-under');
+  const setView = (t) => { viewer.view(t); if (underBtn) underBtn.classList.toggle('on', t === 'under'); };
+  $('view-iso').onclick = () => setView('iso');
+  $('view-top').onclick = () => setView('top');
+  $('view-front').onclick = () => setView('front');
+  if ($('view-inside')) $('view-inside').onclick = () => { if (!viewer.active) onModeChange('3d'); setView('interior'); };
+  // ⬇️ 바닥 보기 — 기초·데크 하부 (다시 누르면 입체 시점으로)
+  if (underBtn) underBtn.onclick = () => setView(viewer.underside ? 'iso' : 'under');
   const editBtn = $('view-edit');
   if (editBtn) editBtn.onclick = () => {
     if (!viewer.active) onModeChange('3d');

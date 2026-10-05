@@ -615,7 +615,7 @@ const T = [
 
 // 템플릿 목록 (썸네일/표시용 메타)
 export function listTemplates() {
-  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택', showroom: t.showroom || null }));
+  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택', showroom: t.showroom || null, real: !!(t.base && t.base.model3d) }));
 }
 
 // 템플릿을 실제 편집 가능한 도면 객체로 인스턴스화 (새 id 부여)

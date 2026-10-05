@@ -2102,6 +2102,33 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   $('view-top').onclick = () => setView('top');
   $('view-front').onclick = () => setView('front');
   if ($('view-inside')) $('view-inside').onclick = () => { if (!viewer.active) onModeChange('3d'); setView('interior'); };
+  // 🏘️ 주택 비교 — 실물 모델이 있는 제품 중 하나를 옆에 세움 (다시 누르면 끄기)
+  const cmpBtn = $('view-compare'), cmpMenu = $('cmp-menu');
+  if (cmpBtn && cmpMenu) {
+    const closeMenu = () => cmpMenu.classList.add('hidden');
+    cmpBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (viewer.compare) { viewer.setCompare(null); cmpBtn.classList.remove('on'); cmpBtn.textContent = '🏘️ 비교'; closeMenu(); return; }
+      if (!cmpMenu.classList.contains('hidden')) return closeMenu();
+      cmpMenu.innerHTML = '<div class="cmp-h">옆에 세워 비교할 제품</div>';
+      for (const t of listTemplates().filter((x) => x.real)) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.innerHTML = `${t.title}${t.showroom ? `<small>${t.showroom} 전시</small>` : ''}`;
+        b.onclick = () => {
+          const d2 = instantiateTemplate(t.id);
+          if (!d2) return;
+          viewer.setCompare(d2, t.title);
+          cmpBtn.classList.add('on'); cmpBtn.textContent = '🏘️ 비교 끄기';
+          closeMenu();
+          flash(`'${t.title}'을(를) 동쪽 옆에 세웠어요 — 시간·계절·방향을 바꾸면 두 집에 함께 적용돼요`);
+        };
+        cmpMenu.appendChild(b);
+      }
+      cmpMenu.classList.remove('hidden');
+    };
+    document.addEventListener('click', (e) => { if (!cmpMenu.contains(e.target)) closeMenu(); });
+  }
   // ⬇️ 바닥 보기 — 기초·데크 하부 (다시 누르면 입체 시점으로)
   if (underBtn) underBtn.onclick = () => setView(viewer.underside ? 'iso' : 'under');
   const editBtn = $('view-edit');

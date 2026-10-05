@@ -71,46 +71,54 @@ if A.max_obj_tris > 0:
             d = o.modifiers.new('간소화', 'DECIMATE'); d.ratio = A.max_obj_tris / t
             print(f"decimate {o.name}: {t} → ~{A.max_obj_tris}")
 
-# 1) 절차적 색 재질 찾기
+# 1) 형태 확정 — 모디파이어 적용(불리언은 커터로 구멍) → 부모 해제 → 커터·카메라·조명·엠프티 삭제
+sel_only(meshes)
+bpy.ops.object.convert(target='MESH')
+meshes = [o for o in bpy.data.objects if o.type == 'MESH' and o.name not in cutters]
+sel_only(meshes)
+bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')   # 월드 위치 그대로 → 절차적 무늬(Object 좌표)도 그대로
+for o in list(bpy.data.objects):
+    if o.type != 'MESH' or o.name in cutters:
+        bpy.data.objects.remove(o, do_unlink=True)
+
+# 2) 재질별로 분리 — 부품마다 재질 하나 → 재질마다 따로 펼쳐 무늬 이미지를 꽉 채워 굽기 위함
+sel_only(list(bpy.data.objects))
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+bpy.ops.mesh.separate(type='MATERIAL')
+bpy.ops.object.mode_set(mode='OBJECT')
+for o in list(bpy.data.objects):
+    if not o.data.polygons: bpy.data.objects.remove(o, do_unlink=True)
+def obj_mat(o):
+    if not o.material_slots: return None
+    i = o.data.polygons[0].material_index
+    return o.material_slots[min(i, len(o.material_slots) - 1)].material
+
+# 3) 절차적·이미지 무늬 재질 → 이미지로 굽기
 def bsdf_of(m):
     return next((n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None) if m and m.node_tree else None
 proc = [m for m in bpy.data.materials if bsdf_of(m) and bsdf_of(m).inputs['Base Color'].is_linked]
+users = {m.name: [o for o in bpy.data.objects if obj_mat(o) == m] for m in proc}
+proc = [m for m in proc if users[m.name]]
 print("procedural:", [m.name for m in proc])
-users = {m.name: [o for o in meshes if any(s.material == m for s in o.material_slots)] for m in proc}
 
-# 재질 그룹이 오브젝트를 공유하면 같은 UV 배치를 써야 하므로 union-find 로 묶음
-parent = {m.name: m.name for m in proc}
-def find(a):
-    while parent[a] != a: parent[a] = parent[parent[a]]; a = parent[a]
-    return a
-owner = {}
-for mn, objs in users.items():
-    for o in objs:
-        if o.name in owner: parent[find(mn)] = find(owner[o.name])
-        else: owner[o.name] = mn
-unions = collections.defaultdict(list)
-for m in proc: unions[find(m.name)].append(m)
-
-def world_area(objs, mat=None):
+def world_area(objs):
     a = 0.0
     for o in objs:
-        me = o.data
-        for p in me.polygons:
-            if mat is None or (p.material_index < len(o.material_slots) and o.material_slots[p.material_index].material == mat):
-                a += p.area * (o.matrix_world.to_scale().x * o.matrix_world.to_scale().y)
+        sx, sy, sz = o.matrix_world.to_scale()
+        k = max(abs(sx * sy), abs(sy * sz), abs(sx * sz))
+        a += sum(p.area for p in o.data.polygons) * k
     return a
 
-# 2) Cycles 베이크 설정 (색만, 조명 없음)
+# Cycles 베이크 설정 (색만, 조명 없음)
 sc.render.engine = 'CYCLES'
 sc.cycles.device = 'CPU'
 sc.cycles.samples = 1
 sc.render.bake.use_pass_direct = False
 sc.render.bake.use_pass_indirect = False
 sc.render.bake.use_pass_color = True
-sc.render.bake.margin = 8
+sc.render.bake.margin = 16
 
 dummy = bpy.data.images.new("__dummy", 4, 4)
-all_mats = {s.material for o in meshes for s in o.material_slots if s.material}
 def set_active_img(mat, img):
     nt = mat.node_tree
     n = nt.nodes.get("__bake")
@@ -120,10 +128,10 @@ def set_active_img(mat, img):
     for x in nt.nodes: x.select = False
     n.select = True; nt.nodes.active = n
 
+import numpy as np
 baked = {}
-for root, mats in unions.items():
-    objs = sorted({o for m in mats for o in users[m.name]}, key=lambda o: o.name)
-    # UV 펼치기 (그룹 전체를 한 UV 공간에 함께 배치)
+for m in proc:
+    objs = users[m.name]
     # 새 UV(BakeUV)에 펼침 — 이미지 무늬 재질은 원래 UV(렌더용)로 읽어야 무늬가 안 깨짐
     for o in objs:
         uvs = o.data.uv_layers
@@ -135,24 +143,27 @@ for root, mats in unions.items():
     sel_only(objs)
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004, scale_to_bounds=False)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.003, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
-    for m in mats:
-        mobjs = users[m.name]
-        area = world_area(mobjs, m)
-        size = 2048 if area > 30 else (1024 if area > 2 else 512)
-        img = bpy.data.images.new("bake_" + m.name, size, size, alpha=False)
-        img.generated_color = (0.5, 0.5, 0.5, 1)
-        # 선택 오브젝트의 다른 재질들엔 더미 이미지를 활성으로 둬서 베이크 오류 방지
-        for om in {s.material for o in mobjs for s in o.material_slots if s.material}:
-            set_active_img(om, img if om == m else dummy)
-        sel_only(mobjs)
-        bpy.ops.object.bake(type='DIFFUSE', pass_filter={'COLOR'}, margin=8, use_clear=True)
-        img.pack()
-        baked[m.name] = img
-        print(f"baked {m.name:<20} objs={len(mobjs):3d} area={area:6.1f}m2 size={size}")
+    area = world_area(objs)
+    size = 2048 if area > 30 else (1024 if area > 2 else 512)
+    img = bpy.data.images.new("bake_" + m.name, size, size, alpha=True)
+    img.generated_color = (0, 0, 0, 0)
+    for om in {s.material for o in objs for s in o.material_slots if s.material}:
+        set_active_img(om, img if om == m else dummy)
+    bpy.ops.object.bake(type='DIFFUSE', pass_filter={'COLOR'}, margin=16, use_clear=True)
+    # 빈 곳(구워지지 않은 픽셀)은 평균색으로 — 멀리서 볼 때(밉맵) 검은색이 번져 어둡게 보이는 것 방지
+    px = np.array(img.pixels[:], dtype=np.float32).reshape(-1, 4)
+    filled = px[:, 3] > 0.5
+    if filled.any():
+        px[~filled, :3] = px[filled, :3].mean(axis=0)
+    px[:, 3] = 1.0
+    img.pixels = px.ravel().tolist()
+    img.pack()
+    baked[m.name] = img
+    print(f"baked {m.name:<20} objs={len(objs):3d} area={area:6.1f}m2 size={size} fill={filled.mean():.0%}")
 
-# 3) 베이크한 재질을 단순 PBR(이미지 → 기본색)로 교체
+# 베이크한 재질을 단순 PBR(이미지 → 기본색)로 교체
 for m in proc:
     b = bsdf_of(m)
     rough, metal = b.inputs['Roughness'].default_value, b.inputs['Metallic'].default_value
@@ -165,41 +176,21 @@ for m in proc:
     nt.links.new(nb.outputs['BSDF'], out.inputs['Surface'])
 # 구운 무늬는 BakeUV 로 읽음 → BakeUV 만 남기고 렌더용으로 지정
 for o in bpy.data.objects:
-    if o.type == 'MESH' and 'BakeUV' in o.data.uv_layers:
+    if 'BakeUV' in o.data.uv_layers:
         uvs = o.data.uv_layers
         uvs['BakeUV'].active_render = True
         for l in [l for l in uvs if l.name != 'BakeUV']: uvs.remove(l)
-# 나머지 재질의 범프(노이즈) 노드는 웹에서 무시되므로 정리
-for m in all_mats - set(proc):
-    if not m.node_tree: continue
-    for n in list(m.node_tree.nodes):
-        if n.name == "__bake": m.node_tree.nodes.remove(n)
+for m in bpy.data.materials:
+    if m.node_tree and m.node_tree.nodes.get("__bake"): m.node_tree.nodes.remove(m.node_tree.nodes["__bake"])
 
-# 4) 모디파이어 적용(형태 확정) → 부모 해제 → 커터·카메라·조명·엠프티 삭제
-sel_only(meshes)
-bpy.ops.object.convert(target='MESH')
-meshes = [o for o in bpy.data.objects if o.type == 'MESH' and o.name not in cutters]
-sel_only(meshes)
-bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
-for o in list(bpy.data.objects):
-    if o.type != 'MESH' or o.name in cutters:
-        bpy.data.objects.remove(o, do_unlink=True)
-
-# 5) 재질별로 분리 → (재질, 지붕여부)로 다시 합치기
-meshes = list(bpy.data.objects)
-sel_only(meshes)
-bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
-bpy.ops.mesh.separate(type='MATERIAL')
-bpy.ops.object.mode_set(mode='OBJECT')
+# 4) (재질, 지붕여부)로 다시 합치기
 groups = collections.defaultdict(list)
 ROOF_PREFIX = tuple(p.strip() for p in A.roof_prefix.split(',') if p.strip())
-for o in bpy.data.objects:
-    if not o.data.polygons:
-        bpy.data.objects.remove(o, do_unlink=True); continue
+for o in list(bpy.data.objects):
     zs = [(o.matrix_world @ v.co).z for v in o.data.vertices]
     roof = (min(zs) >= A.roof_z or bool(o.get('roof'))   # 벽 윗선 근처 이상(천장·조명) 또는 생성기가 지붕으로 표시한 부품
             or (bool(ROOF_PREFIX) and o.name.startswith(ROOF_PREFIX)))
-    mat = o.material_slots[0].material if o.material_slots else None
+    mat = obj_mat(o)
     groups[(mat.name if mat else "", roof)].append(o)
 for (mname, roof), objs in groups.items():
     sel_only(objs)
@@ -207,7 +198,7 @@ for (mname, roof), objs in groups.items():
     j = vl.objects.active
     j.name = ("지붕_" if roof else "") + (mname or "무재질")
     if roof: j["roof"] = 1
-# 6) 원점 맞춤: 홈플래너 도면 (0,0) = 블렌더 (origin-x, origin-y)
+# 5) 원점 맞춤: 홈플래너 도면 (0,0) = 블렌더 (origin-x, origin-y)
 for o in bpy.data.objects:
     o.location.x -= A.origin_x; o.location.y -= A.origin_y; o.location.z -= A.origin_z
 vl.update()   # 이동한 위치를 행렬에 반영해야 아래 크기 리포트가 맞음

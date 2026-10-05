@@ -79,6 +79,10 @@ export class Viewer3D {
     this.showRoof = false;
     this.showExterior = false;
     this.showModel3d = true;    // 도면에 실물 모델(블렌더 GLB)이 있으면 자동 생성 모델 대신 표시
+    // ☀️ 햇빛·시간 — 한국(위도 37.5°) 실제 해 위치. 집 방위는 design.northDeg(도면 위쪽 기준 북쪽 각도, 시계방향)
+    this.sunHour = 14;          // 시각(태양시) 4~23
+    this.season = 'equinox';    // 'summer'(하지) | 'equinox'(봄·가을) | 'winter'(동지)
+    this.onDaylight = null;     // (state) => UI 갱신
     this.onModel3dState = null; // (state) => UI 버튼 갱신 — { available, using, loading, failed, mismatch }
     this.wallOpacity = 1;       // 3D 벽 투명도 (1=불투명) — 내부 들여다보기
     this.floorOpacity = 1;      // 3D 바닥 투명도 (1=불투명)
@@ -115,12 +119,14 @@ export class Viewer3D {
       this._ro = new ResizeObserver(() => this._resize());
       this._ro.observe(this.container);
     }
+    this._buildCompass();
     this._animate();
   }
 
   _lights() {
     // 하늘빛/잔디 반사광 — 환경광(RoomEnvironment)이 간접광을 대부분 맡으므로 약하게
-    this.scene.add(new THREE.HemisphereLight('#eaf2ff', '#8a9272', 0.45));
+    this.hemi = new THREE.HemisphereLight('#eaf2ff', '#8a9272', 0.45);
+    this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight('#fff0dc', 2.6);   // 따뜻한 햇빛
     sun.position.set(8000, 14000, 6000);
     sun.castShadow = true;
@@ -136,31 +142,145 @@ export class Viewer3D {
     const fill = new THREE.DirectionalLight('#dfe8ff', 0.35);  // 반대편 채움광(그늘이 새까매지지 않게)
     fill.position.set(6000, 8000, -4000);   // 햇빛 반대편(뒤-오른쪽)
     this.scene.add(fill);
+    this.fill = fill;
+    const under = new THREE.DirectionalLight('#f4efe6', 0);   // 바닥 보기 — 아래에서 비추는 보조광(평소엔 꺼짐)
+    under.position.set(3000, -9000, 4000);
+    this.scene.add(under);
+    this.underLight = under;
   }
 
   // 햇빛 그림자 범위를 현재 도면 크기에 맞춤 — 작은 집일수록 그림자가 또렷해짐
   _fitShadow(b) {
     const s = Math.max(b.w, b.h) / 2 + 4000;
     const sun = this.sun;
-    // 앞-왼쪽 위(고도 약 42°)에서 비춤 — 기본 카메라(앞-오른쪽)와 방향을 엇갈려야
-    //   그림자가 벽 뒤로 숨지 않고 바닥·마당에 보이며, 면마다 밝기 차가 생겨 입체감이 남
-    sun.position.set(-s * 0.9, s * 1.35, s * 1.0);
-    sun.target.position.set(0, 0, 0);
+    this._shadowS = s;
+    // 해 방향은 실제 계산값(계절·시각·집 방위) — 기본(봄·가을 오후 2시, 정남향)은 앞-왼쪽 위에서 비춤
+    this._placeSun();
     const c = sun.shadow.camera;
     c.left = -s; c.right = s; c.top = s; c.bottom = -s;
     c.near = 100; c.far = s * 6;
     c.updateProjectionMatrix();
   }
 
+  // ☀️ 실제 해 위치 — 위도 37.5°(한국), 계절(적위), 시각(시간각), 집 방위(northDeg)
+  //   반환: el(고도, rad), azDeg(방위각: 북 0·동 90·남 180·서 270), dir(해를 향하는 월드 단위벡터)
+  sunState() {
+    const R = Math.PI / 180, lat = 37.5 * R;
+    const dec = ({ summer: 23.44, equinox: 0, winter: -23.44 }[this.season] || 0) * R;
+    const H = (this.sunHour - 12.5) * 15 * R;   // 한국 표준시 기준 남중 ≈ 12:30 (동경 127°)
+    const el = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H));
+    const east = -Math.sin(H) * Math.cos(dec);
+    const north = Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.sin(lat) * Math.cos(H);
+    const az = Math.atan2(east, north);
+    const [N, E] = this._northEast();
+    const hx = N[0] * Math.cos(az) + E[0] * Math.sin(az), hz = N[1] * Math.cos(az) + E[1] * Math.sin(az);
+    const dir = new THREE.Vector3(hx * Math.cos(el), Math.sin(el), hz * Math.cos(el)).normalize();
+    return { el, elDeg: el / R, azDeg: ((az / R) + 360) % 360, dir };
+  }
+  // 월드(x,z) 평면에서 북쪽·동쪽 단위벡터 — northDeg: 도면 위쪽에서 시계방향으로 돈 북쪽 각도
+  _northEast() {
+    const t = ((store.design && store.design.northDeg) || 0) * Math.PI / 180;
+    return [[Math.sin(t), -Math.cos(t)], [Math.cos(t), Math.sin(t)]];
+  }
+  _placeSun() {
+    const s = this._shadowS || 8000, st = this.sunState();
+    const d = st.dir.clone(); if (d.y < 0.06) { d.y = 0.06; d.normalize(); }   // 해가 아주 낮아도 그림자 계산이 깨지지 않게
+    this.sun.position.copy(d.multiplyScalar(s * 2));
+    this.sun.target.position.set(0, 0, 0);
+  }
+  // 시간대 적용 — 해 세기·색, 하늘·안개색, 노출, 밤 실내 조명
+  applyDaylight() {
+    const st = this.sunState(), el = st.el;
+    const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const day = ss(-0.10, 0.12, el);                    // 0=밤 1=낮 (해 고도 -6°~7° 사이 박명)
+    const gold = ss(0.42, 0.06, el) * day;              // 해가 낮을수록 노을빛
+    const amb = ss(-0.08, 0.35, el);                    // 주변광 — 해가 낮아지면 서서히 어두워짐(해질녘)
+    const C = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
+    this._placeSun();
+    this.sun.intensity = 2.6 * ss(0.0, 0.16, el);
+    this.sun.color.copy(C('#fff0dc', '#ffae6a', gold));
+    this.sun.castShadow = el > 0.01;
+    this.hemi.intensity = 0.06 + 0.39 * amb;
+    this.hemi.color.copy(C('#3a4868', '#eaf2ff', day).lerp(new THREE.Color('#ffc69a'), gold * 0.5));
+    this.fill.intensity = 0.04 + 0.31 * amb;
+    this.renderer.toneMappingExposure = 0.42 + 0.58 * (0.4 * day + 0.6 * amb);
+    const top = C('#08111f', '#a9c6e3', day).lerp(new THREE.Color('#7884ad'), gold * 0.6);
+    const hor = C('#1a2639', '#e8eef3', day).lerp(new THREE.Color('#f2ae7b'), gold * 0.75);
+    const key = top.getHexString() + hor.getHexString();
+    if (key !== this._skyKey) {
+      this._skyKey = key;
+      if (this.scene.background && this.scene.background.dispose) this.scene.background.dispose();
+      this.scene.background = this._skyTexture('#' + top.getHexString(), '#' + hor.getHexString());
+    }
+    if (this.scene.fog) this.scene.fog.color.copy(hor);
+    const lamp = ss(0.03, -0.07, el);                   // 실내등은 해가 진 뒤에 켜짐
+    for (const l of this._nightLights || []) { l.intensity = 2.4e6 * lamp; l.visible = lamp > 0.01; }
+    // 주변광(환경맵)도 밤엔 줄임 — 안 줄이면 밤에도 집이 낮처럼 밝게 보임
+    const envK = 0.06 + 0.94 * amb, seen = new Set();
+    this.scene.traverse((o) => {
+      for (const m of [].concat(o.material || [])) {
+        if (!m || seen.has(m) || !('envMapIntensity' in m)) continue;
+        seen.add(m);
+        if (m.userData._envI == null) m.userData._envI = m.envMapIntensity;
+        m.envMapIntensity = m.userData._envI * envK;
+      }
+    });
+    this._envK = envK;
+    this._needsRender = true;
+    if (this.onDaylight) this.onDaylight({ ...st, day, hour: this.sunHour, season: this.season });
+  }
+  // 밤 실내 조명 — 닫힌 방마다 천장 아래 따뜻한 점광원 (낮엔 꺼짐)
+  _buildNightLights(d, b, F, H) {
+    this._nightLights = [];
+    const rooms = d.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type)).slice(0, 10);
+    for (const r of rooms) {
+      const [x, z] = this._p(r.x + r.w / 2, r.y + r.d / 2, b);
+      const l = new THREE.PointLight('#ffd6a0', 0, 0, 2);
+      l.position.set(x, F + H - 180, z);
+      this.modelGroup.add(l); this._nightLights.push(l);
+    }
+  }
+
+  // 🧭 나침반 — 3D 화면 구석, 카메라를 돌리면 함께 돌아감
+  _buildCompass() {
+    const el = document.createElement('div');
+    el.className = 'compass compass3d';
+    el.innerHTML = `<svg viewBox="-50 -50 100 100" width="76" height="76" aria-label="방위">
+      <circle r="44" class="cp-ring"/><g class="cp-needle"><path d="M0,-30 L7,0 L0,4 L-7,0Z" class="cp-n"/><path d="M0,30 L7,0 L0,-4 L-7,0Z" class="cp-s"/></g>
+      <text class="cp-l" data-k="N">N</text><text class="cp-l" data-k="E">E</text><text class="cp-l" data-k="S">S</text><text class="cp-l" data-k="W">W</text></svg>`;
+    this.container.appendChild(el);
+    this._compass = { el, needle: el.querySelector('.cp-needle'), labels: [...el.querySelectorAll('.cp-l')] };
+  }
+  _updateCompass() {
+    if (!this._compass) return;
+    const q = this.camera.quaternion;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), rt = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+    let fx = up.x, fz = up.z; let fl = Math.hypot(fx, fz);
+    if (fl < 1e-4) { const v = new THREE.Vector3(); this.camera.getWorldDirection(v); fx = v.x; fz = v.z; fl = Math.hypot(fx, fz) || 1; }
+    fx /= fl; fz /= fl;
+    let rx = rt.x, rz = rt.z; const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
+    const [N, E] = this._northEast();
+    const ang = (v) => Math.atan2(v[0] * rx + v[1] * rz, v[0] * fx + v[1] * fz);   // 화면 위쪽 기준 시계방향
+    const a = ang(N), key = a.toFixed(3);
+    if (key === this._compassKey) return;
+    this._compassKey = key;
+    this._compass.needle.setAttribute('transform', `rotate(${a * 180 / Math.PI})`);
+    const dirs = { N, E, S: [-N[0], -N[1]], W: [-E[0], -E[1]] };
+    for (const t of this._compass.labels) {
+      const g = ang(dirs[t.dataset.k]);
+      t.setAttribute('x', (Math.sin(g) * 38).toFixed(1)); t.setAttribute('y', (-Math.cos(g) * 38 + 4).toFixed(1));
+    }
+  }
+
   // 하늘 — 위는 맑은 하늘색, 지평선은 옅은 안개색 (세로 그라데이션)
-  _skyTexture() {
+  _skyTexture(top = SKY_TOP, horizon = SKY_HORIZON) {
     const c = document.createElement('canvas');
     c.width = 2; c.height = 256;
     const x = c.getContext('2d');
     const g = x.createLinearGradient(0, 0, 0, 256);
-    g.addColorStop(0, SKY_TOP);
-    g.addColorStop(0.75, SKY_HORIZON);
-    g.addColorStop(1, SKY_HORIZON);
+    g.addColorStop(0, top);
+    g.addColorStop(0.75, horizon);
+    g.addColorStop(1, horizon);
     x.fillStyle = g; x.fillRect(0, 0, 2, 256);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -302,6 +422,8 @@ export class Viewer3D {
     }
     ground.receiveShadow = true;
     ground.userData.isGround = true;   // 3D 내보내기(GLB)에서 제외 — 블렌더에선 자체 바닥 사용
+    ground.visible = !this.underside;  // 바닥 보기: 땅을 치우고 기초·데크 하부를 보여줌
+    this._ground = ground;
     this.modelGroup.add(ground);
 
     // 기초 — 집 전체(벽·바닥·데크·포치·지붕)를 기초 높이만큼 올리고, 그 아래를 콘크리트 기초/데크 하부로 채움.
@@ -353,6 +475,8 @@ export class Viewer3D {
     } finally {
       this.modelGroup = root;
     }
+    this._buildNightLights(d, b, F, H);
+    this.applyDaylight();
     this.usingModel3d = !!m3dNode;
     if (this.onModel3dState) {
       const e = m3d.url && (this._m3dCache || {})[m3d.url];
@@ -1792,6 +1916,7 @@ export class Viewer3D {
     this._resize();   // 매 활성 프레임에 컨테이너 크기와 동기화 (탭 전환 후 흰 화면 자가 복구)
     if (this.dirty) this.rebuild();
     this.controls.update();   // 감쇠(관성) 회전 중이면 'change' → _needsRender
+    this._updateCompass();
     // 변화가 있을 때만 렌더. 혹시 놓친 변경이 있어도 1초마다 한 번은 다시 그려 자가 복구
     if (this._needsRender || performance.now() - this._lastRender > 1000) {
       this._needsRender = false;
@@ -2383,8 +2508,27 @@ export class Viewer3D {
     this.dirty = true;
   }
 
+  // 바닥 보기 — 땅을 숨기고 아래에서 올려다봄 (기초 콘크리트·데크 하부·장선)
+  setUnderside(on) {
+    this.underside = !!on;
+    if (this._ground) this._ground.visible = !on;
+    if (this.underLight) this.underLight.intensity = on ? 1.1 : 0;
+    this._needsRender = true;
+  }
+
   view(type) {
     const b = this._bounds();
+    this.setUnderside(type === 'under');
+    if (type === 'under') {
+      this.camera.fov = 50; this.camera.updateProjectionMatrix();
+      this.controls.maxPolarAngle = Math.PI * 0.98;   // 땅 아래로 내려가 올려다보기
+      this._aerialZoomLimits(b);
+      const d = Math.max(b.w, b.h) * 1.1 + 5000;
+      this.camera.position.set(d * 0.6, -d * 0.75, d * 0.8);
+      this.controls.target.set(0, 0, 0);
+      this.controls.update();
+      return;
+    }
     if (type === 'interior') {
       // 실내 시점 — 집 안 눈높이(1450mm)에서 반대편을 바라봄. 둘러보기 가능.
       this.camera.fov = 62; this.camera.updateProjectionMatrix();

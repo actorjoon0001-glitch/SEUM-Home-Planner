@@ -239,6 +239,11 @@ export class Viewer3D {
       l.position.set(x, F + H - 180, z);
       this.modelGroup.add(l); this._nightLights.push(l);
     }
+    for (const v of this._cmpLamps || []) {   // 비교 중인 옆집
+      const l = new THREE.PointLight('#ffd6a0', 0, 0, 2);
+      l.position.copy(v);
+      this.modelGroup.add(l); this._nightLights.push(l);
+    }
   }
 
   // 🧭 나침반 — 3D 화면 구석, 카메라를 돌리면 함께 돌아감
@@ -386,6 +391,7 @@ export class Viewer3D {
     this._needsRender = true;
     // 실물 모델은 캐시해서 계속 재사용 → 아래 일괄 해제에 휩쓸리지 않게 먼저 떼어냄
     for (const e of Object.values(this._m3dCache || {})) if (e.node && e.node.parent) e.node.parent.remove(e.node);
+    if (this.compare && this.compare.node && this.compare.node.parent) this.compare.node.parent.remove(this.compare.node);
     // 기존 제거 — 지오메트리는 매번 새로 만들므로 GPU 메모리도 함께 해제 (편집할수록 느려지는 것 방지)
     //   (재질·텍스처는 textures.js 캐시를 공유하므로 해제하지 않음)
     this.modelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -475,6 +481,7 @@ export class Viewer3D {
     } finally {
       this.modelGroup = root;
     }
+    this._buildCompare(root, house, b);
     this._buildNightLights(d, b, F, H);
     this.applyDaylight();
     this.usingModel3d = !!m3dNode;
@@ -503,6 +510,88 @@ export class Viewer3D {
     else if (m.sig != null && model3dSig(d) !== m.sig) reason = '창·문 배치';
     else if (this.faceMode || (d.exteriorFaces && Object.keys(d.exteriorFaces).length)) reason = '면별 외장재';
     return { available: !reason, mismatch: !!reason, reason, url: m.url, label: m.label || '', ox: x0, oy: y0 };
+  }
+
+  // 🏘️ 주택 비교 — 다른 제품(실물 모델)을 지금 집 동쪽에 4m 띄워 나란히 세움. 해·시간·방위는 함께 적용
+  //   design: instantiateTemplate 결과, title: 라벨. null 이면 비교 끄기
+  setCompare(design, title) {
+    this.compare = design ? { design, title: title || design.name || '' } : null;
+    this._cmpFrame = !!design;
+    if (!design) this._needCam = true;   // 끄면 원래 집 시점으로
+    this.dirty = true;
+  }
+  _buildCompare(root, house, b) {
+    this._cmpLabels = null; this._cmpLamps = null;
+    const c = this.compare;
+    const mainBox = new THREE.Box3().setFromObject(house);
+    if (!c || mainBox.isEmpty()) return this._syncCmpLabels();
+    const spec = this._model3dSpec(c.design);
+    const src = spec.available ? this._model3dNode(spec.url) : null;   // 처음이면 불러오기 시작 → 다 받으면 다시 그림
+    if (!src) return this._syncCmpLabels();
+    if (!c.node || c.url !== spec.url) { c.node = this._cloneModel3d(src); c.url = spec.url; }
+    const node = c.node;
+    this._applyModel3dOptions(node, c.design);
+    node.traverse((o) => { if (o.userData && o.userData.roof) o.visible = this.showRoof; });
+    node.position.set(0, 0, 0); node.updateMatrixWorld(true);
+    const cb = new THREE.Box3().setFromObject(node);
+    const gap = 4000;
+    node.position.set(mainBox.max.x + gap - cb.min.x, 0, (mainBox.min.z + mainBox.max.z) / 2 - (cb.min.z + cb.max.z) / 2);
+    root.add(node);
+    node.updateMatrixWorld(true);
+    const nb = new THREE.Box3().setFromObject(node);
+    // 비교 집 밤 실내등 위치 (GLB 원점 = 그 도면 방들의 북서쪽 모서리)
+    const cd = c.design, cF = Math.max(0, +cd.foundationHeight || 0), cH = cd.ceilingHeight || 2400;
+    this._cmpLamps = cd.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type)).slice(0, 10).map((r) =>
+      new THREE.Vector3(node.position.x + r.x + r.w / 2 - spec.ox, cF + cH - 180, node.position.z + r.y + r.d / 2 - spec.oy));
+    const top = (bx) => new THREE.Vector3((bx.min.x + bx.max.x) / 2, bx.max.y + 700, (bx.min.z + bx.max.z) / 2);
+    this._cmpLabels = [{ pos: top(mainBox), text: (store.design.name || '현재 도면').trim() }, { pos: top(nb), text: c.title }];
+    // 두 집이 다 들어오게 그림자 범위·카메라 맞춤
+    const all = mainBox.clone().union(nb);
+    const ext = Math.max(Math.abs(all.min.x), Math.abs(all.max.x), Math.abs(all.min.z), Math.abs(all.max.z));
+    this._fitShadow({ w: Math.max(0, ext * 2 - 5000), h: 0 });   // 반경 ≈ ext + 1.5m
+    const ab = { w: all.max.x - all.min.x, h: all.max.z - all.min.z };
+    this._aerialZoomLimits(ab);
+    if (this._cmpFrame) {
+      this._cmpFrame = false;
+      const cx = (all.min.x + all.max.x) / 2, cz = (all.min.z + all.max.z) / 2, dist = Math.max(ab.w, ab.h) * 0.95 + 5000;
+      this.controls.target.set(cx, 0, cz);
+      this.camera.position.set(cx + dist * 0.25, dist * 0.7, cz + dist * 1.0);
+      this.controls.update();
+    }
+    this._syncCmpLabels();
+  }
+  // 캐시된 실물 모델 복제 — userData.m3dOrig(재질)는 clone 시 JSON 으로 깨지므로 따로 옮김
+  _cloneModel3d(src) {
+    const meshes = []; src.traverse((o) => { if (o.isMesh) meshes.push(o); });
+    const saved = meshes.map((o) => { const m = o.userData.m3dOrig || o.material; delete o.userData.m3dOrig; return m; });
+    const node = src.clone();
+    meshes.forEach((o, i) => { o.userData.m3dOrig = saved[i]; });
+    let i = 0;
+    node.traverse((o) => { if (o.isMesh) { o.userData.m3dOrig = saved[i]; o.material = saved[i]; i++; } });
+    node.name = 'compare3d';   // 클릭해도 지금 집이 선택되지 않게
+    return node;
+  }
+  // 비교 라벨(집 이름) — 3D 위에 띄우는 HTML
+  _syncCmpLabels() {
+    const L = this._cmpLabels || [];
+    this._cmpEls = this._cmpEls || [];
+    while (this._cmpEls.length < L.length) {
+      const el = document.createElement('div'); el.className = 'cmp-label';
+      this.container.appendChild(el); this._cmpEls.push(el);
+    }
+    this._cmpEls.forEach((el, i) => { el.style.display = L[i] ? '' : 'none'; if (L[i]) { el.textContent = L[i].text; el.classList.toggle('cmp-b', i === 1); } });
+    this._updateCmpLabels();
+  }
+  _updateCmpLabels() {
+    const L = this._cmpLabels; if (!L || !this._cmpEls) return;
+    const w = this.container.clientWidth, h = this.container.clientHeight;
+    L.forEach((l, i) => {
+      const el = this._cmpEls[i]; if (!el) return;
+      const v = l.pos.clone().project(this.camera);
+      const vis = v.z < 1 && Math.abs(v.x) < 1.2 && Math.abs(v.y) < 1.2;
+      el.style.display = vis ? '' : 'none';
+      el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -100%)`;
+    });
   }
 
   // 제품 옵션(model3d.optionSets) → 실물 모델 부품에 적용. 고른 게 없으면(orig) 블렌더 원래 마감 그대로
@@ -1917,6 +2006,7 @@ export class Viewer3D {
     if (this.dirty) this.rebuild();
     this.controls.update();   // 감쇠(관성) 회전 중이면 'change' → _needsRender
     this._updateCompass();
+    this._updateCmpLabels();
     // 변화가 있을 때만 렌더. 혹시 놓친 변경이 있어도 1초마다 한 번은 다시 그려 자가 복구
     if (this._needsRender || performance.now() - this._lastRender > 1000) {
       this._needsRender = false;

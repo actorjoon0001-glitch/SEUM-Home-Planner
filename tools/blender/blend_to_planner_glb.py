@@ -140,11 +140,23 @@ for m in proc:
             nu = uvs.new(name='BakeUV')
             if not had: nu.active_render = True
         uvs.active = uvs['BakeUV']
+    # 펼칠 때만 크기 배율을 형태에 적용(실제 크기 기준으로 UV 면적 배분) → 펼친 뒤 원래대로
+    #   (mm 단위로 만들고 0.001배 한 부품이 섞이면, 그 부품이 UV를 독차지하고 나머지는 점처럼 찌그러짐)
+    saved = {}
+    for o in objs:
+        sv = o.scale.copy()
+        if o.data.name in saved or all(abs(v - 1) < 1e-6 for v in sv): continue
+        co = np.empty(len(o.data.vertices) * 3, dtype=np.float32); o.data.vertices.foreach_get('co', co)
+        saved[o.data.name] = (o, co, sv)
+        o.data.vertices.foreach_set('co', (co.reshape(-1, 3) * np.array(sv, dtype=np.float32)).ravel())
+        o.scale = (1, 1, 1)
     sel_only(objs)
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.003, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode='OBJECT')
+    for o, co, sv in saved.values():
+        o.data.vertices.foreach_set('co', co); o.scale = sv; o.data.update()
     area = world_area(objs)
     size = 2048 if area > 30 else (1024 if area > 2 else 512)
     img = bpy.data.images.new("bake_" + m.name, size, size, alpha=True)
@@ -174,12 +186,17 @@ for m in proc:
     ti = nt.nodes.new('ShaderNodeTexImage'); ti.image = baked[m.name]
     nt.links.new(ti.outputs['Color'], nb.inputs['Base Color'])
     nt.links.new(nb.outputs['BSDF'], out.inputs['Surface'])
-# 구운 무늬는 BakeUV 로 읽음 → BakeUV 만 남기고 렌더용으로 지정
+# UV 정리 — 구운 재질 부품은 BakeUV 한 벌만, 무늬 없는 재질 부품은 UV 없음
+#   (합칠 때 부품마다 UV 이름이 다르면 UV가 두 벌 생기고, 웹이 엉뚱한 쪽으로 무늬를 읽어 단색·검정으로 보임)
+baked_names = set(baked)
 for o in bpy.data.objects:
-    if 'BakeUV' in o.data.uv_layers:
-        uvs = o.data.uv_layers
-        uvs['BakeUV'].active_render = True
-        for l in [l for l in uvs if l.name != 'BakeUV']: uvs.remove(l)
+    uvs = o.data.uv_layers
+    m = obj_mat(o)
+    keep = 'BakeUV' if (m and m.name in baked_names and 'BakeUV' in uvs) else None
+    for name in [l.name for l in uvs if l.name != keep]:
+        uvs.remove(uvs[name])
+    if keep:
+        uvs[keep].active = True; uvs[keep].active_render = True
 for m in bpy.data.materials:
     if m.node_tree and m.node_tree.nodes.get("__bake"): m.node_tree.nodes.remove(m.node_tree.nodes["__bake"])
 

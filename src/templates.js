@@ -284,11 +284,27 @@ const T = [
       name: '세움 15평 단독 (7,000×7,000)',
       productType: '주택',
       ceilingHeight: 2400,
-      exterior: { material: 'metal', color: '#3d4651' },
-      roof: { type: 'gable', color: '#2e3b30' },
-      model3d: { url: 'models/seum-15.glb', fit: [8500, 9000], roofType: 'gable', ridge: 'z',
-        optionSets: genOptionSets({ wallKind: 'metal', wallLabel: '외장 (메탈사이딩)', wall: ['네이비', '#3d4651'],
-          roof: ['그린', '#2e3b30'], window: ['그레이', '#4a5560'], door: ['그레이', '#4a5560'], deck: true, steel: ['차콜', '#2f3033'] }) },
+      foundationHeight: 310,   // 블렌더 시뮬레이션 기준 바닥 높이(콘크리트 기초 위 마루)
+      exterior: { material: 'wood', color: '#9c6b43', dir: 'v' },
+      roof: { type: 'gable', color: '#3c3d40', ridge: 'x' },
+      // 3D 실물 모델 — 대표님이 디테일 잡은 블렌더 시뮬레이션(가구·조명·소품 포함)
+      //   ownFurniture: 모델에 가구가 이미 있으므로 도면 기본 가구는 3D에서 숨김(상담 중 추가한 가구만 표시)
+      model3d: { url: 'models/seum-15.glb', fit: [8500, 9000], roofType: 'gable', ridge: 'x', label: '시뮬레이션', ownFurniture: true,
+        optionSets: [
+          { key: 'wall', label: '외장 (우드 사이딩)', parts: ['Ext_Wood', '지붕_Ext_Wood'],
+            choices: [{ id: 'orig', label: '우드', swatch: '#9c6b43' }, ...WALL_CHOICES.wood] },
+          { key: 'accent', label: '포인트 (블랙 사이딩)', parts: ['Ext_Black', '지붕_Ext_Black'],
+            choices: [{ id: 'orig', label: '블랙', swatch: '#232427' }, ...WALL_CHOICES.metal.filter((c) => c.id !== 'brown')] },
+          { key: 'roof', label: '지붕·후레싱', parts: ['Roof_DarkGray', '지붕_Roof_DarkGray', 'Metal_Flashing', '지붕_Metal_Flashing'],
+            choices: pick(['다크그레이', '#3c3d40'], ['black', 'charcoal', 'gray', 'brown', 'green', 'red']) },
+          { key: 'steel', label: '난간·기둥·철물', parts: ['Metal_Black', '지붕_Metal_Black'],
+            choices: pick(['블랙', '#1f1f22'], ['charcoal', 'white', 'gray', 'bronze']) },
+          { key: 'window', label: '창틀', parts: ['I_FrameDarkGray', '지붕_I_FrameDarkGray'],
+            choices: pick(['다크그레이', '#333537'], ['black', 'white', 'gray', 'brown']) },
+          { key: 'deck', label: '데크', parts: ['Deck_Composite', 'Deck_Porch'],
+            choices: [{ id: 'orig', label: '우드', swatch: '#8a6a4a' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
+              RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
+        ] },
       rooms: [
         // 좌측 — 주방·다이닝(위) + 거실(아래) 개방형 LDK
         { key: 'kit', type: 'kitchen', name: '주방·다이닝', x: 0,    y: 0,    w: 4300, d: 2800, open: ['s'] },
@@ -640,7 +656,11 @@ export function instantiateTemplate(id) {
     ...(b.model3d ? { model3d: JSON.parse(JSON.stringify(b.model3d)) } : {}),   // 3D 실물 모델(블렌더 GLB)
     rooms, openings, furniture,
   });
-  if (design.model3d) design.model3d.sig = model3dSig(design);   // 원래 창·문 배치 기억 → 바꾸면 자동 모델
+  if (design.model3d) {
+    design.model3d.sig = model3dSig(design);   // 원래 창·문 배치 기억 → 바꾸면 자동 모델
+    // 모델에 가구가 이미 있는 제품: 도면 기본 가구는 3D에서 숨김 (상담 중 새로 추가한 가구만 3D에 표시)
+    if (design.model3d.ownFurniture) design.model3d.baseFurn = design.furniture.map((f) => f.id);
+  }
   return design;
 }
 

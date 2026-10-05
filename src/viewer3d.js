@@ -327,7 +327,9 @@ export class Viewer3D {
         m3dNode.traverse((o) => { if (o.userData && o.userData.roof) o.visible = this.showRoof; });   // 지붕·천장 토글
         this._applyModel3dOptions(m3dNode, d);  // 제품 옵션(외장·띠·지붕·프레임·창틀·데크 색)
         house.add(m3dNode);
-        for (const f of d.furniture) this._buildFurniture(f, b, H);   // 상담 중 추가한 가구는 실물 모델 안에 함께
+        // 상담 중 추가한 가구는 실물 모델 안에 함께 (모델에 가구가 이미 있는 제품은 도면 기본 가구 제외)
+        const baseFurn = new Set((d.model3d && d.model3d.baseFurn) || []);
+        for (const f of d.furniture) if (!baseFurn.has(f.id)) this._buildFurniture(f, b, H);
         if (store.selectedRoom) this._buildEditHandles(d, b);
       } else if (m3dWaiting) {
         // 실물 모델 불러오는 중 — 다 받으면 다시 그림

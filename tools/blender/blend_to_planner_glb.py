@@ -16,6 +16,7 @@
 #   --max-obj-tris : 이보다 무거운 부품(이불·쿠션 주름 등)은 모양 유지하며 간소화 (0=끔)
 #   --exclude-collection : 이 컬렉션의 오브젝트는 빼고 변환 (쉼표 구분, 예: Backdrop — 렌더용 배경·잔디)
 #   --hq : 무늬 굽기 해상도를 한 단계 올림 (큰 면 4096 / 중간 2048 / 작은 부품 1024) — 선명하지만 파일이 커짐
+#   겹친 면(같은 자리에 붙은 두 부품의 면)은 웹에서 깜빡이므로 큰 쪽을 0.6mm 뒤로 밀어 정리 (--keep-coplanar 로 끔)
 #   이미지 무늬를 쓰는 재질은 원래 UV를 살린 채 새 UV(BakeUV)에 구움 · 렌더 숨김 부품은 제외 · 곡선은 형태로 변환
 #   결과: 출력폴더/<입력이름>.glb  (models/ 에 넣고 템플릿의 model3d.url 로 지정)
 import bpy
@@ -33,6 +34,7 @@ ap.add_argument('--max-obj-tris', type=int, default=0)
 ap.add_argument('--jpeg', type=int, default=82)
 ap.add_argument('--exclude-collection', default='')
 ap.add_argument('--hq', action='store_true')
+ap.add_argument('--keep-coplanar', action='store_true')
 A = ap.parse_args(argv)
 SRC, OUT = A.src, A.out
 os.makedirs(OUT, exist_ok=True)
@@ -90,6 +92,99 @@ bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')   # 월드 위치 그�
 for o in list(bpy.data.objects):
     if o.type != 'MESH' or o.name in cutters:
         bpy.data.objects.remove(o, do_unlink=True)
+
+# 1.5) 겹친 면 정리 — 서로 다른 부품의 면이 같은 자리·같은 방향으로 겹치면 웹에서 깜빡임(z-fighting)
+#   (창 몰딩이 마감재 속에 묻힌 경우, 천장 마감판이 처마 밑면과 딱 붙은 경우 등)
+#   → 겹친 두 부품 중 큰 쪽의 그 면을 0.6mm 뒤로 밀어 작은 부품(디테일)이 보이게 함. 축에 나란한 면만 검사
+def fix_coplanar(push=0.0006, tol=0.00025, cell=0.3):
+    import numpy as np
+    from collections import defaultdict
+    objs = [o for o in bpy.data.objects if o.type == 'MESH' and o.data.polygons]
+    size = {}
+    faces = defaultdict(list)          # (축, 방향) → [(평면값, 2D 사각범위, 2D 다각형, 오브젝트, 폴리곤 index)]
+    for oi, o in enumerate(objs):
+        M = o.matrix_world; me = o.data
+        co = np.empty(len(me.vertices) * 3, dtype=np.float64); me.vertices.foreach_get('co', co)
+        W = co.reshape(-1, 3) @ np.array(M.to_3x3()).T + np.array(M.translation)
+        size[oi] = float(np.prod(np.maximum(W.max(0) - W.min(0), 0.01))) if len(W) else 0
+        for p in me.polygons:
+            n = M.to_3x3() @ p.normal
+            if n.length < 1e-9: continue
+            n.normalize()
+            a = max(range(3), key=lambda i: abs(n[i]))
+            if abs(n[a]) < 0.999: continue
+            V = W[list(p.vertices)]
+            ax = [i for i in range(3) if i != a]
+            P2 = V[:, ax]
+            faces[(a, 1 if n[a] > 0 else -1)].append((float(V[:, a].mean()), P2.min(0), P2.max(0), P2, oi, p.index))
+    def area(poly):
+        x, y = poly[:, 0], poly[:, 1]
+        return 0.5 * float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+    def clip(subj, cl):
+        if area(cl) < 0: cl = cl[::-1]
+        out = list(map(tuple, subj))
+        for i in range(len(cl)):
+            A, B = cl[i], cl[(i + 1) % len(cl)]
+            inp, out = out, []
+            if not inp: break
+            ins = lambda q: (B[0]-A[0]) * (q[1]-A[1]) - (B[1]-A[1]) * (q[0]-A[0]) >= -1e-12
+            def X(q, r):
+                d = (q[0]-r[0]) * (A[1]-B[1]) - (q[1]-r[1]) * (A[0]-B[0])
+                if abs(d) < 1e-18: return r
+                t = ((q[0]-A[0]) * (A[1]-B[1]) - (q[1]-A[1]) * (A[0]-B[0])) / d
+                return (q[0] + t * (r[0]-q[0]), q[1] + t * (r[1]-q[1]))
+            for j in range(len(inp)):
+                q, r = inp[j], inp[(j + 1) % len(inp)]
+                if ins(r):
+                    if not ins(q): out.append(X(q, r))
+                    out.append(r)
+                elif ins(q): out.append(X(q, r))
+        return np.array(out) if len(out) >= 3 else None
+    # 같은 평면에서 겹치는 부품끼리 묶고(연결 요소), 작은 부품부터 0, 0.6, 1.2mm … 순서로 층을 나눔
+    #   (한 쌍씩 큰 쪽만 밀면 그 부품이 다른 부품과 다시 겹칠 수 있음 — 벽 모서리처럼 여럿이 만나는 곳)
+    parent = {}
+    def find(x):
+        while parent.setdefault(x, x) != x:
+            parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    node_faces = defaultdict(list)
+    hits = defaultdict(float)
+    for (a, sg), L in faces.items():
+        L.sort(key=lambda f: f[0])
+        i0 = 0
+        for i, f in enumerate(L):          # 평면값이 tol 이내인 것끼리만 (정렬 후 슬라이딩)
+            while L[i0][0] < f[0] - tol: i0 += 1
+            for g in L[i0:i]:
+                if g[4] == f[4]: continue
+                if (f[1] > g[2] - 1e-6).any() or (g[1] > f[2] - 1e-6).any(): continue
+                ov = clip(f[3], g[3])
+                if ov is None or abs(area(ov)) < 1e-6: continue    # 1cm² 미만은 무시
+                nf = (f[4], a, sg, round(f[0] / (2 * tol))); ng = (g[4], a, sg, round(g[0] / (2 * tol)))
+                parent[find(nf)] = find(ng)
+                hits[tuple(sorted((objs[f[4]].name, objs[g[4]].name)))] += abs(area(ov))
+            node_faces[(f[4], a, sg, round(f[0] / (2 * tol)))].append(f[5])
+    comps = defaultdict(list)
+    for nd in parent: comps[find(nd)].append(nd)
+    moves = defaultdict(dict)          # 오브젝트 → {꼭짓점: 월드 이동 벡터}
+    for members in comps.values():
+        members.sort(key=lambda nd: (size[nd[0]], objs[nd[0]].name))
+        for rank, (oi, a, sg, _) in enumerate(members):
+            if not rank: continue
+            vd = moves[oi]
+            for pi in node_faces[(oi, a, sg, _)]:
+                for vi in objs[oi].data.polygons[pi].vertices:
+                    v = vd.setdefault(vi, [0.0, 0.0, 0.0])
+                    if rank * push > abs(v[a]): v[a] = -sg * rank * push
+    for oi, vd in moves.items():
+        o = objs[oi]
+        if o.data.users > 1: o.data = o.data.copy()
+        Minv = o.matrix_world.to_3x3().inverted()
+        for vi, d in vd.items(): o.data.vertices[vi].co += Minv @ mathutils.Vector(d)
+        o.data.update()
+    print(f"겹친 면 정리: {len(hits)}쌍, 부품 {len(moves)}개 조정")
+    for k, v in sorted(hits.items(), key=lambda x: -x[1])[:12]: print(f"  {k[0]} ↔ {k[1]}  {v*1e4:.0f}cm²")
+if not A.keep_coplanar:
+    for _ in range(2): fix_coplanar()   # 두 번째는 밀면서 새로 생긴 겹침 정리
 
 # 2) 재질별로 분리 — 부품마다 재질 하나 → 재질마다 따로 펼쳐 무늬 이미지를 꽉 채워 굽기 위함
 sel_only(list(bpy.data.objects))

@@ -167,6 +167,7 @@ for m in proc:
     bpy.ops.object.mode_set(mode='OBJECT')
     for o, co, sv in saved.values():
         o.data.vertices.foreach_set('co', co); o.scale = sv; o.data.update()
+    vl.update()   # 되돌린 크기 배율을 matrix_world 에 반영 (안 하면 면적이 mm² 로 계산돼 굽기 해상도가 과해짐)
     area = world_area(objs)
     size = (4096 if area > 40 else (2048 if area > 4 else 1024)) if A.hq else (2048 if area > 30 else (1024 if area > 2 else 512))
     img = bpy.data.images.new("bake_" + m.name, size, size, alpha=True)

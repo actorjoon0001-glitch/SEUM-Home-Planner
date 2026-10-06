@@ -15,6 +15,7 @@
 #   --roof-prefix : 이 이름으로 시작하는 오브젝트도 지붕으로 (쉼표 구분, 예: Canopy,PDL)
 #   --max-obj-tris : 이보다 무거운 부품(이불·쿠션 주름 등)은 모양 유지하며 간소화 (0=끔)
 #   --exclude-collection : 이 컬렉션의 오브젝트는 빼고 변환 (쉼표 구분, 예: Backdrop — 렌더용 배경·잔디)
+#   --exclude-objects : 이 이름의 오브젝트는 빼고 변환 (쉼표 구분, 예: Ground — 렌더용 잔디 바닥)
 #   --hq : 무늬 굽기 해상도를 한 단계 올림 (큰 면 4096 / 중간 2048 / 작은 부품 1024) — 선명하지만 파일이 커짐
 #   겹친 면(같은 자리에 붙은 두 부품의 면)은 웹에서 깜빡이므로 큰 쪽을 0.6mm 뒤로 밀어 정리 (--keep-coplanar 로 끔)
 #   이미지 무늬를 쓰는 재질은 원래 UV를 살린 채 새 UV(BakeUV)에 구움 · 렌더 숨김 부품은 제외 · 곡선은 형태로 변환
@@ -33,6 +34,7 @@ ap.add_argument('--roof-prefix', default='')
 ap.add_argument('--max-obj-tris', type=int, default=0)
 ap.add_argument('--jpeg', type=int, default=82)
 ap.add_argument('--exclude-collection', default='')
+ap.add_argument('--exclude-objects', default='')
 ap.add_argument('--hq', action='store_true')
 ap.add_argument('--keep-coplanar', action='store_true')
 A = ap.parse_args(argv)
@@ -64,6 +66,10 @@ for cn in [c.strip() for c in A.exclude_collection.split(',') if c.strip()]:
     if not c: print("컬렉션 없음:", cn); continue
     for o in list(c.all_objects): bpy.data.objects.remove(o, do_unlink=True)
     print("제외:", cn)
+for on in [c.strip() for c in A.exclude_objects.split(',') if c.strip()]:
+    o = bpy.data.objects.get(on)
+    if o: bpy.data.objects.remove(o, do_unlink=True); print("제외 오브젝트:", on)
+    else: print("오브젝트 없음:", on)
 # 블렌더 조명 → 출력폴더/<이름>.lights.json (웹 3D 에서 다운라이트·간접등을 실제 조명으로 켬)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lights_json

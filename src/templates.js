@@ -442,45 +442,53 @@ const T = [
       name: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
       productType: '농막',
       ceilingHeight: 2400,
-      exterior: { material: 'metal', color: '#3a3d42' },
-      roof: { type: 'gable', color: '#2e3b30', ridge: 'x' },   // 긴 건물(12.9m) — 용마루 가로
-      model3d: { url: 'models/twin-10.glb', fit: [12900, 3200], roofType: 'gable', ridge: 'x',
-        optionSets: genOptionSets({ wallKind: 'metal', wallLabel: '외장 (메탈사이딩)', wall: ['차콜', '#3a3d42'],
-          roof: ['그린', '#2e3b30'], window: ['그레이', '#4a5560'], door: ['그레이', '#4a5560'], deck: true, steel: ['차콜', '#2f3033'] }) },
+      exterior: { material: 'wood', color: '#a0703f', dir: 'v' },
+      roof: { type: 'gable', color: '#2a2b2d', ridge: 'z' },   // 6평동 징크 박공(앞뒤로 긴 용마루) · 4평동 평지붕
+      // 3D 실물 모델 — 블렌더로 디테일 작업한 본점 쌍둥이 시뮬레이션 (가구·조명·데크 그늘막 포함)
+      model3d: { url: 'models/twin-10.glb', fit: [8850, 6380], roofType: 'gable', ridge: 'z', label: '시뮬레이션', ownFurniture: true,
+        optionSets: [
+          { key: 'wall', label: '외장 (우드 사이딩)', parts: ['TD_WoodSiding', '지붕_TD_WoodSiding'],
+            choices: [{ id: 'orig', label: '우드', swatch: '#a0703f' }, ...WALL_CHOICES.wood] },
+          { key: 'roof', label: '지붕 (징크)', parts: ['TD_Zinc', '지붕_TD_Zinc', 'TD_SeamCap', '지붕_TD_SeamCap', 'TD_ZincTrim', '지붕_TD_ZincTrim'],
+            choices: pick(['차콜', '#2a2b2d'], ['black', 'gray', 'brown', 'green', 'red']) },
+          { key: 'window', label: '창틀·프레임', parts: ['TD_WinFrame', '지붕_TD_WinFrame', 'TD_FrameBlack', '지붕_TD_FrameBlack', 'TD_WinSurround', '지붕_TD_WinSurround'],
+            choices: pick(['블랙', '#1c1f24'], ['charcoal', 'white', 'gray', 'bronze']) },
+          { key: 'trim', label: '몰딩·물받이', parts: ['TD_TrimGray', '지붕_TD_TrimGray', 'TD_Gutter', '지붕_TD_Gutter'],
+            choices: pick(['차콜', '#2a2b2e'], ['black', 'white', 'gray', 'bronze']) },
+          { key: 'deck', label: '데크', parts: ['TD_DeckEmboss', '지붕_TD_DeckEmboss'],
+            choices: [{ id: 'orig', label: '우드', swatch: '#8a6a4a' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
+              RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
+        ] },
+      // 실물 모델 배치: 외곽 8,850×6,380 — 6평동(좌 2,780) · 중앙 데크(2,810, 그늘막) · 4평동(우 3,260)
+      //  6평동: 뒤(북) 욕실 · 앞(남) 거실·주방 / 4평동: 침실 / 두 동 모두 데크 쪽으로 출입
       rooms: [
-        // 6평 동(좌) — 6,200×3,200 개방형 거실·침실
-        { key: 'A_liv',  type: 'living',   name: '거실·침실(6평동)', x: 0,     y: 0,    w: 6200, d: 3200 },
-        // 중앙 데크(브리즈웨이) 2,600×3,200 — 개방형(벽 없음), 지붕이 덮는 통로
-        { key: 'deck',   type: 'deck',     name: '데크',             x: 6200,  y: 0,    w: 2600, d: 3200 },
-        // 4평 동(우) — 4,100×3,200 : 거실·주방 / 욕실 / 현관
-        { key: 'B_liv',  type: 'living',   name: '거실·주방(4평동)', x: 8800,  y: 0,    w: 2900, d: 3200 },
-        { key: 'B_bath', type: 'bath',     name: '욕실',             x: 11700, y: 0,    w: 1200, d: 1600 },
-        { key: 'B_ent',  type: 'entrance', name: '현관',             x: 11700, y: 1600, w: 1200, d: 1600 },
+        { key: 'A_bath', type: 'bath',    name: '욕실',             x: 0,    y: 0,    w: 2780, d: 1790 },
+        { key: 'A_liv',  type: 'living',  name: '거실·주방(6평동)', x: 0,    y: 1790, w: 2780, d: 4590 },
+        { key: 'deck',   type: 'deck',    name: '데크',             x: 2780, y: 0,    w: 2810, d: 6380 },
+        { key: 'B_bed',  type: 'bedroom', name: '침실(4평동)',      x: 5590, y: 0,    w: 3260, d: 6380 },
       ],
       openings: [
-        // 6평 동
-        { roomKey: 'A_liv',  side: 's', pos: 3100, winType: 'folding',   w: 3200, h: 2100 },        // 남측 폴딩도어(메인)
-        { roomKey: 'A_liv',  side: 'e', pos: 1600, winType: 'swingDoor', w: 900,  h: 2100 },        // 데크측 출입문
-        { roomKey: 'A_liv',  side: 'w', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 900 },
-        { roomKey: 'A_liv',  side: 'n', pos: 3100, winType: 'fixed',     w: 2000, h: 600,  sill: 1400 },
-        // 4평 동
-        { roomKey: 'B_liv',  side: 'w', pos: 1600, winType: 'swingDoor', w: 900,  h: 2100 },        // 데크측 출입문
-        { roomKey: 'B_liv',  side: 's', pos: 1450, winType: 'sliding',   w: 2000, h: 2100, sill: 0 },
-        { roomKey: 'B_liv',  side: 'n', pos: 1450, winType: 'fixed',     w: 1500, h: 700,  sill: 1100 },
-        { roomKey: 'B_bath', side: 'n', pos: 600,  winType: 'casement',  w: 600,  h: 1200, sill: 1100 },
-        { roomKey: 'B_ent',  side: 'e', pos: 800,  winType: 'swingDoor', w: 900,  h: 2100 },
+        // 6평동 — 남측 주방창, 서측 거실창, 데크 쪽 출입문 + 이동창
+        { roomKey: 'A_liv',  side: 's', pos: 1470, winType: 'fixed',     w: 1060, h: 760,  sill: 880 },
+        { roomKey: 'A_liv',  side: 'w', pos: 1930, winType: 'double',    w: 1660, h: 1060, sill: 970 },
+        { roomKey: 'A_liv',  side: 'e', pos: 530,  winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'A_liv',  side: 'e', pos: 2380, winType: 'sliding',   w: 2040, h: 2100, sill: 0 },
+        { roomKey: 'A_bath', side: 'w', pos: 970,  winType: 'fixed',     w: 760,  h: 660,  sill: 1370 },
+        { roomKey: 'A_bath', side: 's', pos: 2100, winType: 'swingDoor', w: 830,  h: 2000 },
+        // 4평동 — 데크 쪽 폴딩도어, 앞·뒤 고정창, 동측 창
+        { roomKey: 'B_bed',  side: 'w', pos: 3670, winType: 'folding',   w: 3300, h: 2250 },
+        { roomKey: 'B_bed',  side: 's', pos: 1630, winType: 'fixed',     w: 1640, h: 1240, sill: 730 },
+        { roomKey: 'B_bed',  side: 'n', pos: 1630, winType: 'fixed',     w: 1640, h: 1240, sill: 730 },
+        { roomKey: 'B_bed',  side: 'e', pos: 3020, winType: 'fixed',     w: 2040, h: 960,  sill: 1240 },
       ],
       furniture: [
-        // 6평 동
-        { catalogId: 'bedQ',   x: 1400, y: 1100, rotation: 0 },
-        { catalogId: 'sofa2',  x: 4200, y: 800,  rotation: 0 },
-        { catalogId: 'tv',     x: 5900, y: 1600, rotation: 90 },
-        // 4평 동
-        { catalogId: 'sofa2',  x: 9700, y: 2400, rotation: 0 },
-        { catalogId: 'sink',   x: 9200, y: 400,  rotation: 0 },
-        { catalogId: 'fridge', x: 11300, y: 400, rotation: 0 },
-        { catalogId: 'toilet', x: 12000, y: 500, rotation: 0 },
-        { catalogId: 'basin',  x: 12650, y: 350, rotation: 0 },
+        // 6평동 — 앞 주방, 가운데 거실 / 4평동 — 침대·수납
+        { catalogId: 'sink',   x: 1500, y: 5900, rotation: 180 },
+        { catalogId: 'fridge', x: 450,  y: 5600, rotation: 180 },
+        { catalogId: 'sofa2',  x: 1300, y: 3600, rotation: 90 },
+        { catalogId: 'toilet', x: 700,  y: 500,  rotation: 0 },
+        { catalogId: 'basin',  x: 1500, y: 350,  rotation: 0 },
+        { catalogId: 'bedQ',   x: 7600, y: 1300, rotation: 0 },
       ],
     },
   },

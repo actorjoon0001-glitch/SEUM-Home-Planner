@@ -13,6 +13,8 @@
 #             (오브젝트 커스텀 속성 roof=1 이 있으면 높이와 상관없이 지붕 — plan_to_blend.py 가 붙여 줌)
 #   --origin-z : 땅 높이(m) — 모델의 땅이 0이 아니면 그만큼 내림
 #   --roof-prefix : 이 이름으로 시작하는 오브젝트도 지붕으로 (쉼표 구분, 예: Canopy,PDL)
+#   --ceiling-split / --ceiling-z : 벽·천장이 한 덩어리인 부품(쉼표 구분 이름 접두)에서 높이 ceiling-z 이상의
+#       천장·윗면만 떼어 지붕으로 표시 → 지붕 끄기 때 천장도 사라져 실내가 보임 (예: A_Shell,B_Shell)
 #   --keep-prefix : 이 이름으로 시작하는 오브젝트는 높아도 지붕이 아님 — 지붕 끄기에도 남김 (예: 데크 위 처마 Canopy,CNS)
 #   --max-obj-tris : 이보다 무거운 부품(이불·쿠션 주름 등)은 모양 유지하며 간소화 (0=끔)
 #   --exclude-collection : 이 컬렉션의 오브젝트는 빼고 변환 (쉼표 구분, 예: Backdrop — 렌더용 배경·잔디)
@@ -33,6 +35,8 @@ ap.add_argument('--roof-z', type=float, default=2.55)
 ap.add_argument('--origin-z', type=float, default=0.0)
 ap.add_argument('--roof-prefix', default='')
 ap.add_argument('--keep-prefix', default='')
+ap.add_argument('--ceiling-split', default='')
+ap.add_argument('--ceiling-z', type=float, default=2.6)
 ap.add_argument('--max-obj-tris', type=int, default=0)
 ap.add_argument('--jpeg', type=int, default=82)
 ap.add_argument('--exclude-collection', default='')
@@ -104,6 +108,23 @@ bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')   # 월드 위치 그�
 for o in list(bpy.data.objects):
     if o.type != 'MESH' or o.name in cutters:
         bpy.data.objects.remove(o, do_unlink=True)
+
+# 1.4) 천장 떼기 — 벽·천장이 한 덩어리면 높이로 지붕을 가를 수 없음 → 높은 곳의 수평·경사면만 분리해 지붕으로
+CEIL_PREFIX = tuple(p.strip() for p in A.ceiling_split.split(',') if p.strip())
+if CEIL_PREFIX:
+    import bmesh
+    for o in [o for o in bpy.data.objects if o.type == 'MESH' and o.name.startswith(CEIL_PREFIX)]:
+        M = o.matrix_world; R = M.to_3x3()
+        bm = bmesh.new(); bm.from_mesh(o.data)
+        top = [f for f in bm.faces if min((M @ v.co).z for v in f.verts) >= A.ceiling_z and abs((R @ f.normal).normalized().z) > 0.3]
+        if not top or len(top) == len(bm.faces): bm.free(); continue
+        for f in bm.faces: f.select_set(False)
+        for f in top: f.select_set(True)
+        bm.to_mesh(o.data); bm.free()
+        sel_only([o])
+        bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
+        for n in [x for x in bpy.context.selected_objects if x != o]: n['roof'] = 1; n.name = o.name + '_천장'
+        print(f"천장 떼기: {o.name} 면 {len(top)}개")
 
 # 1.5) 겹친 면 정리 — 서로 다른 부품의 면이 같은 자리·같은 방향으로 겹치면 웹에서 깜빡임(z-fighting)
 #   (창 몰딩이 마감재 속에 묻힌 경우, 천장 마감판이 처마 밑면과 딱 붙은 경우 등)

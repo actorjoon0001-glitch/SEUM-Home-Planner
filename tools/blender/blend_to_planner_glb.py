@@ -13,6 +13,7 @@
 #             (오브젝트 커스텀 속성 roof=1 이 있으면 높이와 상관없이 지붕 — plan_to_blend.py 가 붙여 줌)
 #   --origin-z : 땅 높이(m) — 모델의 땅이 0이 아니면 그만큼 내림
 #   --roof-prefix : 이 이름으로 시작하는 오브젝트도 지붕으로 (쉼표 구분, 예: Canopy,PDL)
+#   --keep-prefix : 이 이름으로 시작하는 오브젝트는 높아도 지붕이 아님 — 지붕 끄기에도 남김 (예: 데크 위 처마 Canopy,CNS)
 #   --max-obj-tris : 이보다 무거운 부품(이불·쿠션 주름 등)은 모양 유지하며 간소화 (0=끔)
 #   --exclude-collection : 이 컬렉션의 오브젝트는 빼고 변환 (쉼표 구분, 예: Backdrop — 렌더용 배경·잔디)
 #   --exclude-objects : 이 이름의 오브젝트는 빼고 변환 (쉼표 구분, 예: Ground — 렌더용 잔디 바닥)
@@ -31,6 +32,7 @@ ap.add_argument('--origin-y', type=float, default=0.0)
 ap.add_argument('--roof-z', type=float, default=2.55)
 ap.add_argument('--origin-z', type=float, default=0.0)
 ap.add_argument('--roof-prefix', default='')
+ap.add_argument('--keep-prefix', default='')
 ap.add_argument('--max-obj-tris', type=int, default=0)
 ap.add_argument('--jpeg', type=int, default=82)
 ap.add_argument('--exclude-collection', default='')
@@ -372,10 +374,12 @@ for m in bpy.data.materials:
 # 4) (재질, 지붕여부)로 다시 합치기
 groups = collections.defaultdict(list)
 ROOF_PREFIX = tuple(p.strip() for p in A.roof_prefix.split(',') if p.strip())
+KEEP_PREFIX = tuple(p.strip() for p in A.keep_prefix.split(',') if p.strip())
 for o in list(bpy.data.objects):
     zs = [(o.matrix_world @ v.co).z for v in o.data.vertices]
     roof = (min(zs) >= A.roof_z or bool(o.get('roof'))   # 벽 윗선 근처 이상(천장·조명) 또는 생성기가 지붕으로 표시한 부품
             or (bool(ROOF_PREFIX) and o.name.startswith(ROOF_PREFIX)))
+    if KEEP_PREFIX and o.name.startswith(KEEP_PREFIX): roof = False
     mat = obj_mat(o)
     groups[(mat.name if mat else "", roof)].append(o)
 for (mname, roof), objs in groups.items():

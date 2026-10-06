@@ -442,7 +442,7 @@ const T = [
       name: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
       productType: '농막',
       ceilingHeight: 2400,
-      exterior: { material: 'metal', color: '#3a3d42' },
+      exterior: { material: 'wood', color: '#a0703f', dir: 'v' },
       roof: { type: 'gable', color: '#2a2b2d', ridge: 'z' },   // 6평동 징크 박공(앞뒤로 긴 용마루) · 4평동 평지붕
       // 3D 실물 모델 — 블렌더로 디테일 작업한 본점 쌍둥이 시뮬레이션 (가구·조명·데크 그늘막 포함)
       model3d: { url: 'models/twin-10.glb', fit: [8850, 6380], roofType: 'gable', ridge: 'z', label: '시뮬레이션', ownFurniture: true,

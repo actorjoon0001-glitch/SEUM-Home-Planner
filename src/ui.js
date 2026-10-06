@@ -1186,9 +1186,9 @@ function buildSunPanel(viewer) {
   if (!hourEl) return;
   try {
     const sv = JSON.parse(localStorage.getItem('seum_sun') || 'null');
-    if (sv) { if (sv.hour >= 4 && sv.hour <= 23) viewer.sunHour = sv.hour; if (sv.season) viewer.season = sv.season; }
+    if (sv) { if (sv.hour >= 4 && sv.hour <= 23) viewer.sunHour = sv.hour; if (sv.season) viewer.season = sv.season; if (sv.lamp) viewer.lampMode = sv.lamp; }
   } catch (e) { /* noop */ }
-  const save = () => { try { localStorage.setItem('seum_sun', JSON.stringify({ hour: viewer.sunHour, season: viewer.season })); } catch (e) { /* noop */ } };
+  const save = () => { try { localStorage.setItem('seum_sun', JSON.stringify({ hour: viewer.sunHour, season: viewer.season, lamp: viewer.lampMode })); } catch (e) { /* noop */ } };
   const fmt = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
   const syncUI = () => {
     hourEl.value = viewer.sunHour; timeEl.textContent = fmt(viewer.sunHour);
@@ -1199,11 +1199,20 @@ function buildSunPanel(viewer) {
     const c = document.querySelector('#compass2d .cp-rose'); if (c) c.setAttribute('transform', `rotate(${nd})`);
   };
   viewer.onDaylight = (st) => {
-    if (st.elDeg <= -1) infoEl.textContent = st.hour < 12 ? '🌙 해 뜨기 전 — 실내 조명' : '🌙 밤 — 실내 조명이 켜져 있어요';
+    if (viewer.lampMode === 'on' && st.elDeg > -1) infoEl.textContent = `해 높이 ${Math.round(st.elDeg)}° · 실내 조명 켜짐`;
+    else if (st.elDeg <= -1) infoEl.textContent = viewer.lampMode === 'off' ? '🌙 밤 — 실내 조명 꺼짐' : st.hour < 12 ? '🌙 해 뜨기 전 — 실내 조명' : '🌙 밤 — 실내 조명이 켜져 있어요';
     else infoEl.textContent = `해 높이 ${Math.round(st.elDeg)}° · ${dirName(st.azDeg)}쪽에서 비춤`;
   };
   hourEl.oninput = () => { viewer.sunHour = +hourEl.value; timeEl.textContent = fmt(viewer.sunHour); viewer.applyDaylight(); save(); };
   document.querySelectorAll('#sun-season button').forEach((b) => b.onclick = () => { viewer.season = b.dataset.s; syncUI(); viewer.applyDaylight(); save(); });
+  const lampEl = $('sun-lamp');
+  const LAMP = { auto: '💡 자동', on: '💡 켜기', off: '💡 끄기' };
+  const syncLamp = () => { if (lampEl) { lampEl.textContent = LAMP[viewer.lampMode] || LAMP.auto; lampEl.classList.toggle('on', viewer.lampMode === 'on'); } };
+  if (lampEl) lampEl.onclick = () => {
+    viewer.lampMode = { auto: 'on', on: 'off', off: 'auto' }[viewer.lampMode] || 'auto';
+    syncLamp(); viewer.applyDaylight(); save();
+  };
+  syncLamp();
   faceEl.onchange = () => { const front = +faceEl.value; store.commit((d) => { d.northDeg = (180 - front + 360) % 360; }); };
   let timer = 0;
   playEl.onclick = () => {

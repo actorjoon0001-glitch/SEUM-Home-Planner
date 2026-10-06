@@ -37,6 +37,7 @@ ap.add_argument('--roof-prefix', default='')
 ap.add_argument('--keep-prefix', default='')
 ap.add_argument('--ceiling-split', default='')
 ap.add_argument('--ceiling-z', type=float, default=2.6)
+ap.add_argument('--ceiling-wall', type=float, default=0.15)
 ap.add_argument('--max-obj-tris', type=int, default=0)
 ap.add_argument('--jpeg', type=int, default=82)
 ap.add_argument('--exclude-collection', default='')
@@ -109,22 +110,44 @@ for o in list(bpy.data.objects):
     if o.type != 'MESH' or o.name in cutters:
         bpy.data.objects.remove(o, do_unlink=True)
 
-# 1.4) 천장 떼기 — 벽·천장이 한 덩어리면 높이로 지붕을 가를 수 없음 → 높은 곳의 수평·경사면만 분리해 지붕으로
+# 1.4) 천장 떼기 — 벽·천장이 한 덩어리면 높이로 지붕을 가를 수 없음 → 높은 곳의 큰 수평·경사면만 분리해 지붕으로
+#   · 창·문 위 인방 아랫면처럼 좁은 면(폭 0.5m 이하)은 남김
+#   · 평평한 윗덮개는 벽 두께(--ceiling-wall)만큼 가장자리를 남기고, 안쪽 천장 높이까지 턱을 내려 벽 윗면을 막음
+#     (덮개를 통째로 떼면 벽 두께 속이 비어 보임)
 CEIL_PREFIX = tuple(p.strip() for p in A.ceiling_split.split(',') if p.strip())
 if CEIL_PREFIX:
     import bmesh
     for o in [o for o in bpy.data.objects if o.type == 'MESH' and o.name.startswith(CEIL_PREFIX)]:
-        M = o.matrix_world; R = M.to_3x3()
+        M = o.matrix_world; R = M.to_3x3(); Mi = M.inverted()
         bm = bmesh.new(); bm.from_mesh(o.data)
-        top = [f for f in bm.faces if min((M @ v.co).z for v in f.verts) >= A.ceiling_z and abs((R @ f.normal).normalized().z) > 0.3]
+        def info(f):
+            ws = [M @ v.co for v in f.verts]
+            return (min(w.z for w in ws), max(w.z for w in ws), min(w.x for w in ws), max(w.x for w in ws),
+                    min(w.y for w in ws), max(w.y for w in ws), (R @ f.normal).normalized().z)
+        top = []
+        for f in bm.faces:
+            z0, z1, x0, x1, y0, y1, nz = info(f)
+            if z0 >= A.ceiling_z and abs(nz) > 0.3 and min(x1 - x0, y1 - y0) > 0.5: top.append(f)
         if not top or len(top) == len(bm.faces): bm.free(); continue
+        downs = [info(f) for f in top if info(f)[6] < -0.3]
+        flat_up = [f for f in top if info(f)[6] > 0.995]   # 경사 덮개(박공)는 통째로 뗌
+        for f in flat_up:
+            z0, z1, x0, x1, y0, y1, nz = info(f)
+            under = [d for d in downs if d[1] < z0 and d[2] >= x0 - 1e-3 and d[3] <= x1 + 1e-3 and d[4] >= y0 - 1e-3 and d[5] <= y1 + 1e-3]
+            bmesh.ops.inset_individual(bm, faces=[f], thickness=A.ceiling_wall, use_even_offset=True)
+            if under:
+                dz = z0 - max(d[1] for d in under)
+                ex = bmesh.ops.extrude_edge_only(bm, edges=list(f.edges))
+                nv = [e for e in ex['geom'] if isinstance(e, bmesh.types.BMVert)]
+                # 안쪽 덮개 테두리를 아래로 내려 턱 만들기 — 원래 면(f)은 위에 남겨 지붕으로 떼어냄
+                bmesh.ops.translate(bm, verts=nv, vec=Mi.to_3x3() @ mathutils.Vector((0, 0, -dz)))
         for f in bm.faces: f.select_set(False)
         for f in top: f.select_set(True)
         bm.to_mesh(o.data); bm.free()
         sel_only([o])
         bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
         for n in [x for x in bpy.context.selected_objects if x != o]: n['roof'] = 1; n.name = o.name + '_천장'
-        print(f"천장 떼기: {o.name} 면 {len(top)}개")
+        print(f"천장 떼기: {o.name} 면 {len(top)}개 (덮개 테두리 {len(flat_up)})")
 
 # 1.5) 겹친 면 정리 — 서로 다른 부품의 면이 같은 자리·같은 방향으로 겹치면 웹에서 깜빡임(z-fighting)
 #   (창 몰딩이 마감재 속에 묻힌 경우, 천장 마감판이 처마 밑면과 딱 붙은 경우 등)

@@ -723,7 +723,8 @@ export class Viewer3D {
         if (m.anisotropy && !o.geometry.attributes.uv) m.anisotropy = 0;
         // 유리 — 투과(transmission)는 웹에선 무겁고 어둡게 나오고, 반투명(알파)은 반사까지 흐려져 뿌연 판처럼 보임
         //   → 하늘을 비추는 가벼운 유리 재질로 교체 (정면은 투명, 비스듬할수록 반사)
-        if (m.transmission > 0 || (m.transparent && m.opacity < 0.5)) o.material = this._glassMaterial(m);
+        if (m.transmission > 0 && m.transmission < 0.5) m.transmission = 0;   // 살짝 비치는 천(그늘막 등)은 유리 아님
+        if (m.transmission >= 0.5 || (m.transparent && m.opacity < 0.5)) o.material = this._glassMaterial(m);
         // 금속 지붕은 하늘을 비춰야 실제처럼 회색으로 보임 (실내용 환경맵만 비추면 새까맣게 보임)
         else if (o.userData.roof && m.metalness >= 0.3) {
           const k = m.uuid;

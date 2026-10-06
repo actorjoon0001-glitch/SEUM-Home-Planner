@@ -18,7 +18,7 @@
 #   --hq : 무늬 굽기 해상도를 한 단계 올림 (큰 면 4096 / 중간 2048 / 작은 부품 1024) — 선명하지만 파일이 커짐
 #   겹친 면(같은 자리에 붙은 두 부품의 면)은 웹에서 깜빡이므로 큰 쪽을 0.6mm 뒤로 밀어 정리 (--keep-coplanar 로 끔)
 #   이미지 무늬를 쓰는 재질은 원래 UV를 살린 채 새 UV(BakeUV)에 구움 · 렌더 숨김 부품은 제외 · 곡선은 형태로 변환
-#   결과: 출력폴더/<입력이름>.glb  (models/ 에 넣고 템플릿의 model3d.url 로 지정)
+#   결과: 출력폴더/<입력이름>.glb + <입력이름>.lights.json (조명 — 같은 폴더에 두면 웹이 자동으로 읽음)  (models/ 에 넣고 템플릿의 model3d.url 로 지정)
 import bpy
 _ = bpy.app.version
 import mathutils, collections, os, sys, math, argparse
@@ -64,6 +64,10 @@ for cn in [c.strip() for c in A.exclude_collection.split(',') if c.strip()]:
     if not c: print("컬렉션 없음:", cn); continue
     for o in list(c.all_objects): bpy.data.objects.remove(o, do_unlink=True)
     print("제외:", cn)
+# 블렌더 조명 → 출력폴더/<이름>.lights.json (웹 3D 에서 다운라이트·간접등을 실제 조명으로 켬)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import lights_json
+lights_json.write(bpy, os.path.join(OUT, NAME + '.lights.json'), ox=A.origin_x, oy=A.origin_y, oz=A.origin_z)
 # 렌더에서 숨긴 보조 부품(이전 버전·가이드·경로 곡선 등)은 제외 — 불리언 커터는 형태 확정 때까지 남겨 둠
 for o in list(bpy.data.objects):
     if o.hide_render and o.name not in cutters and o.type in ('MESH', 'CURVE', 'SURFACE', 'FONT', 'META'):

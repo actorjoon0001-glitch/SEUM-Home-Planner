@@ -17,8 +17,12 @@ TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 
 
 const WALL_T = 100; // 벽 두께 mm
 const SKY_TOP = '#a9c6e3', SKY_HORIZON = '#e8eef3';   // 하늘 그라데이션 (지평선색 = 안개색)
-const HQ_KEY = 'seum_3d_hq';                          // 고화질(구석 음영) 사용 여부 저장
+const HQ_KEY = 'seum_3d_hq';
+// 실물 모델 조명(.lights.json, 블렌더 W) → three 세기. 단위가 mm 라 점·스폿은 ×1e6 (candela·m² → mm²)
+const LAMP_K = { spot: 0.09e6, point: 0.09e6, area: 0.006 };
+const LAMP_MAT = /(lamp|lens|glow|bulb|lantern|warm|cove|led|crystal|downpanel)/i, LAMP_MAT_NOT = /(lock|disp|lcd|key)/i;                          // 고화질(구석 음영) 사용 여부 저장
 // 실물 모델(GLB) 압축 해제기 위치 — importmap 의 three 와 같은 곳에서 가져옴
+let _rectLibReady = false;
 const DRACO_PATH = (() => {
   try { return import.meta.resolve('three/addons/libs/draco/gltf/'); }
   catch (e) { return 'https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/gltf/'; }
@@ -80,7 +84,7 @@ export class Viewer3D {
     this.showExterior = false;
     this.showModel3d = true;    // 도면에 실물 모델(블렌더 GLB)이 있으면 자동 생성 모델 대신 표시
     // ☀️ 햇빛·시간 — 한국(위도 37.5°) 실제 해 위치. 집 방위는 design.northDeg(도면 위쪽 기준 북쪽 각도, 시계방향)
-    this.sunHour = 14;          // 시각(태양시) 4~23
+    this.sunHour = 14; this.lampMode = 'auto';          // 시각(태양시) 4~23
     this.season = 'equinox';    // 'summer'(하지) | 'equinox'(봄·가을) | 'winter'(동지)
     this.onDaylight = null;     // (state) => UI 갱신
     this.onModel3dState = null; // (state) => UI 버튼 갱신 — { available, using, loading, failed, mismatch }
@@ -213,8 +217,11 @@ export class Viewer3D {
       this.scene.background = this._skyTexture('#' + top.getHexString(), '#' + hor.getHexString());
     }
     if (this.scene.fog) this.scene.fog.color.copy(hor);
-    const lamp = ss(0.03, -0.07, el);                   // 실내등은 해가 진 뒤에 켜짐
+    const autoLamp = ss(0.03, -0.07, el);               // 실내등은 해가 진 뒤에 켜짐 (💡 버튼으로 항상 켜기/끄기)
+    const lamp = this.lampMode === 'on' ? 1 : this.lampMode === 'off' ? 0 : autoLamp;
+    this._lamp = lamp;
     for (const l of this._nightLights || []) { l.intensity = 2.4e6 * lamp; l.visible = lamp > 0.01; }
+    for (const l of this._modelLights || []) { l.intensity = l.userData.base * lamp; l.visible = lamp > 0.01; }
     // 주변광(환경맵)도 밤엔 줄임 — 안 줄이면 밤에도 집이 낮처럼 밝게 보임
     const envK = 0.06 + 0.94 * amb, seen = new Set();
     this.scene.traverse((o) => {
@@ -223,6 +230,9 @@ export class Viewer3D {
         seen.add(m);
         if (m.userData._envI == null) m.userData._envI = m.envMapIntensity;
         m.envMapIntensity = m.userData._envI * envK;
+        // 실물 모델의 조명 부품(다운라이트 렌즈·간접등 LED·전구) — 조명이 꺼지면 빛도 꺼짐
+        if (m.userData._lampE == null) m.userData._lampE = (m.emissiveIntensity > 0 && m.emissive && m.emissive.getHex() && LAMP_MAT.test(m.name || '') && !LAMP_MAT_NOT.test(m.name || '')) ? m.emissiveIntensity : 0;
+        if (m.userData._lampE) m.emissiveIntensity = m.userData._lampE * (0.04 + 0.96 * lamp);
       }
     });
     this._envK = envK;
@@ -232,7 +242,8 @@ export class Viewer3D {
   // 밤 실내 조명 — 닫힌 방마다 천장 아래 따뜻한 점광원 (낮엔 꺼짐)
   _buildNightLights(d, b, F, H) {
     this._nightLights = [];
-    const rooms = d.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type)).slice(0, 10);
+    // 실물 모델에 블렌더 조명이 있으면 그걸 쓰고, 방마다 넣는 기본 등은 생략
+    const rooms = (this._modelLights || []).length ? [] : d.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type)).slice(0, 10);
     for (const r of rooms) {
       const [x, z] = this._p(r.x + r.w / 2, r.y + r.d / 2, b);
       const l = new THREE.PointLight('#ffd6a0', 0, 0, 2);
@@ -482,6 +493,8 @@ export class Viewer3D {
       this.modelGroup = root;
     }
     this._buildCompare(root, house, b);
+    const ml = m3dNode && m3dNode.getObjectByName('m3dLights');
+    this._modelLights = ml ? ml.children.filter((l) => l.isLight) : [];
     this._buildNightLights(d, b, F, H);
     this.applyDaylight();
     this.usingModel3d = !!m3dNode;
@@ -569,6 +582,7 @@ export class Viewer3D {
     let i = 0;
     node.traverse((o) => { if (o.isMesh) { o.userData.m3dOrig = saved[i]; o.material = saved[i]; i++; } });
     node.name = 'compare3d';   // 클릭해도 지금 집이 선택되지 않게
+    const ml = node.getObjectByName('m3dLights'); if (ml) ml.parent.remove(ml);   // 옆집은 기본 밤 등으로
     return node;
   }
   // 비교 라벨(집 이름) — 3D 위에 띄우는 HTML
@@ -691,8 +705,50 @@ export class Viewer3D {
         // 유리(투과)는 웹에선 무겁고 어둡게 나옴 → 가벼운 반투명 유리로
         if (m.transmission > 0) { m.transmission = 0; m.transparent = true; m.opacity = 0.3; m.depthWrite = false; }
       });
+      // 블렌더 조명(다운라이트·간접등·벽등) — 모델 옆 .lights.json 이 있으면 실제 조명으로
+      try {
+        const r = await fetch(url.replace(/\.glb(\?.*)?$/i, '.lights.json'));
+        if (r.ok) await this._addModelLights(node, (await r.json()).lights || []);
+      } catch (e) { /* 조명 파일 없음 */ }
       return node;
     } finally { draco.dispose(); }
+  }
+
+  // 조명 목록(m, 블렌더 Z-up, GLB 와 같은 원점) → three 조명. 모델 노드 안(mm)에 넣어 모델과 함께 움직임
+  async _addModelLights(node, list) {
+    if (!list.length) return;
+    if (list.some((s) => s.type === 'AREA') && !_rectLibReady) {
+      const { RectAreaLightUniformsLib } = await import('three/addons/lights/RectAreaLightUniformsLib.js');
+      RectAreaLightUniformsLib.init(); _rectLibReady = true;
+    }
+    const P = (v) => new THREE.Vector3(v[0] * 1000, v[2] * 1000, -v[1] * 1000);
+    const D = (v) => new THREE.Vector3(v[0], v[2], -v[1]).normalize();
+    const g = new THREE.Group(); g.name = 'm3dLights'; g.userData.m3dLights = true;
+    for (const s of list) {
+      const col = new THREE.Color().setRGB(s.color[0], s.color[1], s.color[2]);
+      let l;
+      if (s.type === 'SPOT') {
+        l = new THREE.SpotLight(col, 0, 0, Math.min(s.angle || 0.6, Math.PI / 2 * 0.95), s.blend == null ? 0.5 : s.blend, 2);
+        l.target.position.copy(P(s.pos).add(D(s.dir).multiplyScalar(1000)));
+        g.add(l.target);
+        l.userData.base = s.w * LAMP_K.spot;
+      } else if (s.type === 'POINT') {
+        l = new THREE.PointLight(col, 0, 0, 2);
+        l.userData.base = s.w * LAMP_K.point;
+      } else if (s.type === 'AREA') {
+        const w = Math.max(0.01, s.w_size), h = Math.max(0.01, s.h_size);
+        l = new THREE.RectAreaLight(col, 0, w * 1000, h * 1000);
+        const z = D(s.dir).negate(), x = D(s.ux || [1, 0, 0]);
+        x.sub(z.clone().multiplyScalar(x.dot(z))).normalize();
+        l.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, z.clone().cross(x), z));
+        l.userData.base = s.w / (w * h) * LAMP_K.area;
+      } else continue;
+      l.position.copy(P(s.pos));
+      l.visible = false;
+      l.name = s.name;
+      g.add(l);
+    }
+    node.add(g);
   }
 
   // 벽 재질 (투명도 < 1 이면 반투명 → 내부 들여다보기)
@@ -2045,6 +2101,7 @@ export class Viewer3D {
     root.name = (store.design && store.design.name) || 'SEUM';
     const clone = this.modelGroup.clone(true);        // 지오메트리·재질은 참조 공유(원본 장면 영향 없음)
     clone.children.filter((c) => c.userData.isGround).forEach((c) => clone.remove(c));   // 지평선까지 깔린 잔디 제외
+    const lg = []; clone.traverse((o) => { if (o.userData.m3dLights) lg.push(o); }); lg.forEach((o) => o.parent.remove(o));   // 블렌더 조명은 제외
     clone.scale.multiplyScalar(0.001);                // mm → m
     root.add(clone);
     const buffer = await new Promise((resolve, reject) => {

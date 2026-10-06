@@ -594,3 +594,6 @@ body {
   background: rgba(255,255,255,.94); border: 1px solid #d6d9de; border-left: 4px solid var(--seum-red); border-radius: 6px;
   padding: 4px 10px; font-size: 12px; font-weight: 700; color: #22262c; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
 .cmp-label.cmp-b { border-left-color: #2f6fd6; }
+
+.sun-lamp { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.sun-lamp.on { background: #fff4d6; border-color: #e0b04a; }

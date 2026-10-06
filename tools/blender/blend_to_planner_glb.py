@@ -233,6 +233,21 @@ sc.render.bake.use_pass_indirect = False
 sc.render.bake.use_pass_color = True
 sc.render.bake.margin = 16
 
+def pushpull(rgb, mask):
+    # 정사각 2의 거듭제곱 이미지: 채워진 픽셀만으로 피라미드를 만들고, 빈 곳은 한 단계 거친 평균색으로 채워 내려옴
+    c = rgb * mask[..., None]; a = mask.astype(np.float32)
+    pyr = [(c, a)]
+    while c.shape[0] > 1:
+        h = c.shape[0] // 2
+        c = c.reshape(h, 2, h, 2, 3).sum((1, 3)); a = a.reshape(h, 2, h, 2).sum((1, 3))
+        pyr.append((c, a))
+    col = pyr[-1][0] / np.maximum(pyr[-1][1], 1e-6)[..., None]
+    for c, a in reversed(pyr[:-1]):
+        up = col.repeat(2, 0).repeat(2, 1)
+        w = np.clip(a, 0, 1)[..., None]
+        col = (c / np.maximum(a, 1e-6)[..., None]) * w + up * (1 - w)
+    return col
+
 dummy = bpy.data.images.new("__dummy", 4, 4)
 def set_active_img(mat, img):
     nt = mat.node_tree
@@ -284,7 +299,9 @@ for m in proc:
     px = np.array(img.pixels[:], dtype=np.float32).reshape(-1, 4)
     filled = px[:, 3] > 0.5
     if filled.any():
-        px[~filled, :3] = px[filled, :3].mean(axis=0)
+        # 빈 곳은 가까운 무늬 색이 번지듯 채움(밀어올리기-끌어내리기) — 한 가지 평균색으로 채우면
+        #   멀리서 볼 때(밉맵) 그 색이 가는 부품(루버 날개 등) 사이로 섞여 얼룩 줄무늬가 생김
+        px[:, :3] = pushpull(px[:, :3].reshape(size, size, 3), filled.reshape(size, size)).reshape(-1, 3)
     px[:, 3] = 1.0
     img.pixels = px.ravel().tolist()
     img.pack()
@@ -340,6 +357,17 @@ for m in bpy.data.materials:
     if m.node_tree and m.node_tree.nodes.get("__bake"): m.node_tree.nodes.remove(m.node_tree.nodes["__bake"])
 for m in bpy.data.materials:            # 굽지 않은 재질도 연결된 거칠기·금속성은 대표값으로 고정
     if m.node_tree and m.name not in baked_names: bake_pbr_values(m)
+# 유리 — 투명 BSDF·유리 BSDF 를 섞어 만든 유리(바깥은 투명+반사 등)는 내보낼 때 불투명 판이 됨
+#   → 프린시플드에 낮은 알파를 넣어 반투명(BLEND)으로 내보냄 (웹에서 유리 재질로 바뀜)
+for m in bpy.data.materials:
+    nt = m.node_tree
+    if not nt or m.name in baked_names: continue
+    if any(n.type in ('BSDF_TRANSPARENT', 'BSDF_GLASS') for n in nt.nodes):
+        for n in nt.nodes:
+            if n.type == 'BSDF_PRINCIPLED' and not n.inputs['Alpha'].is_linked and n.inputs['Alpha'].default_value > 0.2:
+                n.inputs['Alpha'].default_value = 0.12
+        if hasattr(m, 'surface_render_method'): m.surface_render_method = 'BLENDED'
+        print("유리로 처리:", m.name)
 
 # 4) (재질, 지붕여부)로 다시 합치기
 groups = collections.defaultdict(list)

@@ -14,6 +14,8 @@
 #   --origin-z : 땅 높이(m) — 모델의 땅이 0이 아니면 그만큼 내림
 #   --roof-prefix : 이 이름으로 시작하는 오브젝트도 지붕으로 (쉼표 구분, 예: Canopy,PDL)
 #   --max-obj-tris : 이보다 무거운 부품(이불·쿠션 주름 등)은 모양 유지하며 간소화 (0=끔)
+#   --exclude-collection : 이 컬렉션의 오브젝트는 빼고 변환 (쉼표 구분, 예: Backdrop — 렌더용 배경·잔디)
+#   --hq : 무늬 굽기 해상도를 한 단계 올림 (큰 면 4096 / 중간 2048 / 작은 부품 1024) — 선명하지만 파일이 커짐
 #   이미지 무늬를 쓰는 재질은 원래 UV를 살린 채 새 UV(BakeUV)에 구움 · 렌더 숨김 부품은 제외 · 곡선은 형태로 변환
 #   결과: 출력폴더/<입력이름>.glb  (models/ 에 넣고 템플릿의 model3d.url 로 지정)
 import bpy
@@ -29,6 +31,8 @@ ap.add_argument('--origin-z', type=float, default=0.0)
 ap.add_argument('--roof-prefix', default='')
 ap.add_argument('--max-obj-tris', type=int, default=0)
 ap.add_argument('--jpeg', type=int, default=82)
+ap.add_argument('--exclude-collection', default='')
+ap.add_argument('--hq', action='store_true')
 A = ap.parse_args(argv)
 SRC, OUT = A.src, A.out
 os.makedirs(OUT, exist_ok=True)
@@ -52,6 +56,12 @@ for o in bpy.data.objects:
 print("cutters:", sorted(cutters))
 for o in bpy.data.objects:
     o.hide_set(False); o.hide_viewport = False; o.hide_select = False
+# 제외할 컬렉션(렌더용 배경·잔디 등)
+for cn in [c.strip() for c in A.exclude_collection.split(',') if c.strip()]:
+    c = bpy.data.collections.get(cn)
+    if not c: print("컬렉션 없음:", cn); continue
+    for o in list(c.all_objects): bpy.data.objects.remove(o, do_unlink=True)
+    print("제외:", cn)
 # 렌더에서 숨긴 보조 부품(이전 버전·가이드·경로 곡선 등)은 제외 — 불리언 커터는 형태 확정 때까지 남겨 둠
 for o in list(bpy.data.objects):
     if o.hide_render and o.name not in cutters and o.type in ('MESH', 'CURVE', 'SURFACE', 'FONT', 'META'):
@@ -157,8 +167,9 @@ for m in proc:
     bpy.ops.object.mode_set(mode='OBJECT')
     for o, co, sv in saved.values():
         o.data.vertices.foreach_set('co', co); o.scale = sv; o.data.update()
+    vl.update()   # 되돌린 크기 배율을 matrix_world 에 반영 (안 하면 면적이 mm² 로 계산돼 굽기 해상도가 과해짐)
     area = world_area(objs)
-    size = 2048 if area > 30 else (1024 if area > 2 else 512)
+    size = (4096 if area > 40 else (2048 if area > 4 else 1024)) if A.hq else (2048 if area > 30 else (1024 if area > 2 else 512))
     img = bpy.data.images.new("bake_" + m.name, size, size, alpha=True)
     img.generated_color = (0, 0, 0, 0)
     for om in {s.material for o in objs for s in o.material_slots if s.material}:

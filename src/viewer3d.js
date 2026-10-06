@@ -697,14 +697,23 @@ export class Viewer3D {
       node.name = 'model3d';
       gltf.scene.scale.setScalar(1000);   // m → mm
       node.add(gltf.scene);
+      const roofMats = {};
       gltf.scene.traverse((o) => {
         if (!o.isMesh) return;
         o.castShadow = true; o.receiveShadow = true;
         const m = o.material;
         if (m.map) m.map.anisotropy = 8;
+        // 금속 결(이방성 반사)은 UV 가 있어야 계산됨 — 단색 재질은 변환 때 UV 를 지우므로 끔 (안 끄면 새까맣게 나옴)
+        if (m.anisotropy && !o.geometry.attributes.uv) m.anisotropy = 0;
         // 유리 — 투과(transmission)는 웹에선 무겁고 어둡게 나오고, 반투명(알파)은 반사까지 흐려져 뿌연 판처럼 보임
         //   → 하늘을 비추는 가벼운 유리 재질로 교체 (정면은 투명, 비스듬할수록 반사)
         if (m.transmission > 0 || (m.transparent && m.opacity < 0.5)) o.material = this._glassMaterial(m);
+        // 금속 지붕은 하늘을 비춰야 실제처럼 회색으로 보임 (실내용 환경맵만 비추면 새까맣게 보임)
+        else if (o.userData.roof && m.metalness >= 0.3) {
+          const k = m.uuid;
+          roofMats[k] = roofMats[k] || Object.assign(m.clone(), { envMap: this._skyEnv(), envMapIntensity: 1.6 });
+          o.material = roofMats[k];
+        }
       });
       // 블렌더 조명(다운라이트·간접등·벽등) — 모델 옆 .lights.json 이 있으면 실제 조명으로
       try {

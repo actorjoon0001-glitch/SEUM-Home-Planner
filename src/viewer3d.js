@@ -702,8 +702,9 @@ export class Viewer3D {
         o.castShadow = true; o.receiveShadow = true;
         const m = o.material;
         if (m.map) m.map.anisotropy = 8;
-        // 유리(투과)는 웹에선 무겁고 어둡게 나옴 → 가벼운 반투명 유리로
-        if (m.transmission > 0) { m.transmission = 0; m.transparent = true; m.opacity = 0.3; m.depthWrite = false; }
+        // 유리 — 투과(transmission)는 웹에선 무겁고 어둡게 나오고, 반투명(알파)은 반사까지 흐려져 뿌연 판처럼 보임
+        //   → 하늘을 비추는 가벼운 유리 재질로 교체 (정면은 투명, 비스듬할수록 반사)
+        if (m.transmission > 0 || (m.transparent && m.opacity < 0.5)) o.material = this._glassMaterial(m);
       });
       // 블렌더 조명(다운라이트·간접등·벽등) — 모델 옆 .lights.json 이 있으면 실제 조명으로
       try {
@@ -712,6 +713,44 @@ export class Viewer3D {
       } catch (e) { /* 조명 파일 없음 */ }
       return node;
     } finally { draco.dispose(); }
+  }
+
+  // 창 유리 — 반사는 투명도와 상관없이 그대로(프리멀티플라이 알파), 가장자리(비스듬한 각도)는 더 불투명·반사(프레넬)
+  _glassMaterial(src) {
+    const g = new THREE.MeshPhysicalMaterial({
+      // 창호 유리(로이 복층유리)처럼 살짝 어둡게 — 밝은 색 반투명은 밖에서 보면 뿌연 판처럼 보임
+      name: src.name, color: new THREE.Color(0.035, 0.05, 0.055), metalness: 0, roughness: Math.min(src.roughness == null ? 0.05 : src.roughness, 0.06),
+      transparent: true, opacity: 0.3,
+      depthWrite: false, side: THREE.DoubleSide, premultipliedAlpha: true,
+      envMap: this._skyEnv(), envMapIntensity: 1.1, ior: 1.5, specularIntensity: 1,
+    });
+    g.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
+        `float glassF = pow( 1.0 - saturate( abs( dot( normalize( vViewPosition ), normal ) ) ), 4.0 );
+        diffuseColor.a = mix( diffuseColor.a, 0.8, glassF );
+        vec3 outgoingLight = totalDiffuse + totalSpecular / max( diffuseColor.a, 0.04 ) + totalEmissiveRadiance;`);
+    };
+    g.customProgramCacheKey = () => 'seum-glass';
+    g.userData.glass = true;
+    return g;
+  }
+  // 유리에 비칠 하늘(위: 파란 하늘, 지평선: 밝은 하늘, 아래: 땅) — 실내용 환경맵 대신 밖 풍경 느낌
+  _skyEnv() {
+    if (this._skyEnvTex) return this._skyEnvTex;
+    const sc = new THREE.Scene();
+    sc.add(new THREE.Mesh(new THREE.SphereGeometry(100, 48, 24), new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false,
+      vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `varying vec3 vP; void main(){ float h = vP.y;
+        vec3 sky = mix(vec3(0.78, 0.84, 0.9), vec3(0.22, 0.42, 0.75), smoothstep(0.0, 0.7, h));
+        vec3 gnd = mix(vec3(0.3, 0.32, 0.26), vec3(0.12, 0.14, 0.1), smoothstep(0.0, -0.5, h));
+        gl_FragColor = vec4(h > 0.0 ? sky : gnd, 1.0); }`,
+    })));
+    const pm = new THREE.PMREMGenerator(this.renderer);
+    this._skyEnvTex = pm.fromScene(sc, 0, 0.1, 1000).texture;
+    pm.dispose();
+    return this._skyEnvTex;
   }
 
   // 조명 목록(m, 블렌더 Z-up, GLB 와 같은 원점) → three 조명. 모델 노드 안(mm)에 넣어 모델과 함께 움직임

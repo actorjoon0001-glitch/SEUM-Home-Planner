@@ -285,10 +285,33 @@ for m in proc:
     baked[m.name] = img
     print(f"baked {m.name:<20} objs={len(objs):3d} area={area:6.1f}m2 size={size} fill={filled.mean():.0%}")
 
+# 노드가 연결된 값(거칠기·금속성)의 대표값 — 연결된 채로 내보내면 GLB 에 값이 빠져 '완전 무광(1.0)'이 됨
+#   (거칠기에 노이즈→Map Range 를 걸어 둔 재질이 많음 → 출력 범위의 가운데 값을 씀)
+def eff_value(inp):
+    if not inp.is_linked: return inp.default_value
+    fn = inp.links[0].from_node
+    if fn.type == 'MAP_RANGE':
+        lo, hi = fn.inputs['To Min'], fn.inputs['To Max']
+        if not lo.is_linked and not hi.is_linked: return (lo.default_value + hi.default_value) / 2
+    if fn.type == 'MIX':
+        vals = [i.default_value for i in fn.inputs if i.name in ('A', 'B') and i.type == 'VALUE' and not i.is_linked]
+        if vals: return sum(vals) / len(vals)
+    if fn.type == 'VALUE': return fn.outputs[0].default_value
+    return inp.default_value
+def bake_pbr_values(m):
+    b = bsdf_of(m)
+    if not b: return
+    for k in ('Roughness', 'Metallic'):
+        i = b.inputs[k]
+        if i.is_linked:
+            v = eff_value(i)
+            for l in list(i.links): m.node_tree.links.remove(l)
+            i.default_value = v
+
 # 베이크한 재질을 단순 PBR(이미지 → 기본색)로 교체
 for m in proc:
     b = bsdf_of(m)
-    rough, metal = b.inputs['Roughness'].default_value, b.inputs['Metallic'].default_value
+    rough, metal = eff_value(b.inputs['Roughness']), eff_value(b.inputs['Metallic'])
     nt = m.node_tree; nt.nodes.clear()
     out = nt.nodes.new('ShaderNodeOutputMaterial')
     nb = nt.nodes.new('ShaderNodeBsdfPrincipled')
@@ -309,6 +332,8 @@ for o in bpy.data.objects:
         uvs[keep].active = True; uvs[keep].active_render = True
 for m in bpy.data.materials:
     if m.node_tree and m.node_tree.nodes.get("__bake"): m.node_tree.nodes.remove(m.node_tree.nodes["__bake"])
+for m in bpy.data.materials:            # 굽지 않은 재질도 연결된 거칠기·금속성은 대표값으로 고정
+    if m.node_tree and m.name not in baked_names: bake_pbr_values(m)
 
 # 4) (재질, 지붕여부)로 다시 합치기
 groups = collections.defaultdict(list)

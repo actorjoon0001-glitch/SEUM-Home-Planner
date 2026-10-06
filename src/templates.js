@@ -366,6 +366,7 @@ const T = [
       roof: { type: 'flat', color: '#3a2e26', fascia: '#3a2e26' },  // 처마없는 평지붕/럭스틸밤색
       // 3D 실물 모델 — 블렌더로 디테일 작업한 마곡 박람회 시뮬레이션 (가구·조명 포함)
       model3d: { url: 'models/seum-shelter-10.glb', fit: [7930, 6230], roofType: 'flat', ridge: 'z', label: '시뮬레이션', ownFurniture: true,
+        flatParts: ['Ext_WoodLouver', '지붕_Ext_WoodLouver'],   // 루버 날개가 가늘어 구운 무늬가 조각나 보임 → 단색 + 날개 형상으로
         optionSets: [
           { key: 'wall', label: '외장 (우드 루버강판)', parts: ['Ext_WoodLouver', '지붕_Ext_WoodLouver', 'Ext_LouverGroove', '지붕_Ext_LouverGroove'],
             choices: [{ id: 'orig', label: '우드톤', swatch: '#9c7244' }, ...WALL_CHOICES.wood] },

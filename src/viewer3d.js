@@ -306,7 +306,9 @@ export class Viewer3D {
   // 후처리 체인: 장면 → 구석 음영(GTAO) → 톤매핑/색공간 출력
   _setupComposer() {
     try {
-      const comp = new EffectComposer(this.renderer);
+      // 후처리 버퍼도 계단 현상 제거(MSAA 4x) — 없으면 루버·난간처럼 가는 부품이 점선·화살표 무늬로 깨짐
+      const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+      const comp = new EffectComposer(this.renderer, rt);
       comp.addPass(new RenderPass(this.scene, this.camera));
       const ao = new GTAOPass(this.scene, this.camera, 1, 1);
       // 단위가 mm 이므로 반경도 mm — 벽 모서리·가구 밑·천장 구석에 은은한 음영
@@ -611,6 +613,7 @@ export class Viewer3D {
   // 제품 옵션(model3d.optionSets) → 실물 모델 부품에 적용. 고른 게 없으면(orig) 블렌더 원래 마감 그대로
   _applyModel3dOptions(node, d) {
     const m = d.model3d, sel = m.options || {}, byPart = new Map();
+    const flat = new Set(m.flatParts || []);   // 가는 부품(루버 날개)이라 구운 무늬가 조각나 보이는 재질 → 평균색 단색
     for (const set of m.optionSets || []) {
       const ch = set.choices.find((c) => c.id === sel[set.key]) || set.choices[0];
       for (const part of set.parts) byPart.set(part, { set, ch });
@@ -620,9 +623,22 @@ export class Viewer3D {
       const u = o.userData;
       if (!u.m3dOrig) u.m3dOrig = o.material;
       const hit = byPart.get(o.name);
-      o.material = (!hit || hit.ch.id === 'orig') ? u.m3dOrig
-        : this._m3dCached(u.m3dOrig.uuid + '|' + hit.set.key + '|' + hit.ch.id, () => this._m3dVariant(u.m3dOrig, hit.ch));
+      const base = flat.has(o.name) && u.m3dOrig.map ? this._m3dCached(u.m3dOrig.uuid + '|flat', () => this._m3dFlat(u.m3dOrig)) : u.m3dOrig;
+      o.material = (!hit || hit.ch.id === 'orig') ? base
+        : this._m3dCached(base.uuid + '|' + hit.set.key + '|' + hit.ch.id, () => this._m3dVariant(base, hit.ch));
     });
+  }
+  // 구운 무늬 → 평균색 단색 재질
+  _m3dFlat(orig) {
+    const m = orig.clone(), img = orig.map.image;
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 64, 64);
+    const px = ctx.getImageData(0, 0, 64, 64).data; let r = 0, g = 0, b = 0;
+    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
+    const n = px.length / 4 * 255;
+    m.map = null; m.color.setRGB(r / n, g / n, b / n, THREE.SRGBColorSpace);
+    return m;
   }
   _m3dVariant(orig, ch) {
     const m = orig.clone();

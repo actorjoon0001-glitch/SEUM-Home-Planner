@@ -34,7 +34,6 @@ function makeStubViewer() {
 // ===========================================================================
 // 로그인 게이트 (세움 홈플래너 전용 계정) — 아래 리스너는 '동기'로 즉시 연결되어
 // three.js/앱 초기화 성공 여부와 무관하게 항상 동작한다.
-// (관리자 게이트는 index.html 인라인 스크립트에서 먼저 처리)
 // ===========================================================================
 const gate = document.getElementById('auth-gate');
 const authForm = document.getElementById('auth-form');
@@ -69,7 +68,7 @@ function reflectAuth() {
 function authErrorText(e) {
   const m = (e && e.message) || String(e);
   if (/Invalid login credentials/i.test(m))
-    return '이메일 또는 비밀번호가 올바르지 않습니다. 계정이 없으면 아래 회원가입으로 만드세요.';
+    return '이메일 또는 비밀번호가 올바르지 않습니다. 세움 OS 직원 계정을 확인해 주세요.';
   if (/User already registered/i.test(m)) return '이미 가입된 이메일입니다. 로그인해 주세요.';
   if (/Password should be at least/i.test(m)) return '비밀번호는 6자 이상이어야 합니다.';
   if (/Email not confirmed/i.test(m)) return '이메일 인증이 완료되지 않았습니다. 받은 편지함의 인증 메일을 확인하세요.';

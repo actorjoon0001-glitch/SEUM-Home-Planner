@@ -746,15 +746,16 @@ export class Viewer3D {
     const g = new THREE.MeshPhysicalMaterial({
       // 창호 유리(로이 복층유리)처럼 살짝 어둡게 — 밝은 색 반투명은 밖에서 보면 뿌연 판처럼 보임
       name: src.name, color: new THREE.Color(0.035, 0.05, 0.055), metalness: 0, roughness: Math.min(src.roughness == null ? 0.05 : src.roughness, 0.06),
-      transparent: true, opacity: 0.3,
-      depthWrite: false, side: THREE.DoubleSide, premultipliedAlpha: true,
+      // 유리는 얇은 판(앞·뒷면)이고 복층유리·겹친 창짝이면 여러 장 → 카메라 쪽 면만 그리고 한 장은 옅게 (겹치면 자연히 진해짐)
+      transparent: true, opacity: 0.16,
+      depthWrite: false, side: THREE.FrontSide, premultipliedAlpha: true,
       envMap: this._skyEnv(), envMapIntensity: 1.1, ior: 1.5, specularIntensity: 1,
     });
     g.onBeforeCompile = (sh) => {
       sh.fragmentShader = sh.fragmentShader.replace(
         'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
         `float glassF = pow( 1.0 - saturate( abs( dot( normalize( vViewPosition ), normal ) ) ), 4.0 );
-        diffuseColor.a = mix( diffuseColor.a, 0.8, glassF );
+        diffuseColor.a = mix( diffuseColor.a, 0.6, glassF );
         vec3 outgoingLight = totalDiffuse + totalSpecular / max( diffuseColor.a, 0.04 ) + totalEmissiveRadiance;`);
     };
     g.customProgramCacheKey = () => 'seum-glass';

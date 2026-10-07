@@ -149,6 +149,16 @@ if CEIL_PREFIX:
         for n in [x for x in bpy.context.selected_objects if x != o]: n['roof'] = 1; n.name = o.name + '_천장'
         print(f"천장 떼기: {o.name} 면 {len(top)}개 (덮개 테두리 {len(flat_up)})")
 
+# 1.3) 다각형(n-gon) 미리 삼각형으로 — 문·창 구멍이 뚫린 큰 벽 면은 오목한 다각형이라,
+#   아래에서 꼭짓점을 조금씩 밀거나 떼어낸 뒤 내보낼 때 나누면 삼각형이 구멍을 덮어 버림(문에 검은 대각선)
+import bmesh
+for o in [o for o in bpy.data.objects if o.type == 'MESH']:
+    if not any(len(p.vertices) > 4 for p in o.data.polygons): continue
+    if o.data.users > 1: o.data = o.data.copy()
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4], quad_method='BEAUTY', ngon_method='BEAUTY')
+    bm.to_mesh(o.data); bm.free(); o.data.update()
+
 # 1.5) 겹친 면 정리 — 서로 다른 부품의 면이 같은 자리·같은 방향으로 겹치면 웹에서 깜빡임(z-fighting)
 #   (창 몰딩이 마감재 속에 묻힌 경우, 천장 마감판이 처마 밑면과 딱 붙은 경우 등)
 #   → 겹친 두 부품 중 큰 쪽의 그 면을 0.6mm 뒤로 밀어 작은 부품(디테일)이 보이게 함. 축에 나란한 면만 검사

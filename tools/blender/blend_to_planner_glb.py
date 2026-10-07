@@ -65,6 +65,11 @@ for o in bpy.data.objects:
         if m.type == 'BOOLEAN' and getattr(m, 'collection', None):
             for c in m.collection.all_objects: cutters.add(c.name)
 print("cutters:", sorted(cutters))
+# 곡선의 단면·굵기 모양으로 쓰는 곡선(렌더 숨김이어도 필요)도 형태 확정 때까지 남겨 둠
+for o in bpy.data.objects:
+    if o.type == 'CURVE':
+        for ref in (o.data.bevel_object, o.data.taper_object):
+            if ref: cutters.add(ref.name)
 for o in bpy.data.objects:
     o.hide_set(False); o.hide_viewport = False; o.hide_select = False
 # 제외할 컬렉션(렌더용 배경·잔디 등)
@@ -86,7 +91,7 @@ for o in list(bpy.data.objects):
     if o.hide_render and o.name not in cutters and o.type in ('MESH', 'CURVE', 'SURFACE', 'FONT', 'META'):
         bpy.data.objects.remove(o, do_unlink=True)
 # 곡선(수전·의자 다리 등)은 형태(메시)로 변환해 함께 포함
-curves = [o for o in bpy.data.objects if o.type in ('CURVE', 'SURFACE', 'FONT', 'META')]
+curves = [o for o in bpy.data.objects if o.type in ('CURVE', 'SURFACE', 'FONT', 'META') and o.name not in cutters]
 if curves:
     sel_only(curves); bpy.ops.object.convert(target='MESH')
 
@@ -148,6 +153,16 @@ if CEIL_PREFIX:
         bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
         for n in [x for x in bpy.context.selected_objects if x != o]: n['roof'] = 1; n.name = o.name + '_천장'
         print(f"천장 떼기: {o.name} 면 {len(top)}개 (덮개 테두리 {len(flat_up)})")
+
+# 1.3) 다각형(n-gon) 미리 삼각형으로 — 문·창 구멍이 뚫린 큰 벽 면은 오목한 다각형이라,
+#   아래에서 꼭짓점을 조금씩 밀거나 떼어낸 뒤 내보낼 때 나누면 삼각형이 구멍을 덮어 버림(문에 검은 대각선)
+import bmesh
+for o in [o for o in bpy.data.objects if o.type == 'MESH']:
+    if not any(len(p.vertices) > 4 for p in o.data.polygons): continue
+    if o.data.users > 1: o.data = o.data.copy()
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4], quad_method='BEAUTY', ngon_method='BEAUTY')
+    bm.to_mesh(o.data); bm.free(); o.data.update()
 
 # 1.5) 겹친 면 정리 — 서로 다른 부품의 면이 같은 자리·같은 방향으로 겹치면 웹에서 깜빡임(z-fighting)
 #   (창 몰딩이 마감재 속에 묻힌 경우, 천장 마감판이 처마 밑면과 딱 붙은 경우 등)

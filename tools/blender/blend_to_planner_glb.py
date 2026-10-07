@@ -19,6 +19,8 @@
 #   --max-obj-tris : 이보다 무거운 부품(이불·쿠션 주름 등)은 모양 유지하며 간소화 (0=끔)
 #   --exclude-collection : 이 컬렉션의 오브젝트는 빼고 변환 (쉼표 구분, 예: Backdrop — 렌더용 배경·잔디)
 #   --exclude-objects : 이 이름의 오브젝트는 빼고 변환 (쉼표 구분, 예: Ground — 렌더용 잔디 바닥)
+#   --bake-cache : 구운 무늬 저장 폴더 (기본 ~/.cache/seum-bake/<입력이름>) — 재질 설정·부품 모양이 그대로인 재질은
+#       지난번 구운 무늬를 그대로 씀 → 바뀐 재질만 새로 구움 (수정 반영이 수십 분 → 몇 분). --no-cache 로 끔
 #   --hq : 무늬 굽기 해상도를 한 단계 올림 (큰 면 4096 / 중간 2048 / 작은 부품 1024) — 선명하지만 파일이 커짐
 #   겹친 면(같은 자리에 붙은 두 부품의 면)은 웹에서 깜빡이므로 큰 쪽을 0.6mm 뒤로 밀어 정리 (--keep-coplanar 로 끔)
 #   이미지 무늬를 쓰는 재질은 원래 UV를 살린 채 새 UV(BakeUV)에 구움 · 렌더 숨김 부품은 제외 · 곡선은 형태로 변환
@@ -43,6 +45,8 @@ ap.add_argument('--jpeg', type=int, default=82)
 ap.add_argument('--exclude-collection', default='')
 ap.add_argument('--exclude-objects', default='')
 ap.add_argument('--hq', action='store_true')
+ap.add_argument('--bake-cache', default='')
+ap.add_argument('--no-cache', action='store_true')
 ap.add_argument('--keep-coplanar', action='store_true')
 A = ap.parse_args(argv)
 SRC, OUT = A.src, A.out
@@ -320,9 +324,75 @@ def set_active_img(mat, img):
     n.select = True; nt.nodes.active = n
 
 import numpy as np
+# 구운 무늬 캐시 — 재질 지문(노드 설정 + 그 재질 부품들의 모양·위치) 이 같으면 지난번 이미지·UV 재사용
+import hashlib, json as _json
+CACHE = '' if A.no_cache else (A.bake_cache or os.path.join(os.path.expanduser('~/.cache/seum-bake'), NAME))
+if CACHE: os.makedirs(CACHE, exist_ok=True)
+def _val(v):
+    if isinstance(v, (int, float, bool, str)) or v is None: return v
+    try: return [round(x, 6) if isinstance(x, float) else x for x in v]
+    except TypeError: return str(v)
+def tree_sig(nt, seen=None):
+    seen = seen if seen is not None else set()
+    out = []
+    for n in sorted(nt.nodes, key=lambda n: n.name):
+        d = [n.bl_idname, n.name]
+        for pr in n.bl_rna.properties:
+            if pr.is_readonly or pr.identifier in ('name', 'label', 'location', 'width', 'height', 'select', 'hide', 'color', 'use_custom_color', 'show_options', 'show_preview', 'show_texture', 'mute' ) : continue
+            try: v = getattr(n, pr.identifier)
+            except Exception: continue
+            if hasattr(v, 'name') and hasattr(v, 'bl_rna'):
+                v = v.name + (':' + str(tuple(v.size)) if hasattr(v, 'size') else '')
+            d.append((pr.identifier, _val(v)))
+        if n.type == 'VALTORGB':
+            d.append([(round(e.position, 5), _val(e.color)) for e in n.color_ramp.elements] + [n.color_ramp.interpolation])
+        if getattr(n, 'node_tree', None) and n.node_tree.name not in seen:
+            seen.add(n.node_tree.name); d.append(tree_sig(n.node_tree, seen))
+        d.append([(i.identifier, _val(getattr(i, 'default_value', None)) if not i.is_linked else 'L') for i in n.inputs])
+        out.append(d)
+    out.append(sorted((l.from_node.name, l.from_socket.identifier, l.to_node.name, l.to_socket.identifier) for l in nt.links))
+    return out
+def obj_sig(o):
+    me = o.data
+    co = np.empty(len(me.vertices) * 3, dtype=np.float32); me.vertices.foreach_get('co', co)
+    lv = np.empty(len(me.loops), dtype=np.int32); me.loops.foreach_get('vertex_index', lv)
+    ls = np.empty(len(me.polygons), dtype=np.int32); me.polygons.foreach_get('loop_total', ls)
+    h = hashlib.sha1(); h.update(np.round(co, 5).tobytes()); h.update(lv.tobytes()); h.update(ls.tobytes())
+    h.update(np.round(np.array(o.matrix_world, dtype=np.float64), 6).tobytes())
+    for uvl in me.uv_layers:   # 이미지 무늬 재질은 원래 UV 로 무늬를 읽음
+        if uvl.name == 'BakeUV': continue
+        uv = np.empty(len(me.loops) * 2, dtype=np.float32); uvl.data.foreach_get('uv', uv); h.update(np.round(uv, 5).tobytes())
+    return h.hexdigest()
+def mat_key(m, objs):
+    h = hashlib.sha1(_json.dumps(tree_sig(m.node_tree), default=str).encode())
+    h.update(str(A.hq).encode()); h.update(b'v1')
+    for s_ in sorted(obj_sig(o) for o in objs): h.update(s_.encode())
+    return h.hexdigest()[:20]
+
 baked = {}
+n_hit = 0
 for m in proc:
     objs = users[m.name]
+    key = mat_key(m, objs) if CACHE else None
+    cpath = os.path.join(CACHE, f"{key}.png") if key else None
+    if cpath and os.path.exists(cpath) and os.path.exists(cpath[:-4] + '.npz'):
+        uvz = np.load(cpath[:-4] + '.npz')
+        ok = True
+        for o in objs:
+            k = obj_sig(o)
+            if k not in uvz or len(uvz[k]) != len(o.data.loops) * 2: ok = False; break
+        if ok:
+            for o in objs:
+                uvs = o.data.uv_layers
+                if 'BakeUV' not in uvs:
+                    had = len(uvs) > 0
+                    nu = uvs.new(name='BakeUV')
+                    if not had: nu.active_render = True
+                uvs['BakeUV'].data.foreach_set('uv', uvz[obj_sig(o)])
+            img = bpy.data.images.load(cpath); img.name = "bake_" + m.name; img.pack()
+            baked[m.name] = img; n_hit += 1
+            print(f"cached {m.name:<20} objs={len(objs):3d} size={img.size[0]}")
+            continue
     # 새 UV(BakeUV)에 펼침 — 이미지 무늬 재질은 원래 UV(렌더용)로 읽어야 무늬가 안 깨짐
     for o in objs:
         uvs = o.data.uv_layers
@@ -365,9 +435,18 @@ for m in proc:
         px[:, :3] = pushpull(px[:, :3].reshape(size, size, 3), filled.reshape(size, size)).reshape(-1, 3)
     px[:, 3] = 1.0
     img.pixels = px.ravel().tolist()
+    if cpath:   # 캐시에 저장 (이미지 + 부품별 BakeUV)
+        uvsave = {}
+        for o in objs:
+            uv = np.empty(len(o.data.loops) * 2, dtype=np.float32); o.data.uv_layers['BakeUV'].data.foreach_get('uv', uv)
+            uvsave[obj_sig(o)] = uv
+        img.filepath_raw = cpath; img.file_format = 'PNG'; img.save()
+        np.savez(cpath[:-4] + '.npz', **uvsave)
     img.pack()
     baked[m.name] = img
     print(f"baked {m.name:<20} objs={len(objs):3d} area={area:6.1f}m2 size={size} fill={filled.mean():.0%}")
+
+print(f"굽기 캐시: {n_hit}/{len(proc)} 재질 재사용" + (f" ({CACHE})" if CACHE else " (끔)"))
 
 # 노드가 연결된 값(거칠기·금속성)의 대표값 — 연결된 채로 내보내면 GLB 에 값이 빠져 '완전 무광(1.0)'이 됨
 #   (거칠기에 노이즈→Map Range 를 걸어 둔 재질이 많음 → 출력 범위의 가운데 값을 씀)

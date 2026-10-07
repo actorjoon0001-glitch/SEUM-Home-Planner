@@ -442,10 +442,11 @@ const T = [
       name: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
       productType: '농막',
       ceilingHeight: 2400,
+      wallThickness: 280, wallThicknessInt: 120,   // 시공 도면: 외벽 280t · 칸막이 120t (4평동 외벽 200t 은 방별 wallT)
       exterior: { material: 'wood', color: '#a0703f', dir: 'v' },
       roof: { type: 'gable', color: '#2a2b2d', ridge: 'z' },   // 6평동 징크 박공(앞뒤로 긴 용마루) · 4평동 평지붕
       // 3D 실물 모델 — 블렌더로 디테일 작업한 본점 쌍둥이 시뮬레이션 (가구·조명·데크 그늘막 포함)
-      model3d: { url: 'models/twin-10.glb', fit: [8850, 6380], roofType: 'gable', ridge: 'z', label: '시뮬레이션', ownFurniture: true,
+      model3d: { url: 'models/twin-10.glb', fit: [8800, 6300], roofType: 'gable', ridge: 'z', label: '시뮬레이션', ownFurniture: true,
         optionSets: [
           { key: 'wall', label: '외장 (우드 사이딩)', parts: ['TD_WoodSiding', '지붕_TD_WoodSiding'],
             choices: [{ id: 'orig', label: '우드', swatch: '#a0703f' }, ...WALL_CHOICES.wood] },
@@ -459,36 +460,37 @@ const T = [
             choices: [{ id: 'orig', label: '우드', swatch: '#8a6a4a' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
               RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
         ] },
-      // 실물 모델 배치: 외곽 8,850×6,380 — 6평동(좌 2,780) · 중앙 데크(2,810, 그늘막) · 4평동(우 3,260)
-      //  6평동: 뒤(북) 욕실 · 앞(남) 거실·주방 / 4평동: 침실 / 두 동 모두 데크 쪽으로 출입
+      // 시공 도면(1층 평면도) 기준 배치: 6평동 2,700×6,300 · 중앙 데크 2,900(5평) · 4평동(S-1500) 3,200×6,200
+      //  6평동: 북측 욕실(안목 1,400) / 칸막이 120 / 거실·주방(안목 4,220) — 외벽 280
+      //  4평동: 외벽 200, 데크 쪽 폴딩도어 3200(+여닫이), 남·북 픽스창 1800×1400, 동측 단창 2000×600
       rooms: [
-        { key: 'A_bath', type: 'bath',    name: '욕실',             x: 0,    y: 0,    w: 2780, d: 1790 },
-        { key: 'A_liv',  type: 'living',  name: '거실·주방(6평동)', x: 0,    y: 1790, w: 2780, d: 4590 },
-        { key: 'deck',   type: 'deck',    name: '데크',             x: 2780, y: 0,    w: 2810, d: 6380 },
-        { key: 'B_bed',  type: 'bedroom', name: '침실(4평동)',      x: 5590, y: 0,    w: 3260, d: 6380 },
+        { key: 'A_bath', type: 'bath',    name: '욕실',             x: 0,    y: 0,    w: 2700, d: 1740 },
+        { key: 'A_liv',  type: 'living',  name: '거실·주방(6평동)', x: 0,    y: 1740, w: 2700, d: 4560 },
+        { key: 'deck',   type: 'deck',    name: '데크',             x: 2700, y: 0,    w: 2900, d: 6300 },
+        { key: 'B_bed',  type: 'bedroom', name: '방(4평동)',        x: 5600, y: 100,  w: 3200, d: 6200, wallT: 200 },
       ],
       openings: [
-        // 6평동 — 남측 주방창, 서측 거실창, 데크 쪽 출입문 + 이동창
-        { roomKey: 'A_liv',  side: 's', pos: 1470, winType: 'fixed',     w: 1060, h: 760,  sill: 880 },
-        { roomKey: 'A_liv',  side: 'w', pos: 1930, winType: 'double',    w: 1660, h: 1060, sill: 970 },
-        { roomKey: 'A_liv',  side: 'e', pos: 530,  winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'A_liv',  side: 'e', pos: 2380, winType: 'sliding',   w: 2040, h: 2100, sill: 0 },
-        { roomKey: 'A_bath', side: 'w', pos: 970,  winType: 'fixed',     w: 760,  h: 660,  sill: 1370 },
-        { roomKey: 'A_bath', side: 's', pos: 2100, winType: 'swingDoor', w: 830,  h: 2000 },
-        // 4평동 — 데크 쪽 폴딩도어, 앞·뒤 고정창, 동측 창
-        { roomKey: 'B_bed',  side: 'w', pos: 3670, winType: 'folding',   w: 3300, h: 2250 },
-        { roomKey: 'B_bed',  side: 's', pos: 1630, winType: 'fixed',     w: 1640, h: 1240, sill: 730 },
-        { roomKey: 'B_bed',  side: 'n', pos: 1630, winType: 'fixed',     w: 1640, h: 1240, sill: 730 },
-        { roomKey: 'B_bed',  side: 'e', pos: 3020, winType: 'fixed',     w: 2040, h: 960,  sill: 1240 },
+        // 6평동 — 서측 욕실창 600×500 · 거실창 1500×900, 남측 주방창 900×600, 데크 쪽 단열문 900×2100 · 이중창 2000×2100
+        { roomKey: 'A_bath', side: 'w', pos: 1300, winType: 'double',    w: 600,  h: 500,  sill: 1600 },
+        { roomKey: 'A_liv',  side: 'w', pos: 2010, winType: 'double',    w: 1500, h: 900,  sill: 1100 },
+        { roomKey: 'A_liv',  side: 's', pos: 1450, winType: 'double',    w: 900,  h: 600,  sill: 1100 },
+        { roomKey: 'A_liv',  side: 'e', pos: 660,  winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'A_liv',  side: 'e', pos: 2260, winType: 'sliding',   w: 2000, h: 2100, sill: 0 },
+        { roomKey: 'A_bath', side: 's', pos: 2150, winType: 'swingDoor', w: 700,  h: 2000 },
+        // 4평동 — 데크 쪽 폴딩도어 3200, 남·북 픽스창 1800×1400, 동측 단창 2000×600
+        { roomKey: 'B_bed',  side: 'w', pos: 3100, winType: 'foldSwing', w: 3200, h: 2100 },
+        { roomKey: 'B_bed',  side: 'n', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 700 },
+        { roomKey: 'B_bed',  side: 's', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 700 },
+        { roomKey: 'B_bed',  side: 'e', pos: 3100, winType: 'fixed',     w: 2000, h: 600,  sill: 1500 },
       ],
       furniture: [
-        // 6평동 — 앞 주방, 가운데 거실 / 4평동 — 침대·수납
-        { catalogId: 'sink',   x: 1500, y: 5900, rotation: 180 },
-        { catalogId: 'fridge', x: 450,  y: 5600, rotation: 180 },
-        { catalogId: 'sofa2',  x: 1300, y: 3600, rotation: 90 },
-        { catalogId: 'toilet', x: 700,  y: 500,  rotation: 0 },
-        { catalogId: 'basin',  x: 1500, y: 350,  rotation: 0 },
-        { catalogId: 'bedQ',   x: 7600, y: 1300, rotation: 0 },
+        // 6평동 — 욕실(세면대·변기), 남측 주방(냉장고 자리·싱크)
+        { catalogId: 'basin',  x: 1100, y: 450,  rotation: 0 },
+        { catalogId: 'toilet', x: 1900, y: 550,  rotation: 0 },
+        { catalogId: 'fridge', x: 650,  y: 5700, rotation: 180 },
+        { catalogId: 'sink',   x: 1650, y: 5800, rotation: 180 },
+        // 4평동 — 북측 침대
+        { catalogId: 'bedQ',   x: 7200, y: 1400, rotation: 0 },
       ],
     },
   },
@@ -650,7 +652,7 @@ export function instantiateTemplate(id) {
     if (Array.isArray(r.open) && r.open.length) room.open = r.open.slice(); // 개방형 면(벽 생략)
     // 선택 마감 옵션 — 난간(rail)·포치 조명(lights)·아트월(artWall)·색상 지정
     for (const k of ['rail', 'artWall']) if (Array.isArray(r[k]) && r[k].length) room[k] = r[k].slice();
-    for (const k of ['lights', 'railColor', 'artColor', 'floorColor', 'deckDir']) if (r[k] != null) room[k] = r[k];
+    for (const k of ['lights', 'railColor', 'artColor', 'floorColor', 'deckDir', 'wallT']) if (r[k] != null) room[k] = r[k];
     return room;
   });
   const openings = (b.openings || []).map((o) => ({
@@ -670,6 +672,8 @@ export function instantiateTemplate(id) {
     productType: b.productType || '',
     ceilingHeight: b.ceilingHeight,
     ...(b.foundationHeight ? { foundationHeight: b.foundationHeight } : {}),   // 기초 높이
+    ...(b.wallThickness ? { wallThickness: b.wallThickness } : {}),             // 2D 도면 외벽 두께
+    ...(b.wallThicknessInt ? { wallThicknessInt: b.wallThicknessInt } : {}),   // 2D 도면 칸막이 두께
     exterior: { ...b.exterior },
     roof: { ...b.roof },
     ...(b.model3d ? { model3d: JSON.parse(JSON.stringify(b.model3d)) } : {}),   // 3D 실물 모델(블렌더 GLB)

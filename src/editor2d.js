@@ -1,7 +1,7 @@
 // 세움 홈플래너 - 2D 평면 편집기 (HTML5 Canvas)
 // 방 추가/이동/크기조절, 가구 배치/이동/회전, 팬/줌, 치수 표시
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, openingOutline, outlinePoints, outlineShape, outlineShapes } from './data.js';
+import { ROOM_TYPES, catalogOf, rid, WINDOW_TYPES, opening, openingOutline, outlinePoints, outlineShape, outlineShapes, OPEN_ROOM_TYPES } from './data.js';
 import { syncOutlineToRooms } from './roomops.js';
 
 const GRID = 100;          // 스냅 단위 (mm)
@@ -25,6 +25,7 @@ export class Editor2D {
     this.snapMode = true;    // 격자/직각 스냅
     this.orthoMode = true;   // 직교(90°) 강제 — 밑그림 따라 반듯한 벽 그리기 기본값
     this.monoMode = false;   // 모노톤(흑백) — 종이 카달로그 인쇄용: 방·가구·바닥 색 제거
+    this.planStyle = true;   // 실제 시공 도면 스타일 — 두께 있는 벽(해치)·창호 기호·여러 단 치수·축선
     this.onOutlineChange = null; // 그리는 중 길이 입력 상자 위치/값 콜백
 
     // 텍스트 라벨(방 이름 등)
@@ -76,6 +77,15 @@ export class Editor2D {
     for (const r of d.rooms) {
       minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
       maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d);
+    }
+    if (this.planStyle) {
+      // 도면 스타일: 바깥 여러 단 치수(약 90px)·평수 요약(위)이 화면에 들어오게 픽셀 여백 확보
+      const mx = 120, mt = 150, mb = 135;
+      this.scale = Math.max(0.005, Math.min((this.cssW - mx * 2) / Math.max(1, maxX - minX), (this.cssH - mt - mb) / Math.max(1, maxY - minY)));
+      this.ox = -minX * this.scale + (this.cssW - (maxX - minX) * this.scale) / 2;
+      this.oy = -minY * this.scale + mt + (this.cssH - mt - mb - (maxY - minY) * this.scale) / 2;
+      this.draw();
+      return;
     }
     const pad = 1200;
     const w = (maxX - minX) + pad * 2, h = (maxY - minY) + pad * 2;
@@ -209,8 +219,10 @@ export class Editor2D {
     // 선택 벽체(외벽) 크기조절 핸들
     if (store.selectedOutline != null) this._drawOutlineHandles(store.selectedOutline);
 
+    // 도면 스타일: 두께 있는 벽(외벽·칸막이) + 데크 난간 + 축선·여러 단 치수
+    if (this.planStyle) { this._drawPlanWalls(); this._drawPlanRails(); this._drawChainDims(); }
     // 전체 건물 외곽 치수 (치수 토글 시)
-    if (this.showDims) this._drawOverallDims();
+    else if (this.showDims) this._drawOverallDims();
 
     // 창호(개구부)
     for (const o of (d.openings || [])) this._drawOpening(o);
@@ -314,7 +326,8 @@ export class Editor2D {
     });
     // 상단 치수선과 겹치지 않게 요약 알약을 그 위로 올림
     //   (치수 토글=전체 외곽 치수 위 / 그 외=항상 표시되는 방 치수 위)
-    let y = this.showDims ? (yTop - 61 - fs) : (yTop - 35 - fs);
+    let y = this.planStyle ? (yTop - (this._chainTopPx || 40) - 14 - fs)
+      : (this.showDims ? (yTop - 61 - fs) : (yTop - 35 - fs));
     // 사용자가 드래그로 옮긴 위치 오프셋(mm) 반영 — 캡처 시 글씨 위치 조정용
     const off = d.summaryOffset || { dx: 0, dy: 0 };
     let cxD = cx + (off.dx || 0) * this.scale;
@@ -466,16 +479,191 @@ export class Editor2D {
       ctx.stroke(); ctx.setLineDash([]);
       ctx.restore();
     };
-    drawWall(x, y, x + w, y, 'n');
-    drawWall(x, y + h, x + w, y + h, 's');
-    drawWall(x, y, x, y + h, 'w');
-    drawWall(x + w, y, x + w, y + h, 'e');
+    if (this.planStyle) {
+      // 벽은 _drawPlanWalls 가 두께로 한꺼번에 그림 — 여기선 트인 면(점선)·강조만
+      const sides = { n: [x, y, x + w, y], s: [x, y + h, x + w, y + h], w: [x, y, x, y + h], e: [x + w, y, x + w, y + h] };
+      for (const [k, v] of Object.entries(sides)) if (k === hov || (open.includes(k) && !OPEN_ROOM_TYPES.includes(room.type))) drawWall(...v, k);
+      if (selected) { ctx.save(); ctx.strokeStyle = '#c8102e'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(x, y, w, h); ctx.restore(); }
+    } else {
+      drawWall(x, y, x + w, y, 'n');
+      drawWall(x, y + h, x + w, y + h, 's');
+      drawWall(x, y, x, y + h, 'w');
+      drawWall(x + w, y, x + w, y + h, 'e');
+    }
 
     // 이름·면적 라벨은 가구에 가리지 않도록 별도 패스(_drawRoomLabel)에서 맨 위에 그림
 
     // 치수선 — 기본 치수는 항상 표시(회색·편집 가능), 선택 방은 빨강(더블클릭 편집)
     //   ('치수' 토글은 전체 외곽 치수·㎡ 표기 등 상세 표시를 추가로 담당)
-    this._roomDims(room, selected);
+    if (!this.planStyle || selected) this._roomDims(room, selected);   // 도면 스타일: 바깥 여러 단 치수 + 선택 방만 편집 치수
+  }
+
+  // ── 도면 스타일 ─────────────────────────────────────────────────────
+  // 벽 두께(mm): 외벽 = 설정 두께, 칸막이 = 그 45% (80~150)
+  _planT() { const T = this.wallThickness(); return { ext: T, int: Math.max(80, Math.min(150, Math.round(T * 0.45 / 10) * 10)) }; }
+  _isIndoor(r) { return !OPEN_ROOM_TYPES.includes(r.type); }
+  // 벽 선분 목록(mm) — 실내 방의 막힌 면을, 바깥이 다른 실내 방이면 칸막이·아니면 외벽으로 잘게 나눔
+  _planWallSegs() {
+    const rooms = store.design.rooms, T = this._planT(), out = [];
+    const inside = (px, py, self) => rooms.some((q) => q !== self && this._isIndoor(q) && px > q.x + 1 && px < q.x + q.w - 1 && py > q.y + 1 && py < q.y + q.d - 1);
+    for (const r of rooms) {
+      if (!this._isIndoor(r)) continue;
+      const open = Array.isArray(r.open) ? r.open : [];
+      const sides = [['n', r.x, r.y, r.x + r.w, r.y, 0, -1], ['s', r.x, r.y + r.d, r.x + r.w, r.y + r.d, 0, 1],
+        ['w', r.x, r.y, r.x, r.y + r.d, -1, 0], ['e', r.x + r.w, r.y, r.x + r.w, r.y + r.d, 1, 0]];
+      for (const [side, x1, y1, x2, y2, nx, ny] of sides) {
+        if (open.includes(side)) continue;
+        const hz = y1 === y2, a0 = hz ? x1 : y1, a1 = hz ? x2 : y2;
+        // 이웃 방 경계로 구간 나누기
+        const cuts = new Set([a0, a1]);
+        for (const q of rooms) {
+          if (q === r || !this._isIndoor(q)) continue;
+          for (const v of hz ? [q.x, q.x + q.w] : [q.y, q.y + q.d]) if (v > a0 && v < a1) cuts.add(v);
+        }
+        const cs = [...cuts].sort((p, q) => p - q);
+        for (let i = 0; i < cs.length - 1; i++) {
+          const m = (cs[i] + cs[i + 1]) / 2;
+          const px = hz ? m : x1 + nx * 60, py = hz ? y1 + ny * 60 : m;
+          const t = inside(px, py, r) ? T.int : T.ext;
+          out.push(hz ? { x1: cs[i], y1, x2: cs[i + 1], y2: y1, t, hz } : { x1, y1: cs[i], x2: x1, y2: cs[i + 1], t, hz });
+        }
+      }
+    }
+    return out;
+  }
+  _segRect(g, extra = 0) {   // 선분 → 화면 사각형 [x, y, w, h] (끝을 두께 절반만큼 늘려 모서리를 메움)
+    const h = g.t / 2;
+    const x0 = Math.min(g.x1, g.x2) - (g.hz ? h : h), x1 = Math.max(g.x1, g.x2) + h;
+    const y0 = Math.min(g.y1, g.y2) - h, y1 = Math.max(g.y1, g.y2) + h;
+    const [ax, ay] = this.toPx(x0, y0), [bx, by] = this.toPx(x1, y1);
+    return [ax - extra, ay - extra, bx - ax + extra * 2, by - ay + extra * 2];
+  }
+  _hatch() {
+    if (this._hatchPat && this._hatchMono === this.monoMode) return this._hatchPat;
+    const c = document.createElement('canvas'); c.width = c.height = 8;
+    const x = c.getContext('2d');
+    x.fillStyle = this.monoMode ? '#ffffff' : '#e9eaec'; x.fillRect(0, 0, 8, 8);
+    x.strokeStyle = this.monoMode ? '#6b7076' : '#9aa0a8'; x.lineWidth = 0.8;
+    x.beginPath(); x.moveTo(0, 8); x.lineTo(8, 0); x.moveTo(-2, 2); x.lineTo(2, -2); x.moveTo(6, 10); x.lineTo(10, 6); x.stroke();
+    this._hatchPat = this.ctx.createPattern(c, 'repeat'); this._hatchMono = this.monoMode;
+    return this._hatchPat;
+  }
+  _drawPlanWalls() {
+    const segs = this._planSegs = this._planWallSegs();
+    if (!segs.length) return;
+    const ctx = this.ctx, lw = 1.3;
+    ctx.save();
+    ctx.globalAlpha = this._wallAlpha();
+    // 1) 진한 테두리(합쳐진 외곽선만 남도록 살짝 크게) → 2) 해치로 속 채우기
+    ctx.fillStyle = this.monoMode ? '#111418' : '#33373d';
+    for (const g of segs) ctx.fillRect(...this._segRect(g, lw));
+    ctx.fillStyle = this._hatch();
+    for (const g of segs) ctx.fillRect(...this._segRect(g, 0));
+    ctx.restore();
+  }
+  // 개구부 위치의 벽 두께(mm)
+  _wallTAt(cx, cy, horizontal) {
+    for (const g of this._planSegs || []) {
+      if (g.hz !== horizontal) continue;
+      if (g.hz ? (Math.abs(g.y1 - cy) < 2 && cx >= Math.min(g.x1, g.x2) - 1 && cx <= Math.max(g.x1, g.x2) + 1)
+               : (Math.abs(g.x1 - cx) < 2 && cy >= Math.min(g.y1, g.y2) - 1 && cy <= Math.max(g.y1, g.y2) + 1)) return g.t;
+    }
+    return this._planT().int;
+  }
+  // 데크·포치 난간(room.rail) — 가는 이중선 + 기둥
+  _drawPlanRails() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = this.monoMode ? '#111418' : '#3a3f44'; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 1;
+    for (const r of store.design.rooms) {
+      if (!Array.isArray(r.rail) || !r.rail.length) continue;
+      for (const side of r.rail) {
+        const L = { n: [r.x, r.y, r.x + r.w, r.y], s: [r.x, r.y + r.d, r.x + r.w, r.y + r.d], w: [r.x, r.y, r.x, r.y + r.d], e: [r.x + r.w, r.y, r.x + r.w, r.y + r.d] }[side];
+        if (!L) continue;
+        const [ax, ay] = this.toPx(L[0], L[1]), [bx, by] = this.toPx(L[2], L[3]);
+        const hz = ay === by, o = 40 * this.scale / 2;
+        ctx.beginPath();
+        if (hz) { ctx.moveTo(ax, ay - o); ctx.lineTo(bx, by - o); ctx.moveTo(ax, ay + o); ctx.lineTo(bx, by + o); }
+        else { ctx.moveTo(ax - o, ay); ctx.lineTo(bx - o, by); ctx.moveTo(ax + o, ay); ctx.lineTo(bx + o, by); }
+        ctx.stroke();
+        const len = hz ? L[2] - L[0] : L[3] - L[1], n = Math.max(1, Math.round(len / 1500)), p = Math.max(3, 60 * this.scale);
+        for (let i = 0; i <= n; i++) {
+          const t = i / n, px = ax + (bx - ax) * t, py = ay + (by - ay) * t;
+          ctx.fillRect(px - p / 2, py - p / 2, p, p);
+        }
+      }
+    }
+    ctx.restore();
+  }
+  // 바깥 여러 단 치수 — [개구부 단(치수 토글 시)] · 방 경계 단 · 전체 단, 축선(점선) 포함
+  _drawChainDims() {
+    const d = store.design, rooms = d.rooms; if (!rooms.length) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of rooms) { minX = Math.min(minX, r.x); minY = Math.min(minY, r.y); maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d); }
+    const T = this._planT().ext / 2;
+    const near = (a, b) => Math.abs(a - b) < 2;
+    const sides = {
+      n: { hz: true, edge: minY, out: -1, rooms: rooms.filter((r) => near(r.y, minY)), lo: minX, hi: maxX },
+      s: { hz: true, edge: maxY, out: 1, rooms: rooms.filter((r) => near(r.y + r.d, maxY)), lo: minX, hi: maxX },
+      w: { hz: false, edge: minX, out: -1, rooms: rooms.filter((r) => near(r.x, minX)), lo: minY, hi: maxY },
+      e: { hz: false, edge: maxX, out: 1, rooms: rooms.filter((r) => near(r.x + r.w, maxX)), lo: minY, hi: maxY },
+    };
+    const uniq = (a) => [...new Set(a.map((v) => Math.round(v)))].sort((p, q) => p - q);
+    for (const [k, S] of Object.entries(sides)) {
+      const roomPts = uniq([S.lo, S.hi, ...S.rooms.flatMap((r) => S.hz ? [r.x, r.x + r.w] : [r.y, r.y + r.d])]);
+      // 이 면에 붙은 창·문 (방의 바깥 면)
+      const opPts = [];
+      if (this.showDims) {
+        for (const o of d.openings || []) {
+          if (o.side !== k || o.onOutline || o.free) continue;
+          const g = this._openingGeom(o); if (!g) continue;
+          if (!near(S.hz ? g.cy : g.cx, S.edge)) continue;
+          const c = S.hz ? g.cx : g.cy; opPts.push(c - o.w / 2, c + o.w / 2);
+        }
+      }
+      const tiers = [];
+      if (opPts.length) { const op = uniq([...roomPts, ...opPts]); if (op.join() !== roomPts.join()) tiers.push(op); }
+      if (roomPts.length > 2) tiers.push(roomPts);
+      tiers.push([Math.round(S.lo), Math.round(S.hi)]);
+      const base = S.edge + S.out * T;                  // 벽 바깥면
+      if (k === 'n') this._chainTopPx = T * this.scale + 26 + (tiers.length - 1) * 24 + 14;
+      tiers.forEach((pts, ti) => {
+        const offPx = 26 + ti * 24;
+        for (let i = 0; i < pts.length - 1; i++) this._archDim(S, base, offPx, pts[i], pts[i + 1], ti === tiers.length - 1);
+        // 축선·치수 보조선: 벽 바깥면에서 치수선까지
+        for (const v of pts) this._extLine(S, base, offPx, v);
+      });
+    }
+  }
+  _extLine(S, base, offPx, v) {
+    const ctx = this.ctx;
+    const [ax, ay] = S.hz ? this.toPx(v, base) : this.toPx(base, v);
+    const ex = S.hz ? ax : ax + S.out * (offPx + 5), ey = S.hz ? ay + S.out * (offPx + 5) : ay;
+    ctx.save(); ctx.strokeStyle = 'rgba(90,96,104,0.55)'; ctx.lineWidth = 0.8; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(ax + (S.hz ? 0 : S.out * 4), ay + (S.hz ? S.out * 4 : 0)); ctx.lineTo(ex, ey); ctx.stroke(); ctx.restore();
+  }
+  // 건축 치수선 — 사선 눈금 + 선 위 숫자(천 단위 쉼표)
+  _archDim(S, base, offPx, a, b, bold) {
+    const ctx = this.ctx;
+    const [x1, y1] = S.hz ? this.toPx(a, base) : this.toPx(base, a);
+    const [x2, y2] = S.hz ? this.toPx(b, base) : this.toPx(base, b);
+    const dx = S.hz ? 0 : S.out * offPx, dy = S.hz ? S.out * offPx : 0;
+    const ax = x1 + dx, ay = y1 + dy, bx = x2 + dx, by = y2 + dy;
+    const color = this.monoMode ? '#111418' : '#3a3f44';
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.lineWidth = 1.4;
+    for (const [ex, ey] of [[ax, ay], [bx, by]]) { ctx.beginPath(); ctx.moveTo(ex - 3.5, ey + 3.5); ctx.lineTo(ex + 3.5, ey - 3.5); ctx.stroke(); }
+    const len = Math.hypot(bx - ax, by - ay), label = Math.round(b - a).toLocaleString('en-US');
+    ctx.font = `${bold ? 700 : 500} 11px "Noto Sans KR", sans-serif`;
+    if (ctx.measureText(label).width + 6 <= len) {
+      ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      if (S.hz) ctx.fillText(label, mx, my - 2);
+      else { ctx.translate(mx - 2, my); ctx.rotate(-Math.PI / 2); ctx.fillText(label, 0, 0); }
+    }
+    ctx.restore();
   }
 
   _drawHandles(room) {
@@ -783,7 +971,8 @@ export class Editor2D {
     const [pcx, pcy] = this.toPx(g.cx, g.cy);
     const len = o.w * this.scale;
     // 화면상 벽 두께 표현 — 외벽은 실제 두께만큼 덮어 그림
-    const thick = o.onOutline ? Math.max(9, this.wallThickness() * this.scale + 4) : 9;
+    const thick = o.onOutline ? Math.max(9, this.wallThickness() * this.scale + 4)
+      : (this.planStyle && !o.free ? Math.max(5, this._wallTAt(g.cx, g.cy, g.horizontal) * this.scale + 2.6) : 9);
 
     ctx.save();
     ctx.translate(pcx, pcy);
@@ -792,8 +981,12 @@ export class Editor2D {
     ctx.scale(o.flipH ? -1 : 1, o.flipV ? -1 : 1);
 
     // 벽 끊기 (흰 배경)
-    ctx.fillStyle = this.monoMode ? '#ffffff' : '#f4f5f7';
+    ctx.fillStyle = this.planStyle ? '#ffffff' : (this.monoMode ? '#ffffff' : '#f4f5f7');
     ctx.fillRect(-len / 2, -thick / 2 - 1, len, thick + 2);
+    if (this.planStyle) {   // 개구부 양끝 벽 단면(문틀 자리) 마감선
+      ctx.strokeStyle = this.monoMode ? '#111418' : '#33373d'; ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(-len / 2, -thick / 2); ctx.lineTo(-len / 2, thick / 2); ctx.moveTo(len / 2, -thick / 2); ctx.lineTo(len / 2, thick / 2); ctx.stroke();
+    }
 
     if (t.combo === 'foldSwing') {
       // 폴딩(왼쪽) + 여닫이(오른쪽) 복합 도어
@@ -844,6 +1037,23 @@ export class Editor2D {
         // 여닫이(단문) / 피벗 — 문짝 + 열림 호
         ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(-len / 2, len); ctx.stroke();
         ctx.beginPath(); ctx.arc(-len / 2, 0, len, 0, Math.PI / 2); ctx.stroke();
+      }
+    } else if (this.planStyle) {
+      // 창(도면): 벽 양면선 + 가운데 유리 이중선, 미서기는 창짝 2줄 엇갈림
+      const col = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#33373d');
+      const h = thick / 2 - 1.3;
+      ctx.strokeStyle = col; ctx.lineWidth = selected ? 1.6 : 0.9;
+      ctx.beginPath(); ctx.moveTo(-len / 2, -h); ctx.lineTo(len / 2, -h); ctx.moveTo(-len / 2, h); ctx.lineTo(len / 2, h); ctx.stroke();
+      ctx.strokeStyle = selected ? '#c8102e' : (this.monoMode ? '#111418' : '#2f6fa8'); ctx.lineWidth = selected ? 1.8 : 1.2;
+      const slide = /sliding|double|slide/i.test(o.winType || '') || t.slide;
+      if (slide) {
+        const g2 = Math.max(1.6, h * 0.35), ov = len * 0.04;
+        ctx.beginPath(); ctx.moveTo(-len / 2, -g2); ctx.lineTo(ov, -g2); ctx.moveTo(-ov, g2); ctx.lineTo(len / 2, g2); ctx.stroke();
+      } else {
+        const g2 = Math.max(1, h * 0.18);
+        ctx.beginPath(); ctx.moveTo(-len / 2, -g2); ctx.lineTo(len / 2, -g2); ctx.moveTo(-len / 2, g2); ctx.lineTo(len / 2, g2); ctx.stroke();
+        const panes = Math.max(1, t.panes || 1); ctx.lineWidth = 0.8;
+        for (let i = 1; i < panes; i++) { const xx = -len / 2 + (len * i) / panes; ctx.beginPath(); ctx.moveTo(xx, -h); ctx.lineTo(xx, h); ctx.stroke(); }
       }
     } else {
       // 창: 평행 이중선(유리) + 분할

@@ -500,7 +500,11 @@ export class Editor2D {
 
   // ── 도면 스타일 ─────────────────────────────────────────────────────
   // 벽 두께(mm): 외벽 = 설정 두께, 칸막이 = 그 45% (80~150)
-  _planT() { const T = this.wallThickness(); return { ext: T, int: Math.max(80, Math.min(150, Math.round(T * 0.45 / 10) * 10)) }; }
+  // 벽 두께(mm): 외벽 = 설정 두께(방별 room.wallT 우선), 칸막이 = design.wallThicknessInt 또는 외벽의 45% (80~150)
+  _planT() {
+    const T = this.wallThickness(), di = store.design && store.design.wallThicknessInt;
+    return { ext: T, int: di || Math.max(80, Math.min(150, Math.round(T * 0.45 / 10) * 10)) };
+  }
   _isIndoor(r) { return !OPEN_ROOM_TYPES.includes(r.type); }
   // 벽 선분 목록(mm) — 실내 방의 막힌 면을, 바깥이 다른 실내 방이면 칸막이·아니면 외벽으로 잘게 나눔
   _planWallSegs() {
@@ -524,17 +528,20 @@ export class Editor2D {
         for (let i = 0; i < cs.length - 1; i++) {
           const m = (cs[i] + cs[i + 1]) / 2;
           const px = hz ? m : x1 + nx * 60, py = hz ? y1 + ny * 60 : m;
-          const t = inside(px, py, r) ? T.int : T.ext;
-          out.push(hz ? { x1: cs[i], y1, x2: cs[i + 1], y2: y1, t, hz } : { x1, y1: cs[i], x2: x1, y2: cs[i + 1], t, hz });
+          const ext = !inside(px, py, r), t = ext ? (r.wallT || T.ext) : T.int;
+          // 외벽은 바깥면이 방 경계선(= 건물 외곽)에 오도록 안쪽으로 들임 / 칸막이는 경계선 가운데
+          const o = ext ? -t / 2 : 0;
+          out.push(hz ? { x1: cs[i], y1: y1 + ny * o, x2: cs[i + 1], y2: y1 + ny * o, t, hz, ext, edge: y1 }
+                      : { x1: x1 + nx * o, y1: cs[i], x2: x1 + nx * o, y2: cs[i + 1], t, hz, ext, edge: x1 });
         }
       }
     }
     return out;
   }
-  _segRect(g, extra = 0) {   // 선분 → 화면 사각형 [x, y, w, h] (끝을 두께 절반만큼 늘려 모서리를 메움)
-    const h = g.t / 2;
-    const x0 = Math.min(g.x1, g.x2) - (g.hz ? h : h), x1 = Math.max(g.x1, g.x2) + h;
-    const y0 = Math.min(g.y1, g.y2) - h, y1 = Math.max(g.y1, g.y2) + h;
+  _segRect(g, extra = 0) {   // 선분 → 화면 사각형 [x, y, w, h] (칸막이는 끝을 두께 절반만큼 늘려 꺾인 모서리를 메움)
+    const h = g.t / 2, e = g.ext ? 0 : h;
+    const x0 = Math.min(g.x1, g.x2) - (g.hz ? e : h), x1 = Math.max(g.x1, g.x2) + (g.hz ? e : h);
+    const y0 = Math.min(g.y1, g.y2) - (g.hz ? h : e), y1 = Math.max(g.y1, g.y2) + (g.hz ? h : e);
     const [ax, ay] = this.toPx(x0, y0), [bx, by] = this.toPx(x1, y1);
     return [ax - extra, ay - extra, bx - ax + extra * 2, by - ay + extra * 2];
   }
@@ -561,14 +568,15 @@ export class Editor2D {
     for (const g of segs) ctx.fillRect(...this._segRect(g, 0));
     ctx.restore();
   }
-  // 개구부 위치의 벽 두께(mm)
-  _wallTAt(cx, cy, horizontal) {
+  // 개구부 위치의 벽 — { t: 두께(mm), dx, dy: 벽 중심까지 이동(mm, 외벽은 안쪽으로 들어가 있음) }
+  _wallAt(cx, cy, horizontal) {
     for (const g of this._planSegs || []) {
       if (g.hz !== horizontal) continue;
-      if (g.hz ? (Math.abs(g.y1 - cy) < 2 && cx >= Math.min(g.x1, g.x2) - 1 && cx <= Math.max(g.x1, g.x2) + 1)
-               : (Math.abs(g.x1 - cx) < 2 && cy >= Math.min(g.y1, g.y2) - 1 && cy <= Math.max(g.y1, g.y2) + 1)) return g.t;
+      if (g.hz ? (Math.abs(g.edge - cy) < 2 && cx >= Math.min(g.x1, g.x2) - 1 && cx <= Math.max(g.x1, g.x2) + 1)
+               : (Math.abs(g.edge - cx) < 2 && cy >= Math.min(g.y1, g.y2) - 1 && cy <= Math.max(g.y1, g.y2) + 1))
+        return { t: g.t, dx: g.hz ? 0 : g.x1 - cx, dy: g.hz ? g.y1 - cy : 0 };
     }
-    return this._planT().int;
+    return { t: this._planT().int, dx: 0, dy: 0 };
   }
   // 데크·포치 난간(room.rail) — 가는 이중선 + 기둥
   _drawPlanRails() {
@@ -600,7 +608,6 @@ export class Editor2D {
     const d = store.design, rooms = d.rooms; if (!rooms.length) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const r of rooms) { minX = Math.min(minX, r.x); minY = Math.min(minY, r.y); maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.d); }
-    const T = this._planT().ext / 2;
     const near = (a, b) => Math.abs(a - b) < 2;
     const sides = {
       n: { hz: true, edge: minY, out: -1, rooms: rooms.filter((r) => near(r.y, minY)), lo: minX, hi: maxX },
@@ -625,8 +632,8 @@ export class Editor2D {
       if (opPts.length) { const op = uniq([...roomPts, ...opPts]); if (op.join() !== roomPts.join()) tiers.push(op); }
       if (roomPts.length > 2) tiers.push(roomPts);
       tiers.push([Math.round(S.lo), Math.round(S.hi)]);
-      const base = S.edge + S.out * T;                  // 벽 바깥면
-      if (k === 'n') this._chainTopPx = T * this.scale + 26 + (tiers.length - 1) * 24 + 14;
+      const base = S.edge;                              // 벽 바깥면 = 건물 외곽선
+      if (k === 'n') this._chainTopPx = 26 + (tiers.length - 1) * 24 + 14;
       tiers.forEach((pts, ti) => {
         const offPx = 26 + ti * 24;
         for (let i = 0; i < pts.length - 1; i++) this._archDim(S, base, offPx, pts[i], pts[i + 1], ti === tiers.length - 1);
@@ -968,11 +975,12 @@ export class Editor2D {
     const t = WINDOW_TYPES[o.winType] || {};
     const isDoor = t.glass === false;
     const selected = o.id === store.selectedOpening;
-    const [pcx, pcy] = this.toPx(g.cx, g.cy);
+    const W = this.planStyle && !o.free && !o.onOutline ? this._wallAt(g.cx, g.cy, g.horizontal) : null;
+    const [pcx, pcy] = this.toPx(g.cx + (W ? W.dx : 0), g.cy + (W ? W.dy : 0));
     const len = o.w * this.scale;
     // 화면상 벽 두께 표현 — 외벽은 실제 두께만큼 덮어 그림
     const thick = o.onOutline ? Math.max(9, this.wallThickness() * this.scale + 4)
-      : (this.planStyle && !o.free ? Math.max(5, this._wallTAt(g.cx, g.cy, g.horizontal) * this.scale + 2.6) : 9);
+      : (W ? Math.max(5, W.t * this.scale + 2.6) : 9);
 
     ctx.save();
     ctx.translate(pcx, pcy);

@@ -65,6 +65,11 @@ for o in bpy.data.objects:
         if m.type == 'BOOLEAN' and getattr(m, 'collection', None):
             for c in m.collection.all_objects: cutters.add(c.name)
 print("cutters:", sorted(cutters))
+# 곡선의 단면·굵기 모양으로 쓰는 곡선(렌더 숨김이어도 필요)도 형태 확정 때까지 남겨 둠
+for o in bpy.data.objects:
+    if o.type == 'CURVE':
+        for ref in (o.data.bevel_object, o.data.taper_object):
+            if ref: cutters.add(ref.name)
 for o in bpy.data.objects:
     o.hide_set(False); o.hide_viewport = False; o.hide_select = False
 # 제외할 컬렉션(렌더용 배경·잔디 등)
@@ -86,7 +91,7 @@ for o in list(bpy.data.objects):
     if o.hide_render and o.name not in cutters and o.type in ('MESH', 'CURVE', 'SURFACE', 'FONT', 'META'):
         bpy.data.objects.remove(o, do_unlink=True)
 # 곡선(수전·의자 다리 등)은 형태(메시)로 변환해 함께 포함
-curves = [o for o in bpy.data.objects if o.type in ('CURVE', 'SURFACE', 'FONT', 'META')]
+curves = [o for o in bpy.data.objects if o.type in ('CURVE', 'SURFACE', 'FONT', 'META') and o.name not in cutters]
 if curves:
     sel_only(curves); bpy.ops.object.convert(target='MESH')
 

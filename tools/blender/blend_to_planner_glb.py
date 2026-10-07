@@ -541,5 +541,8 @@ print("bbox", tuple(round(v,3) for v in mn), tuple(round(v,3) for v in mx))
 bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, NAME + ".glb"), export_format='GLB',
     export_apply=True, export_extras=True, export_cameras=False, export_lights=False, export_yup=True,
     export_image_format='JPEG', export_jpeg_quality=A.jpeg,
-    export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=7)
+    export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=7,
+    # 위치 정밀도 — Draco 는 부품(재질)마다 자기 크기 기준으로 좌표를 반올림함. 기본 14비트면 9m 집에서 0.6mm 단위라
+    #   서로 맞닿은 부품의 경계가 어긋나 틈으로 뒤가 비쳐 흰 점선(이음매)이 보임 → 18비트(약 0.04mm)
+    export_draco_position_quantization=18, export_draco_normal_quantization=12, export_draco_texcoord_quantization=14)
 print("GLB size:", os.path.getsize(os.path.join(OUT, NAME + ".glb")))

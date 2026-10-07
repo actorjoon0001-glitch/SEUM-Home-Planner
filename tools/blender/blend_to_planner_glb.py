@@ -224,6 +224,17 @@ def fix_coplanar(push=0.0006, tol=0.00025, cell=0.3):
         return x
     node_faces = defaultdict(list)
     hits = defaultdict(float)
+    # 부품마다 같은 평면의 면을 한 묶음(평면 번호)으로 — 반올림 칸으로 나누면 한 사각면의 두 삼각형이
+    #   칸 경계에서 갈려 한쪽만 밀리고(대각선으로 색이 갈림) 함 → 값 차이가 tol 이내면 이어 붙여 묶음
+    plane_id = {}
+    for (a, sg), L in faces.items():
+        per = defaultdict(list)
+        for f in L: per[f[4]].append(f)
+        for oi, fl in per.items():
+            fl.sort(key=lambda f: f[0]); cid = 0; prev = None
+            for f in fl:
+                if prev is not None and f[0] - prev > tol: cid += 1
+                plane_id[(oi, a, sg, f[5])] = cid; prev = f[0]
     for (a, sg), L in faces.items():
         L.sort(key=lambda f: f[0])
         i0 = 0
@@ -234,10 +245,10 @@ def fix_coplanar(push=0.0006, tol=0.00025, cell=0.3):
                 if (f[1] > g[2] - 1e-6).any() or (g[1] > f[2] - 1e-6).any(): continue
                 ov = clip(f[3], g[3])
                 if ov is None or abs(area(ov)) < 1e-6: continue    # 1cm² 미만은 무시
-                nf = (f[4], a, sg, round(f[0] / (2 * tol))); ng = (g[4], a, sg, round(g[0] / (2 * tol)))
+                nf = (f[4], a, sg, plane_id[(f[4], a, sg, f[5])]); ng = (g[4], a, sg, plane_id[(g[4], a, sg, g[5])])
                 parent[find(nf)] = find(ng)
                 hits[tuple(sorted((objs[f[4]].name, objs[g[4]].name)))] += abs(area(ov))
-            node_faces[(f[4], a, sg, round(f[0] / (2 * tol)))].append(f[5])
+            node_faces[(f[4], a, sg, plane_id[(f[4], a, sg, f[5])])].append(f[5])
     comps = defaultdict(list)
     for nd in parent: comps[find(nd)].append(nd)
     moves = defaultdict(dict)          # 오브젝트 → {꼭짓점: 월드 이동 벡터}
@@ -541,5 +552,8 @@ print("bbox", tuple(round(v,3) for v in mn), tuple(round(v,3) for v in mx))
 bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, NAME + ".glb"), export_format='GLB',
     export_apply=True, export_extras=True, export_cameras=False, export_lights=False, export_yup=True,
     export_image_format='JPEG', export_jpeg_quality=A.jpeg,
-    export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=7)
+    export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=7,
+    # 위치 정밀도 — Draco 는 부품(재질)마다 자기 크기 기준으로 좌표를 반올림함. 기본 14비트면 9m 집에서 0.6mm 단위라
+    #   서로 맞닿은 부품의 경계가 어긋나 틈으로 뒤가 비쳐 흰 점선(이음매)이 보임 → 18비트(약 0.04mm)
+    export_draco_position_quantization=18, export_draco_normal_quantization=12, export_draco_texcoord_quantization=14)
 print("GLB size:", os.path.getsize(os.path.join(OUT, NAME + ".glb")))

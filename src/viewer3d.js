@@ -18,6 +18,8 @@ TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 
 const WALL_T = 100; // 벽 두께 mm
 const SKY_TOP = '#a9c6e3', SKY_HORIZON = '#e8eef3';   // 하늘 그라데이션 (지평선색 = 안개색)
 const HQ_KEY = 'seum_3d_hq';
+// 기본 밝기 — 눈부심 없이 편안한 톤 (하얀 벽·천장이 하얗게 날아가지 않게). 1 = 예전 밝기
+const BRIGHT = { exposure: 0.82, sun: 0.85, env: 0.78 };
 // 실물 모델 조명(.lights.json, 블렌더 W) → three 세기. 단위가 mm 라 점·스폿은 ×1e6 (candela·m² → mm²)
 const LAMP_K = { spot: 0.09e6, point: 0.09e6, area: 0.006 };
 const LAMP_MAT = /(lamp|lens|glow|bulb|lantern|warm|cove|led|crystal|downpanel)/i, LAMP_MAT_NOT = /(lock|disp|lcd|key)/i;                          // 고화질(구석 음영) 사용 여부 저장
@@ -43,7 +45,7 @@ export class Viewer3D {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // 톤매핑 — 밋밋한 회색 느낌 대신 자연스럽고 화사한 실내 톤
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = BRIGHT.exposure;
     container.appendChild(this.renderer.domElement);
 
     // 환경광(반사) — 실내 스튜디오 조명을 미리 구워 모든 재질에 반사·간접광으로 입힘.
@@ -201,13 +203,13 @@ export class Viewer3D {
     const amb = ss(-0.08, 0.35, el);                    // 주변광 — 해가 낮아지면 서서히 어두워짐(해질녘)
     const C = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
     this._placeSun();
-    this.sun.intensity = 2.6 * ss(0.0, 0.16, el);
+    this.sun.intensity = 2.6 * BRIGHT.sun * ss(0.0, 0.16, el);
     this.sun.color.copy(C('#fff0dc', '#ffae6a', gold));
     this.sun.castShadow = el > 0.01;
     this.hemi.intensity = 0.06 + 0.39 * amb;
     this.hemi.color.copy(C('#3a4868', '#eaf2ff', day).lerp(new THREE.Color('#ffc69a'), gold * 0.5));
     this.fill.intensity = 0.04 + 0.31 * amb;
-    this.renderer.toneMappingExposure = 0.42 + 0.58 * (0.4 * day + 0.6 * amb);
+    this.renderer.toneMappingExposure = (0.42 + 0.58 * (0.4 * day + 0.6 * amb)) * BRIGHT.exposure;
     const top = C('#08111f', '#a9c6e3', day).lerp(new THREE.Color('#7884ad'), gold * 0.6);
     const hor = C('#1a2639', '#e8eef3', day).lerp(new THREE.Color('#f2ae7b'), gold * 0.75);
     const key = top.getHexString() + hor.getHexString();
@@ -223,7 +225,7 @@ export class Viewer3D {
     for (const l of this._nightLights || []) { l.intensity = 2.4e6 * lamp; l.visible = lamp > 0.01; }
     for (const l of this._modelLights || []) { l.intensity = l.userData.base * lamp; l.visible = lamp > 0.01; }
     // 주변광(환경맵)도 밤엔 줄임 — 안 줄이면 밤에도 집이 낮처럼 밝게 보임
-    const envK = 0.06 + 0.94 * amb, seen = new Set();
+    const envK = (0.06 + 0.94 * amb) * BRIGHT.env, seen = new Set();
     this.scene.traverse((o) => {
       for (const m of [].concat(o.material || [])) {
         if (!m || seen.has(m) || !('envMapIntensity' in m)) continue;
@@ -2240,7 +2242,7 @@ export class Viewer3D {
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = this.renderer.toneMappingExposure;
+    renderer.toneMappingExposure = this.renderer.toneMappingExposure / BRIGHT.exposure;   // 사진급 렌더는 자체 하늘빛 — 예전 밝기 유지
 
     const pt = new WebGLPathTracer(renderer);
     pt.tiles.set(2, 2);            // 한 번에 1/4씩 그려 화면이 멈추지 않게

@@ -13,15 +13,16 @@ MERGE_R = {'SPOT': 0.9, 'POINT': 0.6, 'AREA': 0.0}
 BUDGET = {'SPOT': 24, 'POINT': 12, 'AREA': 4}
 
 
-def collect(bpy, ox=0.0, oy=0.0, oz=0.0, exclude=()):
-    from mathutils import Vector
+def collect(bpy, ox=0.0, oy=0.0, oz=0.0, exclude=(), rot=0.0):
+    from mathutils import Vector, Matrix
+    Rz = Matrix.Rotation(math.radians(rot), 4, 'Z')   # 모델 방향 돌리기(변환기 --rotate-z 와 같게)
     out = []
     for o in bpy.data.objects:
         if o.type != 'LIGHT' or o.hide_render or o.name in SKIP_NAMES: continue
         if any(c.name in exclude for c in o.users_collection): continue
         L = o.data
         if L.type == 'SUN' or L.energy <= 0: continue
-        M = o.matrix_world
+        M = Rz @ o.matrix_world
         p = M.translation
         if L.type == 'POINT' and L.energy >= 500 and p.z > 5: continue    # 장면 밖 큰 보조광
         d = (M.to_3x3() @ Vector((0, 0, -1))).normalized()

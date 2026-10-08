@@ -336,14 +336,30 @@ const T = [
         { roomKey: 'bed',  side: 'e', pos: 1750, winType: 'fixed',     w: 2000, h: 1000, sill: 900 },
       ],
       furniture: [
-        { catalogId: 'dining4', x: 1500, y: 1400, rotation: 0 },
-        { catalogId: 'sink',    x: 2900, y: 400,  rotation: 0 },
-        { catalogId: 'fridge',  x: 3800, y: 450,  rotation: 0 },
-        { catalogId: 'sofa3',   x: 1400, y: 5200, rotation: 0 },
-        { catalogId: 'tv',      x: 2000, y: 6600, rotation: 180 },
-        { catalogId: 'toilet',  x: 6600, y: 500,  rotation: 0 },
-        { catalogId: 'basin',   x: 4700, y: 400,  rotation: 0 },
-        { catalogId: 'bedQ',    x: 5600, y: 5300, rotation: 0 },
+        // 3D 실물 모델(블렌더 시뮬레이션)의 가구 위치·크기 그대로
+        // 주방(북측) — 일자 상판(세탁기·전자레인지 수납 포함) · 인덕션 · 양문형 냉장고
+        { catalogId: 'sink',      x: 1590, y: 350,  w: 3080, d: 600, rotation: 0 },
+        { catalogId: 'induction', x: 450,  y: 325,  w: 600,  d: 450, rotation: 0 },
+        { catalogId: 'fridge',    x: 3755, y: 395,  w: 1140, d: 650, rotation: 0 },
+        // 다이닝 — 식탁 1600×850 + 의자 4개
+        { catalogId: 'dining4',   x: 1050, y: 2200, w: 1600, d: 850, rotation: 0 },
+        { catalogId: 'chair',     x: 650,  y: 1590, w: 450,  d: 500, rotation: 0 },
+        { catalogId: 'chair',     x: 1450, y: 1590, w: 450,  d: 500, rotation: 0 },
+        { catalogId: 'chair',     x: 650,  y: 2810, w: 450,  d: 500, rotation: 180 },
+        { catalogId: 'chair',     x: 1450, y: 2810, w: 450,  d: 500, rotation: 180 },
+        // 거실 — 3인 소파(서측 벽) · 러그 · TV 거실장(동측)
+        { catalogId: 'sofa3',     x: 565,  y: 5115, w: 2540, d: 930, rotation: 270 },
+        { catalogId: 'rug',       x: 1780, y: 4890, w: 1450, d: 1900, rotation: 0 },
+        { catalogId: 'tvstand',   x: 3910, y: 5050, w: 2400, d: 420, rotation: 90 },
+        // 욕실 — 양변기 · 세면대
+        { catalogId: 'toilet',    x: 4800, y: 400,  w: 440,  d: 660, rotation: 0 },
+        { catalogId: 'basin',     x: 5700, y: 285,  w: 520,  d: 420, rotation: 0 },
+        // 현관 — 신발장
+        { catalogId: 'shelf',     x: 6285, y: 2950, w: 1290, d: 400, rotation: 180 },
+        // 침실 — 침대(머리 남쪽) · 협탁 · 옷장
+        { catalogId: 'bedQ',      x: 6119, y: 5950, w: 1480, d: 1960, rotation: 180 },
+        { catalogId: 'shelf',     x: 5064, y: 6720, w: 440,  d: 400, rotation: 180 },
+        { catalogId: 'wardrobe',  x: 6399, y: 3555, w: 1100, d: 610, rotation: 180 },
       ],
     },
   },
@@ -408,22 +424,28 @@ const T = [
         { roomKey: 'bed',  side: 'e', pos: 2350, winType: 'swingDoor', w: 800,  h: 2100, color: '#1c1f24' },
       ],
       furniture: [
-        // 방(좌상)
-        { catalogId: 'bedQ',  x: 1100, y: 1600, rotation: 0 },
-        // 욕실(중상)
-        { catalogId: 'toilet', x: 3900, y: 700,  rotation: 0 },
-        { catalogId: 'basin',  x: 2650, y: 700,  rotation: 0 },
-        // 주방·다이닝(우상)
-        { catalogId: 'sink',    x: 5000, y: 380,  rotation: 0 },
-        { catalogId: 'fridge',  x: 7600, y: 600,  rotation: 0 },
-        { catalogId: 'dining4', x: 6300, y: 1900, rotation: 0 },
-        // 거실(우하)
-        { catalogId: 'sofa3', x: 6200, y: 4900, rotation: 0 },
-        { catalogId: 'tv',    x: 6200, y: 3150, rotation: 180 },
-        // 데크(좌하) — 벽등 2개 + 남서측 계단
+        // 3D 실물 모델(블렌더)의 가구 위치·크기 그대로 (중심 x·y, 폭 w·깊이 d mm)
+        // 방 — 서랍장
+        { catalogId: 'shelf',   x: 1400, y: 420,  w: 1040, d: 360, rotation: 0 },
+        // 욕실 — 양변기 · 세면대
+        { catalogId: 'toilet',  x: 3050, y: 560,  w: 400,  d: 650, rotation: 0 },
+        { catalogId: 'basin',   x: 3750, y: 390,  w: 480,  d: 260, rotation: 0 },
+        // 주방 — 냉장고 · ㄱ자 상판(뒤쪽 하부장 + 오른쪽 싱크) · 인덕션 · 아일랜드 바 · 바 의자
+        { catalogId: 'fridge',  x: 5280, y: 565,  w: 650,  d: 610, rotation: 0 },
+        { catalogId: 'kbase12', x: 6390, y: 540,  w: 1400, d: 620, rotation: 0 },
+        { catalogId: 'sink',    x: 7390, y: 1020, w: 1580, d: 620, rotation: 90 },
+        { catalogId: 'induction', x: 5950, y: 520, w: 500, d: 480, rotation: 0 },
+        { catalogId: 'cooktop', x: 6700, y: 2170, w: 2000, d: 760, rotation: 0 },
+        { catalogId: 'chair',   x: 6600, y: 2830, w: 480,  d: 560, rotation: 180 },
+        // 데크 — 테이블 + 의자 4개
+        { catalogId: 'dining4', x: 3050, y: 5080, w: 800,  d: 800, rotation: 0 },
+        { catalogId: 'chair',   x: 3050, y: 4400, w: 480,  d: 520, rotation: 0 },
+        { catalogId: 'chair',   x: 3050, y: 5760, w: 480,  d: 520, rotation: 180 },
+        { catalogId: 'chair',   x: 2370, y: 5080, w: 480,  d: 520, rotation: 270 },
+        { catalogId: 'chair',   x: 3730, y: 5080, w: 480,  d: 520, rotation: 90 },
+        // 데크 벽등 2개
         { catalogId: 'sconce', x: 1150, y: 3115, rotation: 0, wallNormal: [0, 1] },
         { catalogId: 'sconce', x: 3380, y: 3115, rotation: 0, wallNormal: [0, 1] },
-        { catalogId: 'decksteps', x: 780, y: 6230, rotation: 0 },
       ],
     },
   },
@@ -484,13 +506,26 @@ const T = [
         { roomKey: 'B_bed',  side: 'e', pos: 3100, winType: 'fixed',     w: 2000, h: 600,  sill: 1500 },
       ],
       furniture: [
-        // 6평동 — 욕실(세면대·변기), 남측 주방(냉장고 자리·싱크)
-        { catalogId: 'basin',  x: 1100, y: 450,  rotation: 0 },
-        { catalogId: 'toilet', x: 1900, y: 550,  rotation: 0 },
-        { catalogId: 'fridge', x: 650,  y: 5700, rotation: 180 },
-        { catalogId: 'sink',   x: 1650, y: 5800, rotation: 180 },
-        // 4평동 — 북측 침대
-        { catalogId: 'bedQ',   x: 7200, y: 1400, rotation: 0 },
+        // 3D 실물 모델(블렌더)의 가구 위치·크기 그대로
+        // 6평동 욕실 — 세면대 · 양변기
+        { catalogId: 'basin',  x: 1400, y: 370,  w: 480,  d: 420, rotation: 0 },
+        { catalogId: 'toilet', x: 2100, y: 480,  w: 400,  d: 640, rotation: 0 },
+        // 6평동 주방(남측) — 냉장고 · 싱크 상판 · 인덕션
+        { catalogId: 'fridge', x: 600,  y: 5810, w: 600,  d: 640, rotation: 180 },
+        { catalogId: 'sink',   x: 1745, y: 5840, w: 1610, d: 620, rotation: 180 },
+        { catalogId: 'induction2', x: 2280, y: 5830, w: 360, d: 500, rotation: 180 },
+        // 데크 — 테이블 + 의자 4개, 화분 2개
+        { catalogId: 'dining4', x: 4150, y: 2900, w: 1430, d: 820, rotation: 0 },
+        { catalogId: 'chair',  x: 3790, y: 2200, w: 500,  d: 520, rotation: 0 },
+        { catalogId: 'chair',  x: 4510, y: 2200, w: 500,  d: 520, rotation: 0 },
+        { catalogId: 'chair',  x: 3790, y: 3600, w: 500,  d: 520, rotation: 180 },
+        { catalogId: 'chair',  x: 4510, y: 3600, w: 500,  d: 520, rotation: 180 },
+        { catalogId: 'plant',  x: 3600, y: 400,  w: 320,  d: 320, rotation: 0 },
+        { catalogId: 'plant',  x: 4700, y: 350,  w: 320,  d: 320, rotation: 0 },
+        // 4평동 — 싱글 침대(머리 동쪽) · 낮은 수납장 · 서랍장
+        { catalogId: 'bedS',   x: 7613, y: 860,  w: 1120, d: 2045, rotation: 90 },
+        { catalogId: 'tvstand', x: 6960, y: 5917, w: 2390, d: 465, rotation: 180 },
+        { catalogId: 'shelf',  x: 8410, y: 5912, w: 450,  d: 475, rotation: 180 },
       ],
     },
   },

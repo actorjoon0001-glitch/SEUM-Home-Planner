@@ -683,10 +683,6 @@ function buildRoomPalette() {
 
   // Archisketch 사이드바 구조 (그룹별 도구)
   const GROUPS = [
-    { label: '특수 기능', items: [
-      { ic: '🖼️', label: '도면 이미지 업로드', action: () => openUnderlayDialog(_editor) },
-      { ic: '🔍', label: '도면 검색', action: () => openTemplateDialog() },
-    ] },
     { label: '방 만들기', items: [
       { ic: '📐', label: '벽 그리기', key: 'L', mode: 'outline' },
       { ic: '✏️', label: '방 그리기', key: 'F', mode: 'draw' },

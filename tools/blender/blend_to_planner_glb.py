@@ -87,17 +87,10 @@ for on in [c.strip() for c in A.exclude_objects.split(',') if c.strip()]:
     o = bpy.data.objects.get(on)
     if o: bpy.data.objects.remove(o, do_unlink=True); print("제외 오브젝트:", on)
     else: print("오브젝트 없음:", on)
-# 방향 돌리기 — 맨 위 부모 오브젝트만 원점 기준으로 회전(자식은 따라감). 조명 파일·굽기 모두 돌린 뒤 기준
-if A.rotate_z:
-    Rz = mathutils.Matrix.Rotation(math.radians(A.rotate_z), 4, 'Z')
-    for o in bpy.data.objects:
-        if o.parent is None: o.matrix_world = Rz @ o.matrix_world
-    bpy.context.view_layer.update()
-    print("방향 돌리기:", A.rotate_z, "도")
 # 블렌더 조명 → 출력폴더/<이름>.lights.json (웹 3D 에서 다운라이트·간접등을 실제 조명으로 켬)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lights_json
-lights_json.write(bpy, os.path.join(OUT, NAME + '.lights.json'), ox=A.origin_x, oy=A.origin_y, oz=A.origin_z)
+lights_json.write(bpy, os.path.join(OUT, NAME + '.lights.json'), ox=A.origin_x, oy=A.origin_y, oz=A.origin_z, rot=A.rotate_z)
 # 렌더에서 숨긴 보조 부품(이전 버전·가이드·경로 곡선 등)은 제외 — 불리언 커터는 형태 확정 때까지 남겨 둠
 for o in list(bpy.data.objects):
     if o.hide_render and o.name not in cutters and o.type in ('MESH', 'CURVE', 'SURFACE', 'FONT', 'META'):
@@ -557,7 +550,15 @@ for (mname, roof), objs in groups.items():
     j = vl.objects.active
     j.name = ("지붕_" if roof else "") + (mname or "무재질")
     if roof: j["roof"] = 1
-# 5) 원점 맞춤: 홈플래너 도면 (0,0) = 블렌더 (origin-x, origin-y)
+# 4.5) 방향 돌리기 — 굽기가 끝난 뒤에 돌림 (창틀 안팎 색처럼 '월드 위치·방향'으로 칠하는 재질이 있어
+#   먼저 돌리면 집 중심 기준이 어긋나 안팎 색이 뒤바뀜). 맨 위 부모만 원점 기준으로 회전
+if A.rotate_z:
+    Rz = mathutils.Matrix.Rotation(math.radians(A.rotate_z), 4, 'Z')
+    for o in bpy.data.objects:
+        if o.parent is None: o.matrix_world = Rz @ o.matrix_world
+    vl.update()
+    print("방향 돌리기:", A.rotate_z, "도")
+# 5) 원점 맞춤: 홈플래너 도면 (0,0) = 블렌더 (origin-x, origin-y) — 돌린 뒤 좌표 기준
 for o in bpy.data.objects:
     o.location.x -= A.origin_x; o.location.y -= A.origin_y; o.location.z -= A.origin_z
 vl.update()   # 이동한 위치를 행렬에 반영해야 아래 크기 리포트가 맞음

@@ -231,6 +231,7 @@ def fix_coplanar(push=0.0006, tol=0.00025, cell=0.3):
             parent[x] = parent[parent[x]]; x = parent[x]
         return x
     node_faces = defaultdict(list)
+    adj = defaultdict(set)             # 실제로 겹치는 평면끼리만 이웃
     hits = defaultdict(float)
     # 부품마다 같은 평면의 면을 한 묶음(평면 번호)으로 — 반올림 칸으로 나누면 한 사각면의 두 삼각형이
     #   칸 경계에서 갈려 한쪽만 밀리고(대각선으로 색이 갈림) 함 → 값 차이가 tol 이내면 이어 붙여 묶음
@@ -255,14 +256,25 @@ def fix_coplanar(push=0.0006, tol=0.00025, cell=0.3):
                 if ov is None or abs(area(ov)) < 1e-6: continue    # 1cm² 미만은 무시
                 nf = (f[4], a, sg, plane_id[(f[4], a, sg, f[5])]); ng = (g[4], a, sg, plane_id[(g[4], a, sg, g[5])])
                 parent[find(nf)] = find(ng)
+                adj[nf].add(ng); adj[ng].add(nf)
                 hits[tuple(sorted((objs[f[4]].name, objs[g[4]].name)))] += abs(area(ov))
             node_faces[(f[4], a, sg, plane_id[(f[4], a, sg, f[5])])].append(f[5])
     comps = defaultdict(list)
     for nd in parent: comps[find(nd)].append(nd)
     moves = defaultdict(dict)          # 오브젝트 → {꼭짓점: 월드 이동 벡터}
+    # 층 번호 = 겹치는 이웃이 쓰지 않은 가장 낮은 층 (작은 부품부터).
+    #   묶음 안 순서(rank)를 그대로 쓰면 바닥판처럼 큰 면 하나에 작은 부품이 수십 개 붙을 때
+    #   바닥만 수십 층(예: 17mm) 밀려 올라가 위에 깐 타일을 덮어 버림 → 서로 겹치는 것끼리만 층을 나눔
     for members in comps.values():
         members.sort(key=lambda nd: (size[nd[0]], objs[nd[0]].name))
-        for rank, (oi, a, sg, _) in enumerate(members):
+        layer = {}
+        for nd in members:
+            used = {layer[n] for n in adj[nd] if n in layer}
+            k = 0
+            while k in used: k += 1
+            layer[nd] = k
+        for nd in members:
+            oi, a, sg, _ = nd; rank = layer[nd]
             if not rank: continue
             vd = moves[oi]
             for pi in node_faces[(oi, a, sg, _)]:

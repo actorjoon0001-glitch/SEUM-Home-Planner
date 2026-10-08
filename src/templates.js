@@ -1,7 +1,7 @@
 // 세움 홈플래너 - 단지/평형 템플릿 라이브러리 (내장 프리셋)
 // 상담 시작 시 자주 쓰는 도면을 바로 불러올 수 있도록 미리 정의.
 // rooms 는 key 로 식별하고, openings 가 roomKey 로 참조 → instantiate 시 실제 id 생성.
-import { normalize, rid, fid, WINDOW_TYPES, model3dSig } from './data.js';
+import { normalize, rid, fid, WINDOW_TYPES, model3dSig, FURNITURE_CATALOG, OPEN_ROOM_TYPES } from './data.js';
 
 // ---------------------------------------------------------------------------
 // 실물 모델(블렌더) 제품 옵션 — tools/blender/plan_to_blend.py 로 만든 모델 공용
@@ -305,61 +305,65 @@ const T = [
             choices: [{ id: 'orig', label: '우드', swatch: '#8a6a4a' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
               RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
         ] },
+      // 2D 도면 — 시공 도면(1층 평면도) 기준: 외벽 280t · 칸막이 120t
+      wallThickness: 280,
+      wallThicknessInt: 120,
       rooms: [
-        // 좌측 — 주방·다이닝(위) + 거실(아래) 개방형 LDK
-        { key: 'kit', type: 'kitchen', name: '주방·다이닝', x: 0,    y: 0,    w: 4300, d: 2800, open: ['s'] },
-        { key: 'liv', type: 'living',  name: '거실',        x: 0,    y: 2800, w: 4300, d: 4200, open: ['n'] },
-        // 우측 — 욕실 / 현관 / 침실
-        { key: 'bath', type: 'bath',     name: '욕실', x: 4300, y: 0,    w: 2700, d: 2000 },
-        { key: 'ent',  type: 'entrance', name: '현관', x: 4300, y: 2000, w: 2700, d: 1500 },
-        { key: 'bed',  type: 'bedroom',  name: '침실', x: 4300, y: 3500, w: 2700, d: 3500 },
+        // 좌측 — 주방·다이닝(위) + 거실(아래) 개방형 LDK (안목 4,020)
+        { key: 'kit', type: 'kitchen', name: '주방·다이닝', x: 0,    y: 0,    w: 4360, d: 3210, open: ['s', 'e'] },
+        { key: 'liv', type: 'living',  name: '거실',        x: 0,    y: 3210, w: 4360, d: 3790, open: ['n'] },
+        // 우측 — 욕실(안목 1,400) / 복도·현관(1,350, 3연동 중문) / 침실(3,450)
+        { key: 'bath', type: 'bath',     name: '욕실', x: 4360, y: 0,    w: 2640, d: 1740 },
+        { key: 'hall', type: 'hall',     name: '복도', x: 4360, y: 1740, w: 1140, d: 1470, open: ['w'] },
+        { key: 'ent',  type: 'entrance', name: '현관', x: 5500, y: 1740, w: 1500, d: 1470 },
+        { key: 'bed',  type: 'bedroom',  name: '침실', x: 4360, y: 3210, w: 2640, d: 3790 },
         // 데크(동측) · 포치(남측) — 면적 별도(개방)
         { key: 'deck',  type: 'deck',  name: '데크', x: 7000, y: 0,    w: 1500, d: 9000 },
         { key: 'porch', type: 'porch', name: '포치', x: 0,    y: 7000, w: 7000, d: 2000 },
       ],
       openings: [
-        // 주방·다이닝
-        { roomKey: 'kit', side: 'n', pos: 1800, winType: 'double', w: 1500, h: 700,  sill: 1300 },
-        { roomKey: 'kit', side: 'w', pos: 1400, winType: 'fixed',  w: 700,  h: 1800, sill: 300 },
-        // 거실 — 서측 픽스창 2개 + 남측 포치로 폴딩도어
-        { roomKey: 'liv', side: 'w', pos: 1300, winType: 'fixed',   w: 2000, h: 1000, sill: 1100 },
-        { roomKey: 'liv', side: 'w', pos: 3200, winType: 'fixed',   w: 2000, h: 1000, sill: 300 },
-        { roomKey: 'liv', side: 's', pos: 1800, winType: 'folding', w: 3000, h: 2100 },
-        // 욕실
-        { roomKey: 'bath', side: 'n', pos: 800,  winType: 'double',    w: 600,  h: 500,  sill: 1400 },
-        // 현관 — 거실측 3연동 중문 + 데크측 단열문
-        { roomKey: 'ent',  side: 'w', pos: 750,  winType: 'slideDoor', w: 1350, h: 2100 },
-        { roomKey: 'ent',  side: 'e', pos: 750,  winType: 'swingDoor', w: 900,  h: 2100 },
-        // 침실 — 거실측 문 + 남측창 + 데크측 픽스창
-        { roomKey: 'bed',  side: 'w', pos: 900,  winType: 'swingDoor', w: 900,  h: 2100 },
-        { roomKey: 'bed',  side: 's', pos: 1350, winType: 'double',    w: 2000, h: 1200, sill: 900 },
-        { roomKey: 'bed',  side: 'e', pos: 1750, winType: 'fixed',     w: 2000, h: 1000, sill: 900 },
+        // 주방·다이닝 — 북측 1500×700 이중창 · 서측 700×1800 픽스창
+        { roomKey: 'kit', side: 'n', pos: 1880, winType: 'double', w: 1500, h: 700,  sill: 1300 },
+        { roomKey: 'kit', side: 'w', pos: 2450, winType: 'fixed',  w: 700,  h: 1800, sill: 300 },
+        // 거실 — 서측 2000×1000 픽스창 + 남측 포치로 3000 폴딩도어
+        { roomKey: 'liv', side: 'w', pos: 1890, winType: 'fixed',   w: 2000, h: 1000, sill: 1100 },
+        { roomKey: 'liv', side: 's', pos: 2190, winType: 'folding', w: 3000, h: 2100 },
+        // 욕실 — 동측 600×500 이중창 · 복도 쪽 욕실문 700
+        { roomKey: 'bath', side: 'e', pos: 980,  winType: 'double',    w: 600,  h: 500,  sill: 1400 },
+        { roomKey: 'bath', side: 's', pos: 740,  winType: 'swingDoor', w: 700,  h: 2000, flipV: true },
+        // 현관 — 복도 쪽 3연동 중문 + 데크 쪽 단열문
+        { roomKey: 'ent',  side: 'w', pos: 735,  winType: 'slideDoor', w: 1350, h: 2100 },
+        { roomKey: 'ent',  side: 'e', pos: 610,  winType: 'swingDoor', w: 900,  h: 2100 },
+        // 침실 — 복도 쪽 문(북측) + 남측 2000×1200 이중창 + 데크 쪽 2000×1000 픽스창
+        { roomKey: 'bed',  side: 'n', pos: 640,  winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'bed',  side: 's', pos: 1110, winType: 'double',    w: 2000, h: 1200, sill: 900 },
+        { roomKey: 'bed',  side: 'e', pos: 2160, winType: 'fixed',     w: 2000, h: 1000, sill: 900 },
       ],
       furniture: [
-        // 3D 실물 모델(블렌더 시뮬레이션)의 가구 위치·크기 그대로
+        // 3D 실물 모델(블렌더 시뮬레이션)의 가구 — 도면 벽(외벽 280t) 안쪽에 맞춤
         // 주방(북측) — 일자 상판(세탁기·전자레인지 수납 포함) · 인덕션 · 양문형 냉장고
-        { catalogId: 'sink',      x: 1590, y: 350,  w: 3080, d: 600, rotation: 0 },
-        { catalogId: 'induction', x: 450,  y: 325,  w: 600,  d: 450, rotation: 0 },
-        { catalogId: 'fridge',    x: 3755, y: 395,  w: 1140, d: 650, rotation: 0 },
+        { catalogId: 'sink',      x: 1755, y: 580,  w: 2950, d: 600, rotation: 0 },
+        { catalogId: 'induction', x: 680,  y: 555,  w: 600,  d: 450, rotation: 0 },
+        { catalogId: 'fridge',    x: 3785, y: 605,  w: 1030, d: 650, rotation: 0 },
         // 다이닝 — 식탁 1600×850 + 의자 4개
-        { catalogId: 'dining4',   x: 1050, y: 2200, w: 1600, d: 850, rotation: 0 },
-        { catalogId: 'chair',     x: 650,  y: 1590, w: 450,  d: 500, rotation: 0 },
-        { catalogId: 'chair',     x: 1450, y: 1590, w: 450,  d: 500, rotation: 0 },
-        { catalogId: 'chair',     x: 650,  y: 2810, w: 450,  d: 500, rotation: 180 },
-        { catalogId: 'chair',     x: 1450, y: 2810, w: 450,  d: 500, rotation: 180 },
-        // 거실 — 3인 소파(서측 벽) · 러그 · TV 거실장(동측)
-        { catalogId: 'sofa3',     x: 565,  y: 5115, w: 2540, d: 930, rotation: 270 },
-        { catalogId: 'rug',       x: 1780, y: 4890, w: 1450, d: 1900, rotation: 0 },
-        { catalogId: 'tvstand',   x: 3910, y: 5050, w: 2400, d: 420, rotation: 90 },
+        { catalogId: 'dining4',   x: 1130, y: 2200, w: 1600, d: 850, rotation: 0 },
+        { catalogId: 'chair',     x: 730,  y: 1590, w: 450,  d: 500, rotation: 0 },
+        { catalogId: 'chair',     x: 1530, y: 1590, w: 450,  d: 500, rotation: 0 },
+        { catalogId: 'chair',     x: 730,  y: 2810, w: 450,  d: 500, rotation: 180 },
+        { catalogId: 'chair',     x: 1530, y: 2810, w: 450,  d: 500, rotation: 180 },
+        // 거실 — 3인 소파(서측 벽) · 러그 · TV 거실장(침실 칸막이 쪽)
+        { catalogId: 'sofa3',     x: 745,  y: 5115, w: 2540, d: 930, rotation: 270 },
+        { catalogId: 'rug',       x: 1960, y: 4890, w: 1450, d: 1900, rotation: 0 },
+        { catalogId: 'tvstand',   x: 4060, y: 5050, w: 2400, d: 420, rotation: 90 },
         // 욕실 — 양변기 · 세면대
-        { catalogId: 'toilet',    x: 4800, y: 400,  w: 440,  d: 660, rotation: 0 },
-        { catalogId: 'basin',     x: 5700, y: 285,  w: 520,  d: 420, rotation: 0 },
-        // 현관 — 신발장
-        { catalogId: 'shelf',     x: 6285, y: 2950, w: 1290, d: 400, rotation: 180 },
+        { catalogId: 'toilet',    x: 4800, y: 610,  w: 440,  d: 660, rotation: 0 },
+        { catalogId: 'basin',     x: 5700, y: 490,  w: 520,  d: 420, rotation: 0 },
+        // 현관 — 신발장(침실 벽 쪽)
+        { catalogId: 'shelf',     x: 6135, y: 2975, w: 1150, d: 350, rotation: 180 },
         // 침실 — 침대(머리 남쪽) · 협탁 · 옷장
-        { catalogId: 'bedQ',      x: 6119, y: 5950, w: 1480, d: 1960, rotation: 180 },
-        { catalogId: 'shelf',     x: 5064, y: 6720, w: 440,  d: 400, rotation: 180 },
-        { catalogId: 'wardrobe',  x: 6399, y: 3555, w: 1100, d: 610, rotation: 180 },
+        { catalogId: 'bedQ',      x: 5980, y: 5740, w: 1480, d: 1960, rotation: 180 },
+        { catalogId: 'shelf',     x: 5064, y: 6520, w: 440,  d: 400, rotation: 180 },
+        { catalogId: 'wardrobe',  x: 6170, y: 3575, w: 1100, d: 610, rotation: 180 },
       ],
     },
   },
@@ -695,6 +699,7 @@ export function instantiateTemplate(id) {
     roomId: keyToId[o.roomKey], side: o.side, pos: o.pos, winType: o.winType,
     w: o.w, h: o.h, sill: o.sill, color: o.color || '#4a5560',   // 템플릿에 명시하면 실제 치수·창틀색 사용
     ...(o.trim ? { trim: true } : {}),                            // 창 둘레 두꺼운 마감 몰딩
+    ...(o.flipH ? { flipH: true } : {}), ...(o.flipV ? { flipV: true } : {}),   // 문 여는 방향(경첩 좌우·안/밖)
   })).map((o) => fillWin(o));
   // 가구: 위치·회전 + (있으면) 설치 높이·색·크기
   const furniture = (b.furniture || []).map((f) => {
@@ -702,6 +707,7 @@ export function instantiateTemplate(id) {
     for (const k of ['elev', 'color', 'w', 'd', 'h']) if (f[k] != null) o[k] = f[k];
     return o;
   });
+  fitFurnitureInRooms(rooms, furniture, b);
   const design = normalize({
     name: b.name,
     productType: b.productType || '',
@@ -720,6 +726,38 @@ export function instantiateTemplate(id) {
     if (design.model3d.ownFurniture) design.model3d.baseFurn = design.furniture.map((f) => f.id);
   }
   return design;
+}
+
+// 가구가 벽을 뚫지 않게 — 놓인 방의 벽 안쪽(2D 도면 벽 두께 기준)으로 밀어 넣고, 넘치면 그 방향 크기를 줄임
+//   외벽 = 방별 wallT 또는 설계 외벽 두께(안쪽으로 들어감) / 칸막이 = 두께 절반 / 개방면 = 0
+//   벽에 거는 소품(wallMount)·데크·포치 위 가구는 그대로
+export function fitFurnitureInRooms(rooms, furniture, opt = {}) {
+  const T = opt.wallThickness || 150;
+  const TI = opt.wallThicknessInt || Math.max(80, Math.min(150, Math.round(T * 0.45 / 10) * 10));
+  const indoor = rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type));
+  const inRoom = (px, py, self) => indoor.find((q) => q !== self && px > q.x && px < q.x + q.w && py > q.y && py < q.y + q.d);
+  const moved = [];
+  for (const f of furniture) {
+    const c = FURNITURE_CATALOG.find((k) => k.id === f.catalogId);
+    if (!c || c.wallMount) continue;
+    const r = indoor.find((q) => f.x >= q.x && f.x <= q.x + q.w && f.y >= q.y && f.y <= q.y + q.d);
+    if (!r) continue;
+    const open = Array.isArray(r.open) ? r.open : [];
+    const inset = (side, px, py) => open.includes(side) ? 0 : (inRoom(px, py, r) ? TI / 2 : (r.wallT || T));
+    const rot = ((Math.round(f.rotation || 0) % 360) + 360) % 360, sw = rot === 90 || rot === 270;
+    let w = f.w != null ? f.w : c.w, d = f.d != null ? f.d : c.d;
+    let ex = sw ? d : w, ey = sw ? w : d;   // 도면상 가로·세로 크기
+    const x0 = r.x + inset('w', r.x - 60, f.y), x1 = r.x + r.w - inset('e', r.x + r.w + 60, f.y);
+    const y0 = r.y + inset('n', f.x, r.y - 60), y1 = r.y + r.d - inset('s', f.x, r.y + r.d + 60);
+    const before = [f.x, f.y, ex, ey];
+    if (ex > x1 - x0) ex = x1 - x0;
+    if (ey > y1 - y0) ey = y1 - y0;
+    f.x = Math.min(Math.max(f.x, x0 + ex / 2), x1 - ex / 2);
+    f.y = Math.min(Math.max(f.y, y0 + ey / 2), y1 - ey / 2);
+    if (ex !== before[2] || ey !== before[3]) { if (sw) { f.d = ex; f.w = ey; } else { f.w = ex; f.d = ey; } }
+    if (f.x !== before[0] || f.y !== before[1] || ex !== before[2] || ey !== before[3]) moved.push({ f, before });
+  }
+  return moved;
 }
 
 // 창호 기본 치수 채우기 (템플릿에 명시한 w/h/sill 우선, 없으면 WINDOW_TYPES 기본값)

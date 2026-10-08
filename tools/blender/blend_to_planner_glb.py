@@ -48,6 +48,7 @@ ap.add_argument('--hq', action='store_true')
 ap.add_argument('--bake-cache', default='')
 ap.add_argument('--no-cache', action='store_true')
 ap.add_argument('--keep-coplanar', action='store_true')
+ap.add_argument('--rotate-z', type=float, default=0.0)   # 모델 방향 돌리기(도, 원점 기준) — 도면과 앞뒤가 반대로 그려진 모델
 A = ap.parse_args(argv)
 SRC, OUT = A.src, A.out
 os.makedirs(OUT, exist_ok=True)
@@ -86,6 +87,13 @@ for on in [c.strip() for c in A.exclude_objects.split(',') if c.strip()]:
     o = bpy.data.objects.get(on)
     if o: bpy.data.objects.remove(o, do_unlink=True); print("제외 오브젝트:", on)
     else: print("오브젝트 없음:", on)
+# 방향 돌리기 — 맨 위 부모 오브젝트만 원점 기준으로 회전(자식은 따라감). 조명 파일·굽기 모두 돌린 뒤 기준
+if A.rotate_z:
+    Rz = mathutils.Matrix.Rotation(math.radians(A.rotate_z), 4, 'Z')
+    for o in bpy.data.objects:
+        if o.parent is None: o.matrix_world = Rz @ o.matrix_world
+    bpy.context.view_layer.update()
+    print("방향 돌리기:", A.rotate_z, "도")
 # 블렌더 조명 → 출력폴더/<이름>.lights.json (웹 3D 에서 다운라이트·간접등을 실제 조명으로 켬)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lights_json

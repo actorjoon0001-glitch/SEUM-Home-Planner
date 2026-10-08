@@ -224,11 +224,11 @@ export class Editor2D {
     // 전체 건물 외곽 치수 (치수 토글 시)
     else if (this.showDims) this._drawOverallDims();
 
-    // 창호(개구부)
-    for (const o of (d.openings || [])) this._drawOpening(o);
-
     // 가구
     if (this.showFurniture) for (const f of d.furniture) this._drawFurniture(f);
+
+    // 창호(개구부) — 가구 위에 그려 문짝·열림 호가 가려지지 않게
+    for (const o of (d.openings || [])) this._drawOpening(o);
 
     // 방 이름·면적 라벨 — 가구 위(맨 앞)에 그려 가리지 않게 (드래그로 이동 가능)
     for (const L of layers) if (L.room) this._drawRoomLabel(L.room);

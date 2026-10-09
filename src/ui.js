@@ -5,7 +5,7 @@ import {
   WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
   ROOF_TYPES, ROOF_PALETTE, PRODUCT_TYPES, outlineShapes,
 } from './data.js';
-import { listTemplates, instantiateTemplate, familyVariants } from './templates.js';
+import { listTemplates, instantiateTemplate, familyVariants, templateIdOf } from './templates.js';
 import { cloud } from './cloud.js';
 import { dxfToUnderlay } from './dxf.js';
 import { swatchDataURL, extKind, ROTATABLE } from './textures.js';
@@ -206,7 +206,7 @@ function enterEditor(loadFn) {
 }
 // onDelete: 휴지통으로 보내기(관리자) — { hard: true } 면 이 기기 저장처럼 바로 삭제
 // photo: 대표 사진(온라인 카탈로그와 같은 이미지) — 있으면 도면 미리보기 대신 사진 / code: 카탈로그 모델명
-function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null, photo = null, code = null, codeNote = null } = {}) {
+function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null, photo = null, code = null, codeNote = null, video = null } = {}) {
   const card = document.createElement('div');
   card.className = 'dash-card' + (photo ? ' dc-has-photo' : '');
   if (photo) {
@@ -214,6 +214,12 @@ function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMov
     const img = document.createElement('img'); img.src = photo; img.alt = code || name; img.loading = 'lazy'; img.draggable = false;
     img.onerror = () => { card.classList.remove('dc-has-photo'); ph.remove(); };   // 사진이 없으면 도면 미리보기만
     ph.appendChild(img);
+    if (video) {   // 🎬 드론샷 소개 영상 — 도면을 열지 않고 바로 재생
+      const pb = document.createElement('button'); pb.type = 'button'; pb.className = 'dc-play'; pb.title = '드론샷 소개 영상 보기';
+      pb.innerHTML = '<span>▶</span> 영상';
+      pb.onclick = (e) => { e.stopPropagation(); openVideo(video.url, (code ? code + ' · ' : '') + name); };
+      ph.appendChild(pb);
+    }
     card.appendChild(ph);
   }
   const cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.className = 'dc-thumb';
@@ -301,8 +307,8 @@ async function renderDash() {
   if (admToggle) admToggle.classList.toggle('hidden', !admin);
   if (!admin && admSub) { admSub.classList.add('hidden'); admToggle && admToggle.classList.remove('open'); }
   // 관리자 하위 메뉴가 선택돼 있으면 펼친 상태 유지(강조)
-  if (admin && admSub && ['all', 'trash', 'access'].includes(_dashView)) { admSub.classList.remove('hidden'); admToggle && admToggle.classList.add('open'); }
-  if (!admin && (_dashView === 'all' || _dashView === 'trash' || _dashView === 'access')) { _dashView = 'mine'; setActiveNav('mine'); }
+  if (admin && admSub && ['all', 'trash', 'access', 'videos'].includes(_dashView)) { admSub.classList.remove('hidden'); admToggle && admToggle.classList.add('open'); }
+  if (!admin && ['all', 'trash', 'access', 'videos'].includes(_dashView)) { _dashView = 'mine'; setActiveNav('mine'); }
   if (!grid) return;
   grid.innerHTML = '';
   if (_dashView === 'mine') {
@@ -337,6 +343,7 @@ async function renderDash() {
     //   관리자가 휴지통에 넣은 내장 템플릿은 숨김 (설정 행의 trashedBuiltin / deletedBuiltin)
     const items = [];
     const hidden = await builtinHidden();
+    await loadVideos();                                // 모델 영상(관리자가 올린 드론샷) — 카드 ▶ 버튼
     const overrides = await builtinShowroomMap();     // 내장 템플릿 전시장 이동 override
     const known = await knownShowrooms();             // 사용자가 만든 전시장(빈 전시장도 표시)
     // 도면을 특정 전시장으로 이동 실행 (apply 는 항목별 저장 함수) — 드래그·버튼 공용
@@ -359,7 +366,7 @@ async function renderDash() {
       let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
       const sr = (overrides[t.id] != null ? overrides[t.id] : (t.showroom || '')).trim();
       items.push({
-        title: t.title, showroom: sr, data: d, photo: t.photo, code: t.code, codeNote: t.codeNote,
+        title: t.title, showroom: sr, data: d, photo: t.photo, code: t.code, codeNote: t.codeNote, tid: t.id,
         apply: (room) => setBuiltinShowroom(t.id, room),
         open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }),
         del: admin ? () => adminAct(() => trashBuiltin(t.id), '휴지통으로 보냈어요') : null,
@@ -395,7 +402,7 @@ async function renderDash() {
       for (const it of groups[room]) {
         const card = projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del, {
           onMove: admin ? () => moveByPrompt(it.apply, it.showroom) : null,
-          photo: it.photo, code: it.code, codeNote: it.codeNote,
+          photo: it.photo, code: it.code, codeNote: it.codeNote, video: it.tid ? videoOf(it.tid) : null,
         });
         if (admin) {
           card.draggable = true;
@@ -494,6 +501,67 @@ async function renderDash() {
           () => adminAct(() => cloud.removeDesign(r.id), '영구 삭제했어요')));
       }
     } catch (e) { grid.innerHTML = `<p class="dash-empty">불러오기 실패: ${esc(e.message || String(e))}</p>`; }
+  } else if (_dashView === 'videos') {
+    title.textContent = '모델 영상 (관리자)';
+    sub.textContent = '전시 모델마다 드론샷 소개 영상을 올리면 전시장 카드의 ▶ 버튼과 3D 화면의 🎬 드론 영상 버튼으로 바로 볼 수 있어요.';
+    if (!admin) { grid.innerHTML = '<p class="dash-empty">관리자 계정으로 로그인해야 볼 수 있습니다.</p>'; return; }
+    await loadVideos(true);
+    const wrap = document.createElement('div'); wrap.className = 'vid-list'; wrap.style.gridColumn = '1 / -1';
+    grid.appendChild(wrap);
+    const fmtMB = (b) => (b / 1048576).toFixed(b > 104857600 ? 0 : 1) + 'MB';
+    for (const t of listTemplates().filter((x) => x.real)) {
+      const v = videoOf(t.id);
+      const row = document.createElement('div'); row.className = 'vid-row';
+      row.innerHTML = `
+        <div class="vid-ph">${t.photo ? `<img src="${esc(t.photo)}" alt="" loading="lazy">` : ''}</div>
+        <div class="vid-info">
+          ${t.code ? `<div class="dc-code">${esc(t.code)}${t.codeNote ? ` <small>${esc(t.codeNote)}</small>` : ''}</div>` : ''}
+          <div class="vid-name">${esc(t.title)}</div>
+          <div class="vid-stat">${v ? `🎬 ${esc(v.name || '영상')} · ${v.size ? fmtMB(v.size) : ''} · ${esc(fmtDate(v.at))}` : '<span class="muted">영상 없음</span>'}</div>
+          <div class="vid-prog hidden"><div class="vid-bar"></div><span class="vid-pct"></span></div>
+        </div>
+        <div class="vid-acts">
+          ${v ? '<button type="button" class="vid-btn" data-a="play">▶ 보기</button>' : ''}
+          <button type="button" class="vid-btn primary" data-a="up">${v ? '🔁 바꾸기' : '⬆ 영상 올리기'}</button>
+          ${v ? '<button type="button" class="vid-btn danger" data-a="del">삭제</button>' : ''}
+        </div>`;
+      const prog = row.querySelector('.vid-prog'), bar = row.querySelector('.vid-bar'), pct = row.querySelector('.vid-pct');
+      const btns = row.querySelectorAll('.vid-btn');
+      row.querySelector('[data-a="up"]').onclick = () => {
+        const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'video/mp4,video/webm,video/quicktime';
+        inp.onchange = async () => {
+          const f = inp.files && inp.files[0]; if (!f) return;
+          const ext = (f.name.split('.').pop() || 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '') || 'mp4';
+          const path = `${t.id}/${Date.now()}.${ext}`;
+          btns.forEach((b) => { b.disabled = true; });
+          prog.classList.remove('hidden'); bar.style.width = '0%'; pct.textContent = `올리는 중… 0% (${fmtMB(f.size)})`;
+          try {
+            const url = await cloud.uploadVideo(f, path, (r) => { bar.style.width = Math.round(r * 100) + '%'; pct.textContent = `올리는 중… ${Math.round(r * 100)}% (${fmtMB(f.size)})`; });
+            const old = videoOf(t.id);
+            const all = { ...(await loadVideos(true)) };
+            all[t.id] = { url, path, name: f.name, size: f.size, at: Date.now() };
+            await cloud.saveSettings({ videos: all }); _videos = all;
+            if (old && old.path && old.path !== path) { try { await cloud.removeVideo(old.path); } catch { /* 예전 파일 정리 실패는 무시 */ } }
+            flash(`🎬 '${t.title}' 영상을 올렸어요`);
+          } catch (e) { alert('영상 올리기 실패: ' + (e.message || e)); }
+          renderDash();
+        };
+        inp.click();
+      };
+      const pl = row.querySelector('[data-a="play"]'); if (pl) pl.onclick = () => openVideo(v.url, (t.code ? t.code + ' · ' : '') + t.title);
+      const dl = row.querySelector('[data-a="del"]');
+      if (dl) dl.onclick = async () => {
+        if (!confirm(`'${t.title}' 영상을 삭제할까요?`)) return;
+        try {
+          const all = { ...(await loadVideos(true)) }; const old = all[t.id]; delete all[t.id];
+          await cloud.saveSettings({ videos: all }); _videos = all;
+          if (old && old.path) { try { await cloud.removeVideo(old.path); } catch { /* noop */ } }
+          flash('영상을 삭제했어요');
+        } catch (e) { alert('삭제 실패: ' + (e.message || e)); }
+        renderDash();
+      };
+      wrap.appendChild(row);
+    }
   } else if (_dashView === 'access') {
     title.textContent = '접속 기록 (관리자)';
     sub.textContent = '최근 로그인·작업 기록입니다. (최근 300건)';
@@ -543,6 +611,38 @@ async function renderDash() {
       body.innerHTML = `<p class="dash-empty">기록을 불러오지 못했습니다: ${esc(e.message || String(e))}<br><span class="muted small">Supabase에 <code>seum_activity_log</code> 테이블이 필요합니다. (supabase/schema.sql 실행)</span></p>`;
     }
   }
+}
+
+// ── 모델 영상 ─────────────────────────────────────────────
+//   설정 행(videos: { 템플릿id: { url, path, name, size, at } }) — 누구나 읽고, 관리자만 바꿈
+let _videos = null;
+async function loadVideos(force) {
+  if (_videos && !force) return _videos;
+  try { const { data } = await cloud.getSettings(); _videos = (data && data.videos) || {}; }
+  catch { _videos = _videos || {}; }
+  syncVideoBtn();
+  return _videos;
+}
+function videoOf(tid) { return (tid && _videos && _videos[tid] && _videos[tid].url) ? _videos[tid] : null; }
+// 영상 재생 창 — 화면 위에 크게, 닫으면(✕·바깥·Esc) 보던 화면 그대로
+function openVideo(url, title) {
+  const ov = document.createElement('div'); ov.className = 'vid-overlay';
+  ov.innerHTML = `<div class="vid-box"><div class="vid-head"><b>🎬 ${esc(title || '')}</b><button type="button" class="vid-x" aria-label="닫기">✕</button></div>
+    <video src="${esc(url)}" controls autoplay playsinline preload="auto"></video></div>`;
+  const close = () => { const v = ov.querySelector('video'); try { v.pause(); } catch { /* noop */ } ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  ov.onclick = (e) => { if (e.target === ov) close(); };
+  ov.querySelector('.vid-x').onclick = close;
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+}
+// 3D 화면 '🎬 드론 영상' — 지금 도면이 영상 있는 전시 모델이면 표시
+function syncVideoBtn() {
+  const b = document.getElementById('view-video'); if (!b) return;
+  const tid = templateIdOf(store.design);
+  const v = videoOf(tid);
+  b.classList.toggle('hidden', !v);
+  if (v) b.onclick = () => { const t = listTemplates().find((x) => x.id === tid); openVideo(v.url, t ? (t.code ? t.code + ' · ' : '') + t.title : ''); };
 }
 
 // 접속 기록 — 시각(KST) 포맷 + 기기(UA) 라벨
@@ -1955,6 +2055,8 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   };
   store.subscribe(syncFloorTabs); syncFloorTabs();
   store.subscribe(syncVariantBar);
+  store.subscribe(syncVideoBtn);
+  loadVideos();   // 모델 영상 목록(설정 행) — 다 받으면 🎬 버튼 표시
   refreshUndo();
 
   $('tb-new').onclick = () => { if (confirm('빈 새 도면을 시작할까요? 저장하지 않은 변경은 사라집니다.')) { store.newDesign(); editor.fit(); viewer._needCam = true; viewer.dirty = true; } };

@@ -251,6 +251,45 @@ export const cloud = {
     return next;
   },
 
+  // --- 모델 영상 (Supabase Storage 'planner-videos' 버킷, 누구나 읽기 · 관리자만 올리기) ---
+  //   큰 파일도 올라가는지 진행률을 보여 주려고 fetch 대신 XHR 로 Storage REST 에 바로 올림
+  VIDEO_BUCKET: 'planner-videos',
+  videoPublicUrl(path) { return `${cfg.supabaseUrl}/storage/v1/object/public/${this.VIDEO_BUCKET}/${path}`; },
+  async uploadVideo(file, path, onProgress) {
+    await this.init();
+    if (!this.isAdmin()) throw new Error('관리자만 올릴 수 있습니다.');
+    const { data } = await client.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if (!token) throw new Error('로그인이 필요합니다.');
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${cfg.supabaseUrl}/storage/v1/object/${this.VIDEO_BUCKET}/${path}`);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.setRequestHeader('apikey', cfg.supabaseAnonKey);
+      xhr.setRequestHeader('x-upsert', 'true');
+      xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+      xhr.setRequestHeader('cache-control', '3600');
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) return resolve();
+        let msg = xhr.responseText || ('HTTP ' + xhr.status);
+        try { const j = JSON.parse(xhr.responseText); msg = j.message || j.error || msg; } catch { /* noop */ }
+        if (/bucket not found/i.test(msg)) msg = "영상 저장소(planner-videos)가 아직 없어요 — supabase/schema.sql 의 '모델 영상' 부분을 Supabase SQL Editor 에서 실행해 주세요.";
+        else if (xhr.status === 413 || /maximum allowed size|too large/i.test(msg)) msg = '파일이 너무 커요 — Supabase 파일 크기 한도를 넘었어요. 1080p 로 줄이거나(1분 ≈ 20MB) Supabase 설정에서 한도를 올려 주세요.';
+        reject(new Error(msg));
+      };
+      xhr.onerror = () => reject(new Error('네트워크 오류로 올리지 못했어요.'));
+      xhr.send(file);
+    });
+    return this.videoPublicUrl(path);
+  },
+  async removeVideo(path) {
+    await this.init();
+    if (!client || !path) return;
+    const { error } = await client.storage.from(this.VIDEO_BUCKET).remove([path]);
+    if (error) throw error;
+  },
+
   // 현재 로그인 계정이 관리자인지 (전체 도면 열람 권한)
   isAdmin() {
     const email = this.user && this.user.email;

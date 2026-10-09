@@ -1008,6 +1008,7 @@ export function instantiateTemplate(id) {
   const floors = (b.floors || [b]).map((f, i) => ({ ...mkFloor(f), name: f.name || (i + 1) + '층' }));
   const design = normalize({
     name: b.name,
+    templateId: id,   // 어느 전시 모델에서 시작했는지 — 모델 영상·사진 연결용
     productType: b.productType || '',
     ceilingHeight: b.ceilingHeight,
     ...(b.foundationHeight ? { foundationHeight: b.foundationHeight } : {}),   // 기초 높이
@@ -1025,6 +1026,15 @@ export function instantiateTemplate(id) {
     if (design.model3d.ownFurniture) design.model3d.baseFurn = design.floors.flatMap((f) => f.furniture.map((x) => x.id));
   }
   return design;
+}
+
+// 도면이 어느 전시 모델(템플릿)에서 왔는지 — templateId 가 없던 예전 저장 도면은 실물 모델 주소로 찾음
+export function templateIdOf(d) {
+  if (!d) return null;
+  if (d.templateId && T.some((t) => t.id === d.templateId)) return d.templateId;
+  const url = d.model3d && d.model3d.url;
+  const t = url && T.find((x) => x.base.model3d && x.base.model3d.url === url);
+  return t ? t.id : null;
 }
 
 // 같은 제품의 형태 묶음(예: 쌍둥이 기본형·ㄱ자형·2층형) — 3D 제품 패널의 '형태' 선택·3종 동시 보기에 사용

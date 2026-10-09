@@ -157,7 +157,7 @@ function drawPlanThumb(cv, d) {
   for (const r of d.rooms || []) { acc(r.x, r.y); acc(r.x + r.w, r.y + r.d); }
   for (const p of (d.outline && d.outline.paths) || []) for (const pt of p.points || []) acc(ptX(pt), ptY(pt));
   if (!isFinite(minX)) return;
-  const pad = 18, bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+  const pad = Math.max(6, Math.round(Math.min(W, H) * 0.1)), bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);   // 작은 미리보기도 꽉 차게
   const s = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh);
   const ox = (W - bw * s) / 2 - minX * s, oy = (H - bh * s) / 2 - minY * s;
   const X = (x) => x * s + ox, Y = (y) => y * s + oy;
@@ -205,14 +205,25 @@ function enterEditor(loadFn) {
   if (_dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.applyInitialView(); }, 0);
 }
 // onDelete: 휴지통으로 보내기(관리자) — { hard: true } 면 이 기기 저장처럼 바로 삭제
-function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null } = {}) {
+// photo: 대표 사진(온라인 카탈로그와 같은 이미지) — 있으면 사진을 크게, 도면은 오른쪽 아래 작게 / code: 카탈로그 모델명
+function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null, photo = null, code = null, codeNote = null } = {}) {
   const card = document.createElement('div');
-  card.className = 'dash-card';
+  card.className = 'dash-card' + (photo ? ' dc-has-photo' : '');
+  if (photo) {
+    const ph = document.createElement('div'); ph.className = 'dc-photo';
+    const img = document.createElement('img'); img.src = photo; img.alt = code || name; img.loading = 'lazy'; img.draggable = false;
+    img.onerror = () => { card.classList.remove('dc-has-photo'); ph.remove(); };   // 사진이 없으면 도면 미리보기만
+    ph.appendChild(img);
+    const mini = document.createElement('canvas'); mini.width = 192; mini.height = 144; mini.className = 'dc-mini';
+    try { drawPlanThumb(mini, design); } catch (e) { /* noop */ }
+    ph.appendChild(mini);
+    card.appendChild(ph);
+  }
   const cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.className = 'dc-thumb';
   card.appendChild(cv);
   try { drawPlanThumb(cv, design); } catch (e) { /* noop */ }
   const body = document.createElement('div'); body.className = 'dc-body';
-  body.innerHTML = `<div class="dc-name">${esc(name)}</div><div class="dc-meta">${esc(meta || '')}</div>`;
+  body.innerHTML = `${code ? `<div class="dc-code">${esc(code)}${codeNote ? ` <small>${esc(codeNote)}</small>` : ''}</div>` : ''}<div class="dc-name">${esc(name)}</div><div class="dc-meta">${esc(meta || '')}</div>`;
   card.appendChild(body);
   card.onclick = () => onOpen();
   if (onMove) {
@@ -364,7 +375,7 @@ async function renderDash() {
       let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
       const sr = (overrides[t.id] != null ? overrides[t.id] : (t.showroom || '')).trim();
       items.push({
-        title: t.title, showroom: sr, data: d,
+        title: t.title, showroom: sr, data: d, photo: t.photo, code: t.code, codeNote: t.codeNote,
         apply: (room) => setBuiltinShowroom(t.id, room),
         open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }),
         del: admin ? () => adminAct(() => trashBuiltin(t.id), '휴지통으로 보냈어요') : null,
@@ -400,6 +411,7 @@ async function renderDash() {
       for (const it of groups[room]) {
         const card = projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del, {
           onMove: admin ? () => moveByPrompt(it.apply, it.showroom) : null,
+          photo: it.photo, code: it.code, codeNote: it.codeNote,
         });
         if (admin) {
           card.draggable = true;

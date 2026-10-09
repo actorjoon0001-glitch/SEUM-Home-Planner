@@ -53,6 +53,10 @@ const TWIN_OPTS = [
     choices: [{ id: 'orig', label: '우드', swatch: '#8a6a4a' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
       RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
 ];
+// ㄱ자형·2층형은 두 동 모두 평지붕(실버 지붕판 + 골판) — 지붕 옵션만 평지붕 부품으로
+const TWIN_OPTS_FLAT = TWIN_OPTS.map((o) => o.key !== 'roof' ? o : { ...o, label: '지붕 (평지붕)',
+  parts: ['TD_RoofSheetSilver', '지붕_TD_RoofSheetSilver', 'TD_RoofCorrugated', '지붕_TD_RoofCorrugated'],
+  choices: pick(['실버', '#b9bcbf'], ['charcoal', 'black', 'gray', 'white', 'brown']) });
 const TWIN_SUM = {
   base: '6평동(거실·주방·욕실) + 4평동(방)을 나란히 두고 가운데 데크(5평)로 잇는 기본 배치 — 실내 10평',
   L: '6평동을 90° 돌려 4평동과 ㄱ자로 배치 — 두 동이 데크를 감싸 마당처럼 아늑, 거실·방이 데크를 마주봄',
@@ -557,7 +561,7 @@ const T = [
       exterior: { material: 'wood', color: '#a0703f', dir: 'v' },
       roof: { type: 'flat', color: '#2a2b2d' },
       model3d: { url: 'models/twin-10-L.glb', fit: [9510, 9080], roofType: 'flat', label: '시뮬레이션', ownFurniture: true,
-        optionSets: TWIN_OPTS, family: 'twin', variant: 'ㄱ자형', summary: TWIN_SUM.L },
+        optionSets: TWIN_OPTS_FLAT, family: 'twin', variant: 'ㄱ자형', summary: TWIN_SUM.L },
       rooms: [
         // 6평동(가로 6,310×2,710): 서쪽 거실·주방 / 동쪽 욕실
         { key: 'A_liv',  type: 'living',  name: '거실·주방(6평동)', x: 0,    y: 0,    w: 4610, d: 2710 },
@@ -614,7 +618,7 @@ const T = [
       exterior: { material: 'wood', color: '#a0703f', dir: 'v' },
       roof: { type: 'flat', color: '#2a2b2d' },
       model3d: { url: 'models/twin-10-2f.glb', fit: [9500, 6370], roofType: 'flat', label: '시뮬레이션', ownFurniture: true, floors: 2,
-        optionSets: TWIN_OPTS, family: 'twin', variant: '2층형', summary: TWIN_SUM.up },
+        optionSets: TWIN_OPTS_FLAT, family: 'twin', variant: '2층형', summary: TWIN_SUM.up },
       floors: [
         {
           name: '1층',

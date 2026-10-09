@@ -60,22 +60,24 @@ vl = bpy.context.view_layer
 # 0) 장면·애니메이션 고정 — 한 파일에 장면이 여러 개(드론샷·변신 연출 등)거나 부품이 움직이는 애니메이션이 있으면
 #    · 지금 열린 장면에 없는 부품(다른 장면 전용)은 지움
 #    · 지금 프레임의 위치·보이기 그대로 굳히고 애니메이션을 지움 (합치기·내보내기 중에 다른 프레임 위치로 튀지 않게)
+_anim = [o for o in sc.objects if o.animation_data]
+# 지금 프레임의 월드 위치를 먼저 다 기록 → 애니메이션·제약·부모(리그)를 모두 떼고 → 기록한 위치로 되돌림
+#   (리그가 아래에서 지워지거나 부모 행렬이 덜 갱신된 채 위치를 넣으면 부품이 원래 자리로 튐)
+if _anim: sc.frame_set(sc.frame_current)
+vl.update()
+_mw = {o: o.matrix_world.copy() for o in sc.objects}
+for o in sc.objects:
+    if o.animation_data: o.animation_data_clear()
+    for c in list(o.constraints): o.constraints.remove(c)
+    if o.parent: o.parent = None
+for o in sc.objects: o.matrix_world = _mw[o]
+vl.update()
+if _anim: print("애니메이션 고정: 프레임", sc.frame_current, "부품", len(_anim))
+# 다른 장면 전용 부품은 위치를 굳힌 다음에 지움 (장면에 안 보이는 리그가 부모일 수 있어 먼저 지우면 부품이 튐)
 _keep = set(sc.objects)
 _gone = [o for o in bpy.data.objects if o not in _keep]
 for o in _gone: bpy.data.objects.remove(o, do_unlink=True)
 if _gone: print("다른 장면 부품 제외:", len(_gone))
-_anim = [o for o in sc.objects if o.animation_data]
-if _anim:
-    sc.frame_set(sc.frame_current)
-    _mw = {o: o.matrix_world.copy() for o in sc.objects}
-    for o in _anim: o.animation_data_clear()
-    def _depth(o):
-        d = 0
-        while o.parent: o = o.parent; d += 1
-        return d
-    for o in sorted(sc.objects, key=_depth): o.matrix_world = _mw[o]
-    vl.update()
-    print("애니메이션 고정: 프레임", sc.frame_current, "부품", len(_anim))
 
 def sel_only(objs, active=None):
     bpy.ops.object.select_all(action='DESELECT')

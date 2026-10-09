@@ -57,6 +57,25 @@ NAME = os.path.splitext(os.path.basename(SRC))[0]
 bpy.ops.wm.open_mainfile(filepath=SRC)
 sc = bpy.context.scene
 vl = bpy.context.view_layer
+# 0) 장면·애니메이션 고정 — 한 파일에 장면이 여러 개(드론샷·변신 연출 등)거나 부품이 움직이는 애니메이션이 있으면
+#    · 지금 열린 장면에 없는 부품(다른 장면 전용)은 지움
+#    · 지금 프레임의 위치·보이기 그대로 굳히고 애니메이션을 지움 (합치기·내보내기 중에 다른 프레임 위치로 튀지 않게)
+_keep = set(sc.objects)
+_gone = [o for o in bpy.data.objects if o not in _keep]
+for o in _gone: bpy.data.objects.remove(o, do_unlink=True)
+if _gone: print("다른 장면 부품 제외:", len(_gone))
+_anim = [o for o in sc.objects if o.animation_data]
+if _anim:
+    sc.frame_set(sc.frame_current)
+    _mw = {o: o.matrix_world.copy() for o in sc.objects}
+    for o in _anim: o.animation_data_clear()
+    def _depth(o):
+        d = 0
+        while o.parent: o = o.parent; d += 1
+        return d
+    for o in sorted(sc.objects, key=_depth): o.matrix_world = _mw[o]
+    vl.update()
+    print("애니메이션 고정: 프레임", sc.frame_current, "부품", len(_anim))
 
 def sel_only(objs, active=None):
     bpy.ops.object.select_all(action='DESELECT')
@@ -575,6 +594,7 @@ print("final objects:", len(bpy.data.objects), "roof:", sum(1 for o in bpy.data.
 print("bbox", tuple(round(v,3) for v in mn), tuple(round(v,3) for v in mx))
 bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, NAME + ".glb"), export_format='GLB',
     export_apply=True, export_extras=True, export_cameras=False, export_lights=False, export_yup=True,
+    use_active_scene=True, export_animations=False,   # 블렌더에 장면(드론샷 등)이 여러 개면 같은 부품이 장면마다 중복 기록됨 → 지금 장면만
     export_image_format='JPEG', export_jpeg_quality=A.jpeg,
     export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=7,
     # 위치 정밀도 — Draco 는 부품(재질)마다 자기 크기 기준으로 좌표를 반올림함. 기본 14비트면 9m 집에서 0.6mm 단위라

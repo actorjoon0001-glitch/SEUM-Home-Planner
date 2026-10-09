@@ -617,7 +617,7 @@ const T = [
     // 쌍둥이 10평 2층형 — 4평동 위에 6평동을 올림 · 데크에서 외부 계단으로 2층 테라스 → 6평동 (블렌더 모델 기준)
     id: 'twin-10-2f',
     // 온라인 카탈로그(seum-catalog) 대표 사진·모델명 — 카탈로그에 없는 변형이라 3D 렌더 사진
-    photo: 'models/thumbs/twin-10-2f.jpg', code: 'FOREST10-BK', codeNote: '2층 변형',
+    photo: 'models/thumbs/twin-10-2f.jpg?v=2', code: 'FOREST10-BK', codeNote: '2층 변형',
     title: '세움 쌍둥이 10평 2층형 (4평 위 6평 · 외부 계단)',
     category: '농막',
     showroom: '본점',

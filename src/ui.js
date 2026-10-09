@@ -205,7 +205,7 @@ function enterEditor(loadFn) {
   if (_dash && _dash.editor) setTimeout(() => { _dash.editor._resize(); _dash.editor.applyInitialView(); }, 0);
 }
 // onDelete: 휴지통으로 보내기(관리자) — { hard: true } 면 이 기기 저장처럼 바로 삭제
-// photo: 대표 사진(온라인 카탈로그와 같은 이미지) — 있으면 사진을 크게, 도면은 오른쪽 아래 작게 / code: 카탈로그 모델명
+// photo: 대표 사진(온라인 카탈로그와 같은 이미지) — 있으면 도면 미리보기 대신 사진 / code: 카탈로그 모델명
 function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null, photo = null, code = null, codeNote = null } = {}) {
   const card = document.createElement('div');
   card.className = 'dash-card' + (photo ? ' dc-has-photo' : '');
@@ -214,9 +214,6 @@ function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMov
     const img = document.createElement('img'); img.src = photo; img.alt = code || name; img.loading = 'lazy'; img.draggable = false;
     img.onerror = () => { card.classList.remove('dc-has-photo'); ph.remove(); };   // 사진이 없으면 도면 미리보기만
     ph.appendChild(img);
-    const mini = document.createElement('canvas'); mini.width = 192; mini.height = 144; mini.className = 'dc-mini';
-    try { drawPlanThumb(mini, design); } catch (e) { /* noop */ }
-    ph.appendChild(mini);
     card.appendChild(ph);
   }
   const cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.className = 'dc-thumb';

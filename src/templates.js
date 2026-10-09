@@ -222,6 +222,8 @@ const T = [
     //  · 본체 3,000×4,000: 황토미장+황토보드 바닥(건식보일러), 편백루바 천장, 좌우 1400×800 이중창
     //  · 포치 3,000×1,900(남측) · 외쪽지붕(shed, T100 징크 백색) · 외장 스마트사이딩(황토색)+검정메탈 포인트
     id: 'seum-hwangto',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명
+    photo: 'models/thumbs/seum-hwangto.jpg', code: 'CUBE-H3-BW',
     title: '세움 황토찜질방 (3,000×4,000)',
     category: '농막',
     showroom: '본점',
@@ -300,6 +302,8 @@ const T = [
     //  · 데크 4평 1,500×9,000(동측) · 포치 4평 7,000×2,000(남측) — 면적 별도
     //  · 벽체 280t 메탈사이딩 / 지붕 T260 징크 / 강화마루
     id: 'seum-15',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명
+    photo: 'models/thumbs/seum-15.jpg', code: 'STAY15-BK',
     title: '세움 15평 단독 (7,000×7,000)',
     category: '주택',
     showroom: '본점',
@@ -397,6 +401,8 @@ const T = [
     //  · 남측 폴딩도어+출입문 → 합성데크 포치(철제난간·태양광 데크등) · 지붕 평지붕(처마없음) 럭스틸밤색
     //  · 외장 루버강판 네츄럴우드(세로) · 창호 전체 검정/브론즈 · 데크 진밤색
     id: 'seum-shelter-10',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명
+    photo: 'models/thumbs/seum-shelter-10.jpg', code: 'FOREST10-E',
     title: '세움 체류형 쉼터 10평 (33㎡)',
     category: '체류형 쉼터',
     showroom: '마곡 박람회',
@@ -484,6 +490,8 @@ const T = [
     //  · 중앙 데크 2,600×3,200: 두 동을 잇는 통로형 데크(지붕이 덮음). 판매평수 10평(데크 별도)
     //  · 외장 세로 메탈사이딩(우드 VS-04-010 / 블랙 VS-04-003), 지붕 T260 징크 처마 200
     id: 'twin-10',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명
+    photo: 'models/thumbs/twin-10.jpg', code: 'FOREST10-BK',
     title: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
     category: '농막',
     showroom: '본점',
@@ -549,6 +557,8 @@ const T = [
   {
     // 쌍둥이 10평 ㄱ자형 — 6평동을 90° 돌려 북쪽에, 4평동은 동쪽 그대로 → 두 동이 데크를 ㄱ자로 감쌈 (블렌더 모델 기준)
     id: 'twin-10-L',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명 — 카탈로그에 없는 변형이라 3D 렌더 사진
+    photo: 'models/thumbs/twin-10-L.jpg', code: 'FOREST10-BK', codeNote: 'ㄱ자 변형',
     title: '세움 쌍둥이 10평 ㄱ자형 (6평+4평 · 데크 감싸기)',
     category: '농막',
     showroom: '본점',
@@ -606,6 +616,8 @@ const T = [
   {
     // 쌍둥이 10평 2층형 — 4평동 위에 6평동을 올림 · 데크에서 외부 계단으로 2층 테라스 → 6평동 (블렌더 모델 기준)
     id: 'twin-10-2f',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명 — 카탈로그에 없는 변형이라 3D 렌더 사진
+    photo: 'models/thumbs/twin-10-2f.jpg', code: 'FOREST10-BK', codeNote: '2층 변형',
     title: '세움 쌍둥이 10평 2층형 (4평 위 6평 · 외부 계단)',
     category: '농막',
     showroom: '본점',
@@ -732,6 +744,8 @@ const T = [
   {
     // 실제 시공 도면(본점19-1 평면도 1:50, 본점19-2 입면도 1:70) 기준
     id: 'seum-bonjeom-19',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명
+    photo: 'models/thumbs/seum-bonjeom-19.jpg', code: 'STAY19-BK',
     title: '세움 본점 19평 (9,000×7,000) + 포치 7평 · 데크 4평',
     category: '주택',
     showroom: '본점',
@@ -844,6 +858,8 @@ const T = [
     //    가운데 현관(3연동 중문)·복도, 남측 방1 · 거실(아트월·TV장) · 방2(드레스룸 연결)
     //  · 포치(남측 2,000) · 데크(서측 1,420, 계단) · 현관 캐노피
     id: 'seum-24',
+    // 온라인 카탈로그(seum-catalog) 대표 사진·모델명
+    photo: 'models/thumbs/seum-24.jpg', code: 'STAY24-WB',
     title: '세움 24평 (12,080×7,080) + 포치 · 데크',
     category: '주택',
     showroom: '본점',
@@ -951,7 +967,8 @@ const T = [
 
 // 템플릿 목록 (썸네일/표시용 메타)
 export function listTemplates() {
-  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택', showroom: t.showroom || null, real: !!(t.base && t.base.model3d) }));
+  return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택', showroom: t.showroom || null, real: !!(t.base && t.base.model3d),
+    photo: t.photo || null, code: t.code || null, codeNote: t.codeNote || null }));
 }
 
 // 템플릿을 실제 편집 가능한 도면 객체로 인스턴스화 (새 id 부여)

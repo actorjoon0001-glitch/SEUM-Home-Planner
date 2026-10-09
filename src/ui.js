@@ -266,13 +266,6 @@ function newCard() {
   card.onclick = () => enterEditor(() => store.newDesign());
   return card;
 }
-function actionCard(label, onClick) {
-  const card = document.createElement('div');
-  card.className = 'dash-card dc-new';
-  card.innerHTML = `<span class="dc-plus">＋</span><span>${esc(label)}</span>`;
-  card.onclick = onClick;
-  return card;
-}
 // 현재 도면을 '전시장 도면'(공용 템플릿)으로 클라우드에 추가 — 전시장 이름별 분류
 async function addCurrentAsShowroom() {
   if (!(cloud.configured() && cloud.user)) { alert('전시장 도면은 로그인 후 클라우드에 저장됩니다.'); return; }
@@ -340,12 +333,6 @@ async function renderDash() {
   } else if (_dashView === 'templates') {
     title.textContent = '전시장 도면';
     sub.textContent = admin ? '전시장별 기본 도면입니다. 카드를 드래그해 다른 전시장으로 옮길 수 있어요.' : '전시장별 기본 도면입니다.';
-    if (admin) grid.appendChild(actionCard('＋ 전시장 만들기 (예: 마곡 박람회)', async () => {
-      const name = prompt('새 전시장 이름 (예: 마곡 박람회)', '');
-      if (name == null || !name.trim()) return;
-      try { await addKnownShowroom(name.trim()); flash(`'${name.trim()}' 전시장을 만들었어요 — 카드의 '전시장 이동'으로 도면을 옮기세요`); renderDash(); }
-      catch (e) { alert('전시장 만들기 실패: ' + (e.message || e)); }
-    }));
     // 항목 수집: 내장 템플릿 + 클라우드 전시장 도면(공용) → 전시장(showroom)별 그룹
     //   관리자가 휴지통에 넣은 내장 템플릿은 숨김 (설정 행의 trashedBuiltin / deletedBuiltin)
     const items = [];
@@ -603,11 +590,6 @@ async function setBuiltinShowroom(id, room) {
 async function knownShowrooms() {
   if (!(cloud.configured() && cloud.user)) return [];
   try { const { data } = await cloud.getSettings(); return Array.isArray(data.showrooms) ? data.showrooms.filter(Boolean) : []; } catch { return []; }
-}
-async function addKnownShowroom(name) {
-  const { data } = await cloud.getSettings();
-  const list = Array.from(new Set([...(data.showrooms || []), String(name).trim()].filter(Boolean)));
-  await cloud.saveSettings({ showrooms: list });
 }
 async function restoreBuiltin(id) {
   const { data } = await cloud.getSettings();

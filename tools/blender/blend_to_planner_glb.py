@@ -97,6 +97,12 @@ for o in bpy.data.objects:
     if o.type == 'CURVE':
         for ref in (o.data.bevel_object, o.data.taper_object):
             if ref: cutters.add(ref.name)
+# 컬렉션 단위 숨김(눈 아이콘·화면 숨김·선택 잠금)도 풀어야 굽기·합치기에서 선택됨 (렌더 제외 컬렉션은 이미 빠짐)
+def _unhide_lc(lc):
+    lc.hide_viewport = False
+    lc.collection.hide_viewport = False; lc.collection.hide_select = False
+    for c in lc.children: _unhide_lc(c)
+_unhide_lc(vl.layer_collection)
 for o in bpy.data.objects:
     o.hide_set(False); o.hide_viewport = False; o.hide_select = False
 # 제외할 컬렉션(렌더용 배경·잔디 등)

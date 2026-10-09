@@ -39,6 +39,26 @@ function genOptionSets(o) {
   return sets;
 }
 
+// 쌍둥이 10평 — 기본형·ㄱ자형·2층형 공통 제품 옵션 (같은 블렌더 재질)
+const TWIN_OPTS = [
+  { key: 'wall', label: '외장 (우드 사이딩)', parts: ['TD_WoodSiding', '지붕_TD_WoodSiding'],
+    choices: [{ id: 'orig', label: '우드', swatch: '#a0703f' }, ...WALL_CHOICES.wood] },
+  { key: 'roof', label: '지붕 (징크)', parts: ['TD_Zinc', '지붕_TD_Zinc', 'TD_SeamCap', '지붕_TD_SeamCap', 'TD_ZincTrim', '지붕_TD_ZincTrim'],
+    choices: pick(['차콜', '#2a2b2d'], ['black', 'gray', 'brown', 'green', 'red']) },
+  { key: 'window', label: '창틀·프레임', parts: ['TD_WinFrame', '지붕_TD_WinFrame', 'TD_FrameBlack', '지붕_TD_FrameBlack', 'TD_WinSurround', '지붕_TD_WinSurround'],
+    choices: pick(['블랙', '#1c1f24'], ['charcoal', 'white', 'gray', 'bronze']) },
+  { key: 'trim', label: '몰딩·물받이', parts: ['TD_TrimGray', '지붕_TD_TrimGray', 'TD_Gutter', '지붕_TD_Gutter'],
+    choices: pick(['차콜', '#2a2b2e'], ['black', 'white', 'gray', 'bronze']) },
+  { key: 'deck', label: '데크', parts: ['TD_DeckEmboss', '지붕_TD_DeckEmboss'],
+    choices: [{ id: 'orig', label: '우드', swatch: '#8a6a4a' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
+      RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
+];
+const TWIN_SUM = {
+  base: '6평동(거실·주방·욕실) + 4평동(방)을 나란히 두고 가운데 데크(5평)로 잇는 기본 배치 — 실내 10평',
+  L: '6평동을 90° 돌려 4평동과 ㄱ자로 배치 — 두 동이 데크를 감싸 마당처럼 아늑, 거실·방이 데크를 마주봄',
+  up: '4평동 위에 6평동을 올린 2층 구조 — 같은 실내 10평을 땅 면적은 줄여서, 외부 계단·2층 테라스',
+};
+
 const T = [
   {
     id: 'house-30',
@@ -473,19 +493,8 @@ const T = [
       roof: { type: 'gable', color: '#2a2b2d', ridge: 'z' },   // 6평동 징크 박공(앞뒤로 긴 용마루) · 4평동 평지붕
       // 3D 실물 모델 — 블렌더로 디테일 작업한 본점 쌍둥이 시뮬레이션 (가구·조명·데크 그늘막 포함)
       model3d: { url: 'models/twin-10.glb', fit: [8800, 6300], roofType: 'gable', ridge: 'z', label: '시뮬레이션', ownFurniture: true,
-        optionSets: [
-          { key: 'wall', label: '외장 (우드 사이딩)', parts: ['TD_WoodSiding', '지붕_TD_WoodSiding'],
-            choices: [{ id: 'orig', label: '우드', swatch: '#a0703f' }, ...WALL_CHOICES.wood] },
-          { key: 'roof', label: '지붕 (징크)', parts: ['TD_Zinc', '지붕_TD_Zinc', 'TD_SeamCap', '지붕_TD_SeamCap', 'TD_ZincTrim', '지붕_TD_ZincTrim'],
-            choices: pick(['차콜', '#2a2b2d'], ['black', 'gray', 'brown', 'green', 'red']) },
-          { key: 'window', label: '창틀·프레임', parts: ['TD_WinFrame', '지붕_TD_WinFrame', 'TD_FrameBlack', '지붕_TD_FrameBlack', 'TD_WinSurround', '지붕_TD_WinSurround'],
-            choices: pick(['블랙', '#1c1f24'], ['charcoal', 'white', 'gray', 'bronze']) },
-          { key: 'trim', label: '몰딩·물받이', parts: ['TD_TrimGray', '지붕_TD_TrimGray', 'TD_Gutter', '지붕_TD_Gutter'],
-            choices: pick(['차콜', '#2a2b2e'], ['black', 'white', 'gray', 'bronze']) },
-          { key: 'deck', label: '데크', parts: ['TD_DeckEmboss', '지붕_TD_DeckEmboss'],
-            choices: [{ id: 'orig', label: '우드', swatch: '#8a6a4a' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
-              RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
-        ] },
+        optionSets: TWIN_OPTS,
+        family: 'twin', variant: '기본형', summary: TWIN_SUM.base },
       // 시공 도면(1층 평면도) 기준 배치: 6평동 2,700×6,300 · 중앙 데크 2,900(5평) · 4평동(S-1500) 3,200×6,200
       //  6평동: 북측 욕실(안목 1,400) / 칸막이 120 / 거실·주방(안목 4,220) — 외벽 280
       //  4평동: 외벽 200, 데크 쪽 폴딩도어 3200(+여닫이), 남·북 픽스창 1800×1400, 동측 단창 2000×600
@@ -530,6 +539,134 @@ const T = [
         { catalogId: 'bedS',   x: 7613, y: 860,  w: 1120, d: 2045, rotation: 90 },
         { catalogId: 'tvstand', x: 6960, y: 5917, w: 2390, d: 465, rotation: 180 },
         { catalogId: 'shelf',  x: 8410, y: 5912, w: 450,  d: 475, rotation: 180 },
+      ],
+    },
+  },
+  {
+    // 쌍둥이 10평 ㄱ자형 — 6평동을 90° 돌려 북쪽에, 4평동은 동쪽 그대로 → 두 동이 데크를 ㄱ자로 감쌈 (블렌더 모델 기준)
+    id: 'twin-10-L',
+    title: '세움 쌍둥이 10평 ㄱ자형 (6평+4평 · 데크 감싸기)',
+    category: '농막',
+    showroom: '본점',
+    tags: ['쌍둥이', '10평', 'ㄱ자', '6평', '4평', '데크', '농막'],
+    base: {
+      name: '세움 쌍둥이 10평 ㄱ자형',
+      productType: '농막',
+      ceilingHeight: 2400,
+      wallThickness: 280, wallThicknessInt: 120,
+      exterior: { material: 'wood', color: '#a0703f', dir: 'v' },
+      roof: { type: 'flat', color: '#2a2b2d' },
+      model3d: { url: 'models/twin-10-L.glb', fit: [9510, 9080], roofType: 'flat', label: '시뮬레이션', ownFurniture: true,
+        optionSets: TWIN_OPTS, family: 'twin', variant: 'ㄱ자형', summary: TWIN_SUM.L },
+      rooms: [
+        // 6평동(가로 6,310×2,710): 서쪽 거실·주방 / 동쪽 욕실
+        { key: 'A_liv',  type: 'living',  name: '거실·주방(6평동)', x: 0,    y: 0,    w: 4610, d: 2710 },
+        { key: 'A_bath', type: 'bath',    name: '욕실',             x: 4610, y: 0,    w: 1700, d: 2710 },
+        { key: 'deck',   type: 'deck',    name: '데크',             x: 0,    y: 2710, w: 6310, d: 6370 },
+        { key: 'B_bed',  type: 'bedroom', name: '방(4평동)',        x: 6310, y: 2690, w: 3200, d: 6200, wallT: 200 },
+      ],
+      openings: [
+        // 6평동 — 북측 거실창 1500×900 · 욕실창 600×500, 서측 주방창 900×600, 데크 쪽 이중창 2000×2100 · 단열문 900, 욕실문 700
+        { roomKey: 'A_liv',  side: 'n', pos: 2610, winType: 'double',    w: 1500, h: 900,  sill: 1100 },
+        { roomKey: 'A_bath', side: 'n', pos: 750,  winType: 'double',    w: 600,  h: 500,  sill: 1600 },
+        { roomKey: 'A_liv',  side: 'w', pos: 1460, winType: 'double',    w: 900,  h: 600,  sill: 1100 },
+        { roomKey: 'A_liv',  side: 's', pos: 2160, winType: 'sliding',   w: 2000, h: 2100, sill: 0 },
+        { roomKey: 'A_liv',  side: 's', pos: 4035, winType: 'swingDoor', w: 900,  h: 2100 },
+        { roomKey: 'A_bath', side: 'w', pos: 2085, winType: 'swingDoor', w: 700,  h: 2000, flipV: true },
+        // 4평동 — 기본형과 같음
+        { roomKey: 'B_bed',  side: 'w', pos: 3100, winType: 'foldSwing', w: 3200, h: 2100 },
+        { roomKey: 'B_bed',  side: 'n', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 700 },
+        { roomKey: 'B_bed',  side: 's', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 700 },
+        { roomKey: 'B_bed',  side: 'e', pos: 3100, winType: 'fixed',     w: 2000, h: 600,  sill: 1500 },
+      ],
+      furniture: [
+        // 6평동 — 욕실(세면대·양변기) · 주방(냉장고·싱크·인덕션, 서쪽 벽)
+        { catalogId: 'basin',  x: 5940, y: 1410, w: 480,  d: 420, rotation: 90 },
+        { catalogId: 'toilet', x: 5830, y: 2105, w: 400,  d: 640, rotation: 90 },
+        { catalogId: 'fridge', x: 500,  y: 610,  w: 600,  d: 640, rotation: 270 },
+        { catalogId: 'sink',   x: 450,  y: 1760, w: 1600, d: 580, rotation: 270 },
+        { catalogId: 'induction2', x: 480, y: 2290, w: 360, d: 500, rotation: 270 },
+        // 데크 — 테이블 + 의자 4개
+        { catalogId: 'dining4', x: 3310, y: 5610, w: 1430, d: 820, rotation: 90 },
+        { catalogId: 'chair',  x: 2600, y: 5250, w: 500,  d: 520, rotation: 270 },
+        { catalogId: 'chair',  x: 2600, y: 5970, w: 500,  d: 520, rotation: 270 },
+        { catalogId: 'chair',  x: 4030, y: 5250, w: 500,  d: 520, rotation: 90 },
+        { catalogId: 'chair',  x: 4030, y: 5970, w: 500,  d: 520, rotation: 90 },
+        // 4평동 — 기본형과 같음
+        { catalogId: 'bedS',   x: 8323, y: 3450, w: 1120, d: 2045, rotation: 90 },
+        { catalogId: 'tvstand', x: 7670, y: 8507, w: 2390, d: 465, rotation: 180 },
+        { catalogId: 'shelf',  x: 9120, y: 8502, w: 450,  d: 475, rotation: 180 },
+      ],
+    },
+  },
+  {
+    // 쌍둥이 10평 2층형 — 4평동 위에 6평동을 올림 · 데크에서 외부 계단으로 2층 테라스 → 6평동 (블렌더 모델 기준)
+    id: 'twin-10-2f',
+    title: '세움 쌍둥이 10평 2층형 (4평 위 6평 · 외부 계단)',
+    category: '농막',
+    showroom: '본점',
+    tags: ['쌍둥이', '10평', '2층', '복층', '6평', '4평', '데크', '농막'],
+    base: {
+      name: '세움 쌍둥이 10평 2층형',
+      productType: '농막',
+      ceilingHeight: 2400,
+      wallThickness: 280, wallThicknessInt: 120,
+      exterior: { material: 'wood', color: '#a0703f', dir: 'v' },
+      roof: { type: 'flat', color: '#2a2b2d' },
+      model3d: { url: 'models/twin-10-2f.glb', fit: [9500, 6370], roofType: 'flat', label: '시뮬레이션', ownFurniture: true, floors: 2,
+        optionSets: TWIN_OPTS, family: 'twin', variant: '2층형', summary: TWIN_SUM.up },
+      floors: [
+        {
+          name: '1층',
+          rooms: [
+            { key: 'deck',  type: 'deck',    name: '데크',       x: 0,    y: 0, w: 6300, d: 6370 },
+            { key: 'B_bed', type: 'bedroom', name: '방(4평동)',  x: 6300, y: 0, w: 3200, d: 6200, wallT: 200 },
+          ],
+          openings: [
+        { roomKey: 'B_bed',  side: 'w', pos: 3100, winType: 'foldSwing', w: 3200, h: 2100 },
+        { roomKey: 'B_bed',  side: 'n', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 700 },
+        { roomKey: 'B_bed',  side: 's', pos: 1600, winType: 'fixed',     w: 1800, h: 1400, sill: 700 },
+        { roomKey: 'B_bed',  side: 'e', pos: 3100, winType: 'fixed',     w: 2000, h: 600,  sill: 1500 },
+          ],
+          furniture: [
+            // 데크 — 테이블 + 의자 4개 · 2층 테라스로 오르는 외부 계단(남측)
+            { catalogId: 'dining4', x: 3300, y: 2900, w: 1430, d: 820, rotation: 90 },
+            { catalogId: 'chair',  x: 2590, y: 2540, w: 500,  d: 520, rotation: 270 },
+            { catalogId: 'chair',  x: 2590, y: 3260, w: 500,  d: 520, rotation: 270 },
+            { catalogId: 'chair',  x: 4020, y: 2540, w: 500,  d: 520, rotation: 90 },
+            { catalogId: 'chair',  x: 4020, y: 3260, w: 500,  d: 520, rotation: 90 },
+            { catalogId: 'stairs', x: 2390, y: 5450, w: 1000, d: 3960, rotation: 90 },
+            // 4평동 — 기본형과 같음
+            { catalogId: 'bedS',   x: 8313, y: 740,  w: 1120, d: 2045, rotation: 90 },
+            { catalogId: 'tvstand', x: 7660, y: 5797, w: 2390, d: 465, rotation: 180 },
+            { catalogId: 'shelf',  x: 9110, y: 5792, w: 450,  d: 475, rotation: 180 },
+          ],
+        },
+        {
+          name: '2층',
+          rooms: [
+            // 6평동(3,200×6,200): 북쪽 거실·주방 / 남쪽 욕실 · 서쪽 2층 테라스(2,000)
+            { key: 'A_liv',  type: 'living',  name: '거실·주방(6평동)', x: 6300, y: 0,    w: 3200, d: 4530 },
+            { key: 'A_bath', type: 'bath',    name: '욕실',             x: 6300, y: 4530, w: 3200, d: 1670 },
+            { key: 'terr',   type: 'balcony', name: '2층 테라스',       x: 4300, y: 200,  w: 2000, d: 5800, rail: ['w', 'n', 's'] },
+          ],
+          openings: [
+            { roomKey: 'A_liv',  side: 'w', pos: 2115, winType: 'sliding',   w: 2000, h: 2100, sill: 0 },
+            { roomKey: 'A_liv',  side: 'w', pos: 3960, winType: 'swingDoor', w: 900,  h: 2100 },
+            { roomKey: 'A_liv',  side: 'e', pos: 2560, winType: 'double',    w: 1500, h: 900,  sill: 1100 },
+            { roomKey: 'A_liv',  side: 'n', pos: 1480, winType: 'double',    w: 900,  h: 600,  sill: 1100 },
+            { roomKey: 'A_bath', side: 'e', pos: 735,  winType: 'double',    w: 600,  h: 500,  sill: 1600 },
+            { roomKey: 'A_bath', side: 'n', pos: 735,  winType: 'swingDoor', w: 700,  h: 2000 },
+          ],
+          furniture: [
+            // 주방(북쪽 벽) — 인덕션 · 싱크 상판 · 냉장고 / 욕실(남쪽) — 양변기 · 세면대
+            { catalogId: 'sink',   x: 7425, y: 435,  w: 1890, d: 570, rotation: 0 },
+            { catalogId: 'induction2', x: 6795, y: 465, w: 430, d: 490, rotation: 0 },
+            { catalogId: 'fridge', x: 8785, y: 485,  w: 600,  d: 640, rotation: 0 },
+            { catalogId: 'toilet', x: 7010, y: 5730, w: 400,  d: 640, rotation: 180 },
+            { catalogId: 'basin',  x: 7840, y: 5835, w: 560,  d: 410, rotation: 180 },
+          ],
+        },
       ],
     },
   },
@@ -705,35 +842,40 @@ export function listTemplates() {
 }
 
 // 템플릿을 실제 편집 가능한 도면 객체로 인스턴스화 (새 id 부여)
+//   base.floors 가 있으면 층별(1층·2층…) 도면 — 각 층의 rooms/openings/furniture 를 따로 만들고 1층을 활성으로
 export function instantiateTemplate(id) {
   const t = T.find((x) => x.id === id);
   if (!t) return null;
   const b = t.base;
-  const keyToId = {};
-  const rooms = b.rooms.map((r) => {
-    const nid = rid();
-    keyToId[r.key] = nid;
-    const room = { id: nid, type: r.type, name: r.name, x: r.x, y: r.y, w: r.w, d: r.d };
-    if (Array.isArray(r.open) && r.open.length) room.open = r.open.slice(); // 개방형 면(벽 생략)
-    // 선택 마감 옵션 — 난간(rail)·포치 조명(lights)·아트월(artWall)·색상 지정
-    for (const k of ['rail', 'artWall']) if (Array.isArray(r[k]) && r[k].length) room[k] = r[k].slice();
-    for (const k of ['lights', 'railColor', 'artColor', 'floorColor', 'deckDir', 'wallT']) if (r[k] != null) room[k] = r[k];
-    return room;
-  });
-  const openings = (b.openings || []).map((o) => ({
-    id: 'o' + Math.random().toString(36).slice(2, 9),
-    roomId: keyToId[o.roomKey], side: o.side, pos: o.pos, winType: o.winType,
-    w: o.w, h: o.h, sill: o.sill, color: o.color || '#4a5560',   // 템플릿에 명시하면 실제 치수·창틀색 사용
-    ...(o.trim ? { trim: true } : {}),                            // 창 둘레 두꺼운 마감 몰딩
-    ...(o.flipH ? { flipH: true } : {}), ...(o.flipV ? { flipV: true } : {}),   // 문 여는 방향(경첩 좌우·안/밖)
-  })).map((o) => fillWin(o));
-  // 가구: 위치·회전 + (있으면) 설치 높이·색·크기
-  const furniture = (b.furniture || []).map((f) => {
-    const o = { id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 };
-    for (const k of ['elev', 'color', 'w', 'd', 'h']) if (f[k] != null) o[k] = f[k];
-    return o;
-  });
-  fitFurnitureInRooms(rooms, furniture, b);
+  const mkFloor = (src) => {
+    const keyToId = {};
+    const rooms = src.rooms.map((r) => {
+      const nid = rid();
+      keyToId[r.key] = nid;
+      const room = { id: nid, type: r.type, name: r.name, x: r.x, y: r.y, w: r.w, d: r.d };
+      if (Array.isArray(r.open) && r.open.length) room.open = r.open.slice(); // 개방형 면(벽 생략)
+      // 선택 마감 옵션 — 난간(rail)·포치 조명(lights)·아트월(artWall)·색상 지정
+      for (const k of ['rail', 'artWall']) if (Array.isArray(r[k]) && r[k].length) room[k] = r[k].slice();
+      for (const k of ['lights', 'railColor', 'artColor', 'floorColor', 'deckDir', 'wallT']) if (r[k] != null) room[k] = r[k];
+      return room;
+    });
+    const openings = (src.openings || []).map((o) => ({
+      id: 'o' + Math.random().toString(36).slice(2, 9),
+      roomId: keyToId[o.roomKey], side: o.side, pos: o.pos, winType: o.winType,
+      w: o.w, h: o.h, sill: o.sill, color: o.color || '#4a5560',   // 템플릿에 명시하면 실제 치수·창틀색 사용
+      ...(o.trim ? { trim: true } : {}),                            // 창 둘레 두꺼운 마감 몰딩
+      ...(o.flipH ? { flipH: true } : {}), ...(o.flipV ? { flipV: true } : {}),   // 문 여는 방향(경첩 좌우·안/밖)
+    })).map((o) => fillWin(o));
+    // 가구: 위치·회전 + (있으면) 설치 높이·색·크기
+    const furniture = (src.furniture || []).map((f) => {
+      const o = { id: fid(), catalogId: f.catalogId, x: f.x, y: f.y, rotation: f.rotation || 0 };
+      for (const k of ['elev', 'color', 'w', 'd', 'h']) if (f[k] != null) o[k] = f[k];
+      return o;
+    });
+    fitFurnitureInRooms(rooms, furniture, b);
+    return { name: src.name, rooms, openings, furniture, outline: null };
+  };
+  const floors = (b.floors || [b]).map((f, i) => ({ ...mkFloor(f), name: f.name || (i + 1) + '층' }));
   const design = normalize({
     name: b.name,
     productType: b.productType || '',
@@ -744,14 +886,22 @@ export function instantiateTemplate(id) {
     exterior: { ...b.exterior },
     roof: { ...b.roof },
     ...(b.model3d ? { model3d: JSON.parse(JSON.stringify(b.model3d)) } : {}),   // 3D 실물 모델(블렌더 GLB)
-    rooms, openings, furniture,
+    rooms: floors[0].rooms, openings: floors[0].openings, furniture: floors[0].furniture,
+    ...(floors.length > 1 ? { floors, activeFloor: 0 } : {}),
   });
   if (design.model3d) {
     design.model3d.sig = model3dSig(design);   // 원래 창·문 배치 기억 → 바꾸면 자동 모델
     // 모델에 가구가 이미 있는 제품: 도면 기본 가구는 3D에서 숨김 (상담 중 새로 추가한 가구만 3D에 표시)
-    if (design.model3d.ownFurniture) design.model3d.baseFurn = design.furniture.map((f) => f.id);
+    if (design.model3d.ownFurniture) design.model3d.baseFurn = design.floors.flatMap((f) => f.furniture.map((x) => x.id));
   }
   return design;
+}
+
+// 같은 제품의 형태 묶음(예: 쌍둥이 기본형·ㄱ자형·2층형) — 3D 제품 패널의 '형태' 선택·3종 동시 보기에 사용
+export function familyVariants(family) {
+  if (!family) return [];
+  return T.filter((t) => t.base.model3d && t.base.model3d.family === family)
+    .map((t) => ({ id: t.id, variant: t.base.model3d.variant || t.title, summary: t.base.model3d.summary || '' }));
 }
 
 // 가구가 벽을 뚫지 않게 — 놓인 방의 벽 안쪽(2D 도면 벽 두께 기준)으로 밀어 넣고, 넘치면 그 방향 크기를 줄임

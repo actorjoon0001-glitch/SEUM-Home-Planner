@@ -310,9 +310,17 @@ export function openingOutline(pathIndex, edgeIndex, pos, winType = 'door') {
 // 저장본/구버전 도면 보정 (새 필드 기본값 채움)
 // 실물 모델(GLB)이 표현하는 창·문 배치 서명 — 창·문을 추가·이동·크기변경하면 달라짐 (색은 제외: 실물에서도 바꿔 칠함)
 export function model3dSig(d) {
-  const idx = new Map((d.rooms || []).map((r, i) => [r.id, i]));
-  return (d.openings || []).map((o) => [idx.get(o.roomId), o.side, Math.round(o.pos / 10), o.winType,
-    Math.round(o.w || 0), Math.round(o.h || 0), Math.round(o.sill || 0)].join(':')).sort().join('|');
+  const one = (rooms, openings) => {
+    const idx = new Map((rooms || []).map((r, i) => [r.id, i]));
+    return (openings || []).map((o) => [idx.get(o.roomId), o.side, Math.round(o.pos / 10), o.winType,
+      Math.round(o.w || 0), Math.round(o.h || 0), Math.round(o.sill || 0)].join(':')).sort().join('|');
+  };
+  // 여러 층 실물 모델(2층 구조) — 층마다 창·문 배치를 이어 붙임 (활성 층은 최상위 데이터가 최신)
+  if (Array.isArray(d.floors) && d.floors.length > 1) {
+    const a = d.activeFloor || 0;
+    return d.floors.map((f, i) => (i === a ? one(d.rooms, d.openings) : one(f.rooms, f.openings))).join('#');
+  }
+  return one(d.rooms, d.openings);
 }
 
 export function normalize(design) {

@@ -555,6 +555,14 @@ body {
 .po-chip:hover .po-sw { border-color: #c9ccd0; }
 .po-chip.on .po-sw { border-color: #c8102e; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1), 0 0 0 2px rgba(200,16,46,.15); }
 .po-chip.on .po-lb { color: #c8102e; font-weight: 700; }
+/* 형태 선택 (같은 제품의 기본형·ㄱ자형·2층형) */
+.po-vrow { display: flex; gap: 6px; margin: 8px 0 6px; }
+.po-var { flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 9px 4px; font-family: inherit; font-size: 13px; font-weight: 600; color: #3a3f47; cursor: pointer; }
+.po-var:hover { border-color: #c9ccd0; }
+.po-var.on { border-color: #c8102e; background: #fdf2f4; color: #c8102e; }
+.po-sum { font-size: 12px; line-height: 1.5; color: #5a6069; background: #f6f7f8; border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; word-break: keep-all; }
+.po-all.on { border-color: #c8102e; color: #c8102e; }
+.po-sep { height: 1px; background: var(--line); margin: 4px 0 12px; }
 
 
 
@@ -596,3 +604,9 @@ body {
 
 .sun-lamp { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .sun-lamp.on { background: #fff4d6; border-color: #e0b04a; }
+
+/* 2D 층 탭 (여러 층 도면) */
+.floor-tabs { position: absolute; top: 14px; right: 16px; z-index: 6; display: flex; gap: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 3px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.floor-tabs .ft-btn { border: 0; background: none; padding: 7px 16px; border-radius: 7px; font-family: inherit; font-size: 13px; font-weight: 600; color: #5a6069; cursor: pointer; }
+.floor-tabs .ft-btn.on { background: #c8102e; color: #fff; }
+@media (max-width: 640px) { .floor-tabs { top: 8px; right: 8px; } .floor-tabs .ft-btn { padding: 6px 12px; } }

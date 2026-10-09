@@ -49,6 +49,7 @@ ap.add_argument('--bake-cache', default='')
 ap.add_argument('--no-cache', action='store_true')
 ap.add_argument('--keep-coplanar', action='store_true')
 ap.add_argument('--rotate-z', type=float, default=0.0)   # 모델 방향 돌리기(도, 원점 기준) — 도면과 앞뒤가 반대로 그려진 모델
+ap.add_argument('--upper-z', type=float, default=0.0)    # 2층 구조: 이 높이(m) 이상에서 시작하는 부품 = 2층 (웹 '2층 걷어내기'로 숨김)
 A = ap.parse_args(argv)
 SRC, OUT = A.src, A.out
 os.makedirs(OUT, exist_ok=True)
@@ -542,14 +543,16 @@ for o in list(bpy.data.objects):
     roof = (min(zs) >= A.roof_z or bool(o.get('roof'))   # 벽 윗선 근처 이상(천장·조명) 또는 생성기가 지붕으로 표시한 부품
             or (bool(ROOF_PREFIX) and o.name.startswith(ROOF_PREFIX)))
     if KEEP_PREFIX and o.name.startswith(KEEP_PREFIX): roof = False
+    upper = bool(A.upper_z) and not roof and min(zs) >= A.upper_z
     mat = obj_mat(o)
-    groups[(mat.name if mat else "", roof)].append(o)
-for (mname, roof), objs in groups.items():
+    groups[(mat.name if mat else "", roof, upper)].append(o)
+for (mname, roof, upper), objs in groups.items():
     sel_only(objs)
     if len(objs) > 1: bpy.ops.object.join()
     j = vl.objects.active
-    j.name = ("지붕_" if roof else "") + (mname or "무재질")
+    j.name = ("지붕_" if roof else "2층_" if upper else "") + (mname or "무재질")
     if roof: j["roof"] = 1
+    if upper: j["upper"] = 1
 # 4.5) 방향 돌리기 — 굽기가 끝난 뒤에 돌림 (창틀 안팎 색처럼 '월드 위치·방향'으로 칠하는 재질이 있어
 #   먼저 돌리면 집 중심 기준이 어긋나 안팎 색이 뒤바뀜). 맨 위 부모만 원점 기준으로 회전
 if A.rotate_z:
@@ -568,7 +571,7 @@ for o in bpy.data.objects:
     for v in o.data.vertices:
         w = o.matrix_world @ v.co; mn = mathutils.Vector(map(min, mn, w)); mx = mathutils.Vector(map(max, mx, w))
     o.data.calc_loop_triangles(); tri += len(o.data.loop_triangles)
-print("final objects:", len(bpy.data.objects), "roof:", sum(1 for o in bpy.data.objects if o.get("roof")), "tris:", tri)
+print("final objects:", len(bpy.data.objects), "roof:", sum(1 for o in bpy.data.objects if o.get("roof")), "upper:", sum(1 for o in bpy.data.objects if o.get("upper")), "tris:", tri)
 print("bbox", tuple(round(v,3) for v in mn), tuple(round(v,3) for v in mx))
 bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, NAME + ".glb"), export_format='GLB',
     export_apply=True, export_extras=True, export_cameras=False, export_lights=False, export_yup=True,

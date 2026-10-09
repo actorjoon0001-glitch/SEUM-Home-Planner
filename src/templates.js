@@ -838,6 +838,115 @@ const T = [
       ],
     },
   },
+  {
+    // 세움 24평 — 대표님 블렌더 디테일 모델(가구·조명·소품 포함) 기준
+    //  · 본채 12,080×7,080 (외벽 280 · 칸막이 120): 북측 욕실 / 다용도실(뒷문) / 주방·식당 / 드레스룸 / 부부욕실
+    //    가운데 현관(3연동 중문)·복도, 남측 방1 · 거실(아트월·TV장) · 방2(드레스룸 연결)
+    //  · 포치(남측 2,000) · 데크(서측 1,420, 계단) · 현관 캐노피
+    id: 'seum-24',
+    title: '세움 24평 (12,080×7,080) + 포치 · 데크',
+    category: '주택',
+    showroom: '본점',
+    tags: ['세움도면', '24평', '12080x7080', '포치', '데크', '박공', '드레스룸', '욕실2'],
+    base: {
+      name: '세움 24평 (12,080×7,080)',
+      productType: '주택',
+      ceilingHeight: 2400,
+      foundationHeight: 250,
+      wallThickness: 280, wallThicknessInt: 120,
+      exterior: { material: 'metalV', color: '#b8773e', corner: '#2f3237' },
+      roof: { type: 'gable', color: '#4e4f51', ridge: 'x' },
+      model3d: { url: 'models/seum-24.glb', fit: [13500, 9080], roofType: 'gable', ridge: 'x', label: '시뮬레이션', ownFurniture: true,
+        optionSets: [
+          { key: 'wall', label: '외장 (우드 사이딩)', parts: ['우드_메탈사이딩', '지붕_우드_메탈사이딩'],
+            choices: [{ id: 'orig', label: '우드', swatch: '#b8773e' }, ...WALL_CHOICES.wood] },
+          { key: 'accent', label: '포인트 (블랙 사이딩)', parts: ['24_블랙_메탈사이딩', '지붕_24_블랙_메탈사이딩'],
+            choices: [{ id: 'orig', label: '블랙', swatch: '#2a2b2e' }, ...WALL_CHOICES.metal.filter((c) => c.id !== 'charcoal')] },
+          { key: 'roof', label: '지붕 (징크)·후레싱', parts: ['징크판넬', '지붕_징크판넬', '후레싱_차콜', '지붕_후레싱_차콜'],
+            choices: pick(['다크그레이', '#4e4f51'], ['black', 'charcoal', 'gray', 'brown', 'green', 'red']) },
+          { key: 'window', label: '창틀', parts: ['창호_외부프레임_블랙', '창호프레임', '창호케이싱'],
+            choices: pick(['블랙', '#2f2f32'], ['charcoal', 'white', 'gray', 'brown']) },
+          { key: 'steel', label: '포치 기둥·난간', parts: ['24_블랙_무광', '지붕_24_블랙_무광'],
+            choices: pick(['블랙', '#1f1f22'], ['charcoal', 'white', 'gray', 'bronze']) },
+          { key: 'deck', label: '데크', parts: ['합성데크_X0', '합성데크_X1', '합성데크_X2', '합성데크_Y0', '합성데크_Y1', '합성데크_Y2'],
+            choices: [{ id: 'orig', label: '그레이우드', swatch: '#8c8681' }, RM('teak', '티크', '#6b4a2f', '#b98a5c'),
+              RM('brown', '브라운', '#3a2a1f', '#7a5b44'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
+        ] },
+      rooms: [
+        // 본채 x 1,420~13,500 · y 0~7,080 (치수는 벽 중심 기준 — 블렌더 모델 벽 위치 그대로)
+        // 트인 공간(주방·식당 · 복도 · 거실)을 먼저 그려야 2D에서 트인 면(점선)이 다른 방 벽을 덮지 않음
+        { key: 'kit',   type: 'kitchen',  name: '주방·식당', x: 6760,  y: 0,    w: 4000, d: 3540, open: ['w', 's'] },
+        { key: 'hall',  type: 'hall',     name: '복도',      x: 3360,  y: 1840, w: 3400, d: 1700, open: ['e', 's'] },
+        { key: 'liv',   type: 'living',   name: '거실',      x: 5060,  y: 3540, w: 4300, d: 3540, open: ['n'] },
+        { key: 'bath',  type: 'bath',     name: '욕실',      x: 1420,  y: 0,    w: 2840, d: 1840 },
+        { key: 'util',  type: 'utility',  name: '다용도실',  x: 4260,  y: 0,    w: 2500, d: 1840 },
+        { key: 'ent',   type: 'entrance', name: '현관',      x: 1420,  y: 1840, w: 1940, d: 1700 },
+        { key: 'bath2', type: 'bath',     name: '부부욕실',  x: 10760, y: 0,    w: 2740, d: 1740 },
+        { key: 'dress', type: 'utility',  name: '드레스룸',  x: 10760, y: 1740, w: 2740, d: 1800 },
+        { key: 'bed1',  type: 'bedroom',  name: '방1',       x: 1420,  y: 3540, w: 3640, d: 3540 },
+        { key: 'bed2',  type: 'bedroom',  name: '방2',       x: 9360,  y: 3540, w: 4140, d: 3540 },
+        // 포치(남측 2,000) · 데크(서측 1,420, 남쪽 끝 계단)
+        { key: 'porch', type: 'porch',    name: '포치',      x: 1420,  y: 7080, w: 12080, d: 2000, rail: ['s', 'e'], railColor: '#1f1f22', lights: true },
+        { key: 'deck',  type: 'deck',     name: '데크',      x: 0,     y: 0,    w: 1420, d: 9080 },
+      ],
+      openings: [
+        // 북측 — 다용도실 창 · 뒷문, 주방 창
+        { roomKey: 'util',  side: 'n', pos: 800,  winType: 'double',    w: 600,  h: 600,  sill: 1600, color: '#2f2f32' },
+        { roomKey: 'util',  side: 'n', pos: 1990, winType: 'door',      w: 900,  h: 2100, color: '#85878a', flipV: true },
+        { roomKey: 'kit',   side: 'n', pos: 2740, winType: 'double',    w: 1200, h: 700,  sill: 1100, color: '#2f2f32' },
+        // 서측 — 욕실 창 · 현관문(데크 쪽) · 방1 픽스창
+        { roomKey: 'bath',  side: 'w', pos: 1200, winType: 'double',    w: 600,  h: 600,  sill: 1600, color: '#2f2f32' },
+        { roomKey: 'ent',   side: 'w', pos: 1050, winType: 'door',      w: 900,  h: 2100, color: '#85878a' },
+        { roomKey: 'bed1',  side: 'w', pos: 1690, winType: 'fixed',     w: 1500, h: 650,  sill: 1100, color: '#2f2f32' },
+        // 동측 — 부부욕실 창 · 드레스룸 창 · 방2 픽스창
+        { roomKey: 'bath2', side: 'e', pos: 1200, winType: 'double',    w: 600,  h: 600,  sill: 1600, color: '#2f2f32' },
+        { roomKey: 'dress', side: 'e', pos: 890,  winType: 'double',    w: 600,  h: 600,  sill: 1600, color: '#2f2f32' },
+        { roomKey: 'bed2',  side: 'e', pos: 1690, winType: 'fixed',     w: 1500, h: 650,  sill: 1100, color: '#2f2f32' },
+        // 남측(포치 쪽) — 방1 창 · 거실 이중창 · 방2 창
+        { roomKey: 'bed1',  side: 's', pos: 1950, winType: 'double',    w: 1500, h: 1100, sill: 1000, color: '#2f2f32' },
+        { roomKey: 'liv',   side: 's', pos: 2160, winType: 'double',    w: 3300, h: 2100, sill: 100,  color: '#2f2f32' },
+        { roomKey: 'bed2',  side: 's', pos: 2110, winType: 'double',    w: 1500, h: 1100, sill: 1000, color: '#2f2f32' },
+        // 실내 문 — 3연동 중문 · 욕실 · 다용도실 · 방1 · 방2 · 부부욕실 · 드레스룸(개구부)
+        { roomKey: 'ent',   side: 'e', pos: 855,  winType: 'glassSlide', w: 1350, h: 2100, color: '#2b2b2c' },
+        { roomKey: 'bath',  side: 's', pos: 2300, winType: 'swingDoor', w: 700,  h: 2000, color: '#e3e3e2', flipH: true, flipV: true },
+        { roomKey: 'util',  side: 's', pos: 1960, winType: 'swingDoor', w: 800,  h: 2000, color: '#e3e3e2', flipH: true, flipV: true },
+        { roomKey: 'bed1',  side: 'n', pos: 3050, winType: 'swingDoor', w: 900,  h: 2100, color: '#e3e3e2', flipH: true },
+        { roomKey: 'bed2',  side: 'n', pos: 560,  winType: 'swingDoor', w: 900,  h: 2100, color: '#e3e3e2' },
+        { roomKey: 'bath2', side: 's', pos: 2010, winType: 'swingDoor', w: 700,  h: 2000, color: '#e3e3e2', flipH: true, flipV: true },
+        { roomKey: 'bed2',  side: 'n', pos: 3360, winType: 'slideDoor', w: 1000, h: 2100, color: '#e3e3e2' },
+      ],
+      // 3D 실물 모델(블렌더 시뮬레이션)의 가구 위치·크기 그대로
+      furniture: [
+        // 주방(북측 일자) — 냉장고 · 하부장(인덕션·싱크) / 키큰장 · 렌지장(동측) / 식탁 + 의자 2 + 벤치
+        { catalogId: 'fridge',    x: 7320,  y: 620,  w: 860,  d: 690, rotation: 0 },
+        { catalogId: 'sink',      x: 9230,  y: 590,  w: 2940, d: 620, rotation: 0 },
+        { catalogId: 'induction', x: 8370,  y: 630,  w: 580,  d: 400, rotation: 0 },
+        { catalogId: 'ktall',     x: 9775,  y: 2522, w: 650,  d: 585, rotation: 0 },
+        { catalogId: 'ktall',     x: 10400, y: 2510, w: 600,  d: 560, rotation: 0 },
+        { catalogId: 'dining4',   x: 7320,  y: 2380, w: 1400, d: 800, rotation: 0 },
+        { catalogId: 'chair',     x: 6990,  y: 1700, w: 442,  d: 468, rotation: 0 },
+        { catalogId: 'chair',     x: 7650,  y: 1700, w: 442,  d: 468, rotation: 0 },
+        { catalogId: 'shelf',     x: 7320,  y: 3150, w: 1300, d: 450, rotation: 180 },
+        // 욕실 · 부부욕실 — 세면대 · 양변기 / 다용도실 — 세탁기 / 현관 — 신발장
+        { catalogId: 'basin',     x: 2900,  y: 520,  w: 520,  d: 460, rotation: 0 },
+        { catalogId: 'toilet',    x: 3750,  y: 656,  w: 410,  d: 740, rotation: 0 },
+        { catalogId: 'basin',     x: 12030, y: 520,  w: 520,  d: 460, rotation: 0 },
+        { catalogId: 'toilet',    x: 12750, y: 656,  w: 410,  d: 740, rotation: 0 },
+        { catalogId: 'washer',    x: 4670,  y: 1445, w: 650,  d: 650, rotation: 180 },
+        { catalogId: 'shelf',     x: 2463,  y: 2065, w: 1294, d: 330, rotation: 0 },
+        // 거실 — TV장(아트월) · 3인 소파
+        { catalogId: 'tvstand',   x: 5370,  y: 5140, w: 2100, d: 420, rotation: 270 },
+        { catalogId: 'sofa3',     x: 8810,  y: 5135, w: 2190, d: 940, rotation: 90 },
+        // 방1 — 붙박이장 · 침대(머리 서쪽) · 협탁 / 방2 — 침대(머리 동쪽) · 협탁 / 드레스룸 붙박이장
+        { catalogId: 'wardrobe',  x: 2600,  y: 3905, w: 1800, d: 610, rotation: 0 },
+        { catalogId: 'bedQ',      x: 2760,  y: 5530, w: 1680, d: 2080, rotation: 270 },
+        { catalogId: 'shelf',     x: 1958,  y: 4460, w: 455,  d: 500, rotation: 270 },
+        { catalogId: 'bedQ',      x: 12160, y: 5530, w: 1680, d: 2080, rotation: 90 },
+        { catalogId: 'shelf',     x: 12962, y: 6600, w: 455,  d: 500, rotation: 90 },
+        { catalogId: 'wardrobe',  x: 11125, y: 2630, w: 1660, d: 610, rotation: 270 },
+      ],
+    },
+  },
 ];
 
 // 템플릿 목록 (썸네일/표시용 메타)

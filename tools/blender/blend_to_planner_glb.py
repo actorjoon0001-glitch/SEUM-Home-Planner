@@ -49,6 +49,7 @@ ap.add_argument('--bake-cache', default='')
 ap.add_argument('--no-cache', action='store_true')
 ap.add_argument('--keep-coplanar', action='store_true')
 ap.add_argument('--rotate-z', type=float, default=0.0)   # 모델 방향 돌리기(도, 원점 기준) — 도면과 앞뒤가 반대로 그려진 모델
+ap.add_argument('--upper-z', type=float, default=0.0)    # 2층 구조: 이 높이(m) 이상에서 시작하는 부품 = 2층 (웹 '2층 걷어내기'로 숨김)
 A = ap.parse_args(argv)
 SRC, OUT = A.src, A.out
 os.makedirs(OUT, exist_ok=True)
@@ -56,6 +57,27 @@ NAME = os.path.splitext(os.path.basename(SRC))[0]
 bpy.ops.wm.open_mainfile(filepath=SRC)
 sc = bpy.context.scene
 vl = bpy.context.view_layer
+# 0) 장면·애니메이션 고정 — 한 파일에 장면이 여러 개(드론샷·변신 연출 등)거나 부품이 움직이는 애니메이션이 있으면
+#    · 지금 열린 장면에 없는 부품(다른 장면 전용)은 지움
+#    · 지금 프레임의 위치·보이기 그대로 굳히고 애니메이션을 지움 (합치기·내보내기 중에 다른 프레임 위치로 튀지 않게)
+_anim = [o for o in sc.objects if o.animation_data]
+# 지금 프레임의 월드 위치를 먼저 다 기록 → 애니메이션·제약·부모(리그)를 모두 떼고 → 기록한 위치로 되돌림
+#   (리그가 아래에서 지워지거나 부모 행렬이 덜 갱신된 채 위치를 넣으면 부품이 원래 자리로 튐)
+if _anim: sc.frame_set(sc.frame_current)
+vl.update()
+_mw = {o: o.matrix_world.copy() for o in sc.objects}
+for o in sc.objects:
+    if o.animation_data: o.animation_data_clear()
+    for c in list(o.constraints): o.constraints.remove(c)
+    if o.parent: o.parent = None
+for o in sc.objects: o.matrix_world = _mw[o]
+vl.update()
+if _anim: print("애니메이션 고정: 프레임", sc.frame_current, "부품", len(_anim))
+# 다른 장면 전용 부품은 위치를 굳힌 다음에 지움 (장면에 안 보이는 리그가 부모일 수 있어 먼저 지우면 부품이 튐)
+_keep = set(sc.objects)
+_gone = [o for o in bpy.data.objects if o not in _keep]
+for o in _gone: bpy.data.objects.remove(o, do_unlink=True)
+if _gone: print("다른 장면 부품 제외:", len(_gone))
 
 def sel_only(objs, active=None):
     bpy.ops.object.select_all(action='DESELECT')
@@ -124,7 +146,11 @@ for o in list(bpy.data.objects):
 #   · 창·문 위 인방 아랫면처럼 좁은 면(폭 0.5m 이하)은 남김
 #   · 평평한 윗덮개는 벽 두께(--ceiling-wall)만큼 가장자리를 남기고, 안쪽 천장 높이까지 턱을 내려 벽 윗면을 막음
 #     (덮개를 통째로 떼면 벽 두께 속이 비어 보임)
-CEIL_PREFIX = tuple(p.strip() for p in A.ceiling_split.split(',') if p.strip())
+# 항목마다 '이름:높이' 로 따로 줄 수 있음 (2층 구조: 1층 천장 2.6m, 2층 천장 5.5m 등). 높이 없으면 --ceiling-z
+CEIL_Z = {}
+for _p in [p.strip() for p in A.ceiling_split.split(',') if p.strip()]:
+    _n, _, _z = _p.partition(':'); CEIL_Z[_n] = float(_z) if _z else A.ceiling_z
+CEIL_PREFIX = tuple(CEIL_Z)
 if CEIL_PREFIX:
     import bmesh
     for o in [o for o in bpy.data.objects if o.type == 'MESH' and o.name.startswith(CEIL_PREFIX)]:
@@ -135,9 +161,10 @@ if CEIL_PREFIX:
             return (min(w.z for w in ws), max(w.z for w in ws), min(w.x for w in ws), max(w.x for w in ws),
                     min(w.y for w in ws), max(w.y for w in ws), (R @ f.normal).normalized().z)
         top = []
+        cz = next(CEIL_Z[k] for k in CEIL_PREFIX if o.name.startswith(k))
         for f in bm.faces:
             z0, z1, x0, x1, y0, y1, nz = info(f)
-            if z0 >= A.ceiling_z and abs(nz) > 0.3 and min(x1 - x0, y1 - y0) > 0.5: top.append(f)
+            if z0 >= cz and abs(nz) > 0.3 and min(x1 - x0, y1 - y0) > 0.5: top.append(f)
         if not top or len(top) == len(bm.faces): bm.free(); continue
         downs = [info(f) for f in top if info(f)[6] < -0.3]
         flat_up = [f for f in top if info(f)[6] > 0.995]   # 경사 덮개(박공)는 통째로 뗌
@@ -542,14 +569,16 @@ for o in list(bpy.data.objects):
     roof = (min(zs) >= A.roof_z or bool(o.get('roof'))   # 벽 윗선 근처 이상(천장·조명) 또는 생성기가 지붕으로 표시한 부품
             or (bool(ROOF_PREFIX) and o.name.startswith(ROOF_PREFIX)))
     if KEEP_PREFIX and o.name.startswith(KEEP_PREFIX): roof = False
+    upper = bool(A.upper_z) and not roof and min(zs) >= A.upper_z
     mat = obj_mat(o)
-    groups[(mat.name if mat else "", roof)].append(o)
-for (mname, roof), objs in groups.items():
+    groups[(mat.name if mat else "", roof, upper)].append(o)
+for (mname, roof, upper), objs in groups.items():
     sel_only(objs)
     if len(objs) > 1: bpy.ops.object.join()
     j = vl.objects.active
-    j.name = ("지붕_" if roof else "") + (mname or "무재질")
+    j.name = ("지붕_" if roof else "2층_" if upper else "") + (mname or "무재질")
     if roof: j["roof"] = 1
+    if upper: j["upper"] = 1
 # 4.5) 방향 돌리기 — 굽기가 끝난 뒤에 돌림 (창틀 안팎 색처럼 '월드 위치·방향'으로 칠하는 재질이 있어
 #   먼저 돌리면 집 중심 기준이 어긋나 안팎 색이 뒤바뀜). 맨 위 부모만 원점 기준으로 회전
 if A.rotate_z:
@@ -568,10 +597,11 @@ for o in bpy.data.objects:
     for v in o.data.vertices:
         w = o.matrix_world @ v.co; mn = mathutils.Vector(map(min, mn, w)); mx = mathutils.Vector(map(max, mx, w))
     o.data.calc_loop_triangles(); tri += len(o.data.loop_triangles)
-print("final objects:", len(bpy.data.objects), "roof:", sum(1 for o in bpy.data.objects if o.get("roof")), "tris:", tri)
+print("final objects:", len(bpy.data.objects), "roof:", sum(1 for o in bpy.data.objects if o.get("roof")), "upper:", sum(1 for o in bpy.data.objects if o.get("upper")), "tris:", tri)
 print("bbox", tuple(round(v,3) for v in mn), tuple(round(v,3) for v in mx))
 bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, NAME + ".glb"), export_format='GLB',
     export_apply=True, export_extras=True, export_cameras=False, export_lights=False, export_yup=True,
+    use_active_scene=True, export_animations=False,   # 블렌더에 장면(드론샷 등)이 여러 개면 같은 부품이 장면마다 중복 기록됨 → 지금 장면만
     export_image_format='JPEG', export_jpeg_quality=A.jpeg,
     export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=7,
     # 위치 정밀도 — Draco 는 부품(재질)마다 자기 크기 기준으로 좌표를 반올림함. 기본 14비트면 9m 집에서 0.6mm 단위라

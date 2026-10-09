@@ -149,6 +149,7 @@
           <span class="wt-hint">모서리 클릭으로 벽 잇기 · 길이 입력 후 Enter · 더블클릭/Enter로 마침 · Esc 취소</span>
         </div>
         <canvas id="canvas2d"></canvas>
+        <div id="floor-tabs" class="floor-tabs hidden" role="tablist" aria-label="층 선택"></div>
         <div id="compass2d" class="compass compass2d" title="방위 — 3D 햇빛·시간 패널에서 집 방향을 바꿀 수 있어요">
           <svg viewBox="-50 -50 100 100" width="64" height="64" aria-label="방위"><circle r="44" class="cp-ring"/>
             <g class="cp-rose"><path d="M0,-30 L7,0 L0,4 L-7,0Z" class="cp-n"/><path d="M0,30 L7,0 L0,-4 L-7,0Z" class="cp-s"/>
@@ -168,6 +169,7 @@
           <button id="view-edit" class="vp" title="집을 클릭해 선택 → 드래그로 이동, 초록 핸들로 90° 회전, 빨간 모서리로 크기조절. 누르면 선택 해제">✏️ 편집 도움말</button>
           <button id="view-ext" class="vp">외장재</button>
           <button id="view-roof" class="vp">지붕</button>
+          <button id="view-upper" class="vp hidden" title="2층을 들어내 1층 안을 보여줍니다 (다시 누르면 2층 다시 올림)">🏢 2층 걷어내기</button>
           <button id="view-model3d" class="vp hidden" title="블렌더로 만든 실물 3D 모델 ↔ 도면으로 자동 생성한 모델 전환">🏠 실물 모델</button>
           <button id="tb-roof" class="vp">천장 보기</button>
           <button id="view-compare" class="vp" title="다른 제품을 옆에 나란히 세워 크기·외관 비교 (해·시간도 함께)">🏘️ 비교</button>

@@ -5,7 +5,7 @@ import {
   WINDOW_TYPES, WINDOW_CATALOG, EXTERIOR_MATERIALS, EXTERIOR_PALETTE,
   ROOF_TYPES, ROOF_PALETTE, PRODUCT_TYPES, outlineShapes,
 } from './data.js';
-import { listTemplates, instantiateTemplate } from './templates.js';
+import { listTemplates, instantiateTemplate, familyVariants } from './templates.js';
 import { cloud } from './cloud.js';
 import { dxfToUnderlay } from './dxf.js';
 import { swatchDataURL, extKind, ROTATABLE } from './textures.js';
@@ -1344,7 +1344,14 @@ function buildFinish() {
     if (prodOn) {
       const sel = m3.options || {};
       const sw = (c) => c.swatch || c.color || `linear-gradient(135deg, ${c.dark} 0%, ${c.light} 100%)`;
-      prodEl.innerHTML = `
+      const fam = familyVariants(m3.family);
+      const famHtml = fam.length > 1 ? `
+        <div class="po-head">🏘️ 형태 선택</div>
+        <div class="po-vrow">${fam.map((v) => `<button type="button" class="po-var ${v.variant === m3.variant ? 'on' : ''}" data-tid="${esc(v.id)}">${esc(v.variant)}</button>`).join('')}</div>
+        ${(fam.find((v) => v.variant === m3.variant) || {}).summary ? `<p class="po-sum">${esc(fam.find((v) => v.variant === m3.variant).summary)}</p>` : ''}
+        <button type="button" class="wide-btn po-all ${_viewer.compare && _viewer.compare.family === m3.family ? 'on' : ''}" id="po-all">${_viewer.compare && _viewer.compare.family === m3.family ? '🏘️ 나란히 보기 끄기' : `🏘️ ${fam.length}가지 형태 나란히 보기`}</button>
+        <div class="po-sep"></div>` : '';
+      prodEl.innerHTML = famHtml + `
         <div class="po-head">🏠 제품 옵션${m3.label ? ` <small>${esc(m3.label)}</small>` : ''}</div>
         <p class="panel-sub small" style="margin:2px 0 10px">블렌더 실물 모델의 질감(나뭇결·이음)은 그대로, 색만 바뀌어요.</p>
         ${m3.optionSets.map((set) => {
@@ -1356,6 +1363,31 @@ function buildFinish() {
       prodEl.querySelectorAll('.po-chip').forEach((b) => b.onclick = () => {
         store.commit((dd) => { if (dd.model3d) dd.model3d.options = { ...(dd.model3d.options || {}), [b.dataset.k]: b.dataset.id }; });
       });
+      // 형태 바꾸기 — 같은 제품의 다른 형태 템플릿으로 (고른 색 옵션은 그대로 이어감)
+      prodEl.querySelectorAll('.po-var').forEach((b) => b.onclick = () => {
+        if (b.classList.contains('on')) return;
+        const nd = instantiateTemplate(b.dataset.tid); if (!nd) return;
+        if (nd.model3d) nd.model3d.options = { ...(m3.options || {}) };
+        const wasCmp = _viewer.compare && _viewer.compare.family === m3.family;
+        store.loadInto(nd);
+        if (_editor) _editor.applyInitialView();
+        if (_viewer) { _viewer._needCam = true; if (wasCmp) showFamily(); }
+        flash(`${nd.model3d.variant} — ${nd.name}`);
+      });
+      const showFamily = () => {
+        const cur = store.design.model3d;
+        const others = familyVariants(cur.family).filter((v) => v.variant !== cur.variant)
+          .map((v) => { const d2 = instantiateTemplate(v.id); return { design: d2, title: v.variant }; });
+        _viewer.setCompare(others, '', { sameOptions: true });
+        _viewer.compare.family = cur.family;
+        renderCards();
+      };
+      const allBtn = prodEl.querySelector('#po-all');
+      if (allBtn) allBtn.onclick = () => {
+        if (_viewer.compare && _viewer.compare.family === m3.family) { _viewer.setCompare(null); renderCards(); return; }
+        showFamily();
+        flash('같은 색으로 형태만 다르게 나란히 세웠어요 — 해·시간·지붕 걷기도 함께 적용돼요');
+      };
       return;
     }
     const match = (label) => !query || label.includes(query);
@@ -1936,6 +1968,23 @@ function buildToolbar({ editor, viewer, onModeChange }) {
     $('tb-redo').disabled = !store.canRedo();
   };
   store.subscribe(refreshUndo);
+  // 층 탭(1층 | 2층) — 여러 층 도면일 때 2D 위에 바로 전환 버튼 (2층 구조 제품 브리핑용)
+  const floorTabs = $('floor-tabs');
+  const syncFloorTabs = () => {
+    if (!floorTabs) return;
+    const fl = store.floorList(), cur = store.activeFloorIndex();
+    floorTabs.classList.toggle('hidden', fl.length < 2);
+    if (fl.length < 2) return;
+    const key = fl.map((f) => f.name).join('|') + '#' + cur;
+    if (floorTabs.dataset.key === key) return;
+    floorTabs.dataset.key = key;
+    floorTabs.innerHTML = fl.map((f, i) => `<button type="button" role="tab" class="ft-btn ${i === cur ? 'on' : ''}" data-i="${i}">${esc(f.name)}</button>`).join('');
+    floorTabs.querySelectorAll('.ft-btn').forEach((b) => b.onclick = () => {
+      const i = +b.dataset.i; if (i === store.activeFloorIndex()) return;
+      store.switchFloor(i); editor.applyInitialView(); viewer.dirty = true;
+    });
+  };
+  store.subscribe(syncFloorTabs); syncFloorTabs();
   refreshUndo();
 
   $('tb-new').onclick = () => { if (confirm('빈 새 도면을 시작할까요? 저장하지 않은 변경은 사라집니다.')) { store.newDesign(); editor.fit(); viewer._needCam = true; viewer.dirty = true; } };
@@ -2079,9 +2128,25 @@ function buildToolbar({ editor, viewer, onModeChange }) {
         flash(`자동 생성 모델로 보여드려요 (${s.reason} 변경) — 실물 모델은 원래 형태일 때만 표시돼요. 되돌리기: Ctrl+Z`);
       }
       if (_refreshFinish && (!m3dPrev || m3dPrev.using !== s.using)) _refreshFinish();
+      // 🏢 2층 걷어내기 — 2층 부품이 있는 실물 모델(2층 구조)일 때만
+      const upBtn = $('view-upper');
+      if (upBtn) {
+        upBtn.classList.toggle('hidden', !s.hasUpper);
+        if (!s.hasUpper && viewer.hideUpper) viewer.setHideUpper(false);
+        upBtn.classList.toggle('on', !!viewer.hideUpper);
+        upBtn.textContent = viewer.hideUpper ? '🏢 2층 다시 올리기' : '🏢 2층 걷어내기';
+      }
       m3dPrev = s;
     };
   }
+
+  const upperBtn = $('view-upper');
+  if (upperBtn) upperBtn.onclick = () => {
+    viewer.setHideUpper(!viewer.hideUpper);
+    upperBtn.classList.toggle('on', viewer.hideUpper);
+    upperBtn.textContent = viewer.hideUpper ? '🏢 2층 다시 올리기' : '🏢 2층 걷어내기';
+    flash(viewer.hideUpper ? '2층을 들어냈어요 — 1층 안과 계단 동선을 보여줄 수 있어요' : '2층을 다시 올렸어요');
+  };
 
   // 3D 고화질(구석 음영) 토글 — 느린 PC에서 자동으로 꺼지면 버튼도 따라 꺼짐
   // 3D 화면에 라이브러리(제품·창호·방) 끌어다 놓기 → 2D 편집기와 같은 배치 로직

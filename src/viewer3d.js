@@ -406,7 +406,7 @@ export class Viewer3D {
     this._needsRender = true;
     // 실물 모델은 캐시해서 계속 재사용 → 아래 일괄 해제에 휩쓸리지 않게 먼저 떼어냄
     for (const e of Object.values(this._m3dCache || {})) if (e.node && e.node.parent) e.node.parent.remove(e.node);
-    if (this.compare && this.compare.node && this.compare.node.parent) this.compare.node.parent.remove(this.compare.node);
+    for (const it of (this.compare && this.compare.items) || []) if (it.node && it.node.parent) it.node.parent.remove(it.node);
     // 기존 제거 — 지오메트리는 매번 새로 만들므로 GPU 메모리도 함께 해제 (편집할수록 느려지는 것 방지)
     //   (재질·텍스처는 textures.js 캐시를 공유하므로 해제하지 않음)
     this.modelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -467,7 +467,8 @@ export class Viewer3D {
       if (m3dNode) {
         // GLB 원점 = 도면 원점(방들의 북서쪽 모서리) → 방을 통째로 옮기면 모델도 따라감. 지면(0)에 바로 놓임
         m3dNode.position.set(m3d.ox - b.cx, -F, m3d.oy - b.cz);
-        m3dNode.traverse((o) => { if (o.userData && o.userData.roof) o.visible = this.showRoof; });   // 지붕·천장 토글
+        this._m3dHasUpper = false;
+        m3dNode.traverse((o) => this._m3dVis(o));   // 지붕·천장 토글 · 2층 걷어내기
         this._applyModel3dOptions(m3dNode, d);  // 제품 옵션(외장·띠·지붕·프레임·창틀·데크 색)
         house.add(m3dNode);
         // 상담 중 추가한 가구는 실물 모델 안에 함께 (모델에 가구가 이미 있는 제품은 도면 기본 가구 제외)
@@ -504,7 +505,7 @@ export class Viewer3D {
     this.usingModel3d = !!m3dNode;
     if (this.onModel3dState) {
       const e = m3d.url && (this._m3dCache || {})[m3d.url];
-      this.onModel3dState({ available: m3d.available, mismatch: m3d.mismatch, reason: m3d.reason || '', using: !!m3dNode,
+      this.onModel3dState({ available: m3d.available, mismatch: m3d.mismatch, reason: m3d.reason || '', using: !!m3dNode, hasUpper: !!(m3dNode && this._m3dHasUpper),
         loading: !!(e && e.loading), failed: !!(e && e.failed), label: m3d.label });
     }
 
@@ -516,9 +517,13 @@ export class Viewer3D {
   //   2D에서 이런 걸 바꾸면 실물과 달라지므로 자동 생성 모델로 돌아가고, reason 으로 이유를 알림
   _model3dSpec(d) {
     const m = d.model3d;
-    if (!m || !m.url || (d.activeFloor || 0) !== 0 || !d.rooms.length) return { available: false };
+    // 여러 층을 한 모델에 담은 제품(2층 구조)은 어느 층을 편집 중이든 실물 모델 — 위치·크기 기준은 1층 도면
+    const multi = Array.isArray(d.floors) && d.floors.length > 1 && m && m.floors > 1;
+    const af = d.activeFloor || 0;
+    const baseRooms = multi && af !== 0 ? d.floors[0].rooms : d.rooms;
+    if (!m || !m.url || (af !== 0 && !multi) || !baseRooms.length) return { available: false };
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const r of d.rooms) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
+    for (const r of baseRooms) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
     const fit = Array.isArray(m.fit) ? m.fit : null, roof = d.roof || {};
     let reason = '';
     if (fit && (Math.abs(x1 - x0 - fit[0]) > 60 || Math.abs(y1 - y0 - fit[1]) > 60)) reason = '도면 크기';
@@ -529,12 +534,14 @@ export class Viewer3D {
     return { available: !reason, mismatch: !!reason, reason, url: m.url, label: m.label || '', ox: x0, oy: y0 };
   }
 
-  // 🏘️ 주택 비교 — 다른 제품(실물 모델)을 지금 집 동쪽에 4m 띄워 나란히 세움. 해·시간·방위는 함께 적용
-  //   design: instantiateTemplate 결과, title: 라벨. null 이면 비교 끄기
-  setCompare(design, title) {
-    this.compare = design ? { design, title: title || design.name || '' } : null;
-    this._cmpFrame = !!design;
-    if (!design) this._needCam = true;   // 끄면 원래 집 시점으로
+  // 🏘️ 주택 비교 — 다른 제품(실물 모델)을 지금 집 동쪽에 4m 씩 띄워 나란히 세움. 해·시간·방위는 함께 적용
+  //   design: instantiateTemplate 결과(또는 [{design, title}] 여러 채), title: 라벨. null 이면 비교 끄기
+  //   opts.sameOptions: 지금 집에서 고른 제품 옵션(색)을 옆집에도 똑같이 (같은 제품의 형태 비교)
+  setCompare(design, title, opts = {}) {
+    const items = !design ? [] : Array.isArray(design) ? design : [{ design, title }];
+    this.compare = items.length ? { items: items.map((it) => ({ design: it.design, title: it.title || it.design.name || '' })), sameOptions: !!opts.sameOptions } : null;
+    this._cmpFrame = !!items.length;
+    if (!items.length) this._needCam = true;   // 끄면 원래 집 시점으로
     this.dirty = true;
   }
   _buildCompare(root, house, b) {
@@ -542,28 +549,39 @@ export class Viewer3D {
     const c = this.compare;
     const mainBox = new THREE.Box3().setFromObject(house);
     if (!c || mainBox.isEmpty()) return this._syncCmpLabels();
-    const spec = this._model3dSpec(c.design);
-    const src = spec.available ? this._model3dNode(spec.url) : null;   // 처음이면 불러오기 시작 → 다 받으면 다시 그림
-    if (!src) return this._syncCmpLabels();
-    if (!c.node || c.url !== spec.url) { c.node = this._cloneModel3d(src); c.url = spec.url; }
-    const node = c.node;
-    this._applyModel3dOptions(node, c.design);
-    node.traverse((o) => { if (o.userData && o.userData.roof) o.visible = this.showRoof; });
-    node.position.set(0, 0, 0); node.updateMatrixWorld(true);
-    const cb = new THREE.Box3().setFromObject(node);
-    const gap = 4000;
-    node.position.set(mainBox.max.x + gap - cb.min.x, 0, (mainBox.min.z + mainBox.max.z) / 2 - (cb.min.z + cb.max.z) / 2);
-    root.add(node);
-    node.updateMatrixWorld(true);
-    const nb = new THREE.Box3().setFromObject(node);
-    // 비교 집 밤 실내등 위치 (GLB 원점 = 그 도면 방들의 북서쪽 모서리)
-    const cd = c.design, cF = Math.max(0, +cd.foundationHeight || 0), cH = cd.ceilingHeight || 2400;
-    this._cmpLamps = cd.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type)).slice(0, 10).map((r) =>
-      new THREE.Vector3(node.position.x + r.x + r.w / 2 - spec.ox, cF + cH - 180, node.position.z + r.y + r.d / 2 - spec.oy));
     const top = (bx) => new THREE.Vector3((bx.min.x + bx.max.x) / 2, bx.max.y + 700, (bx.min.z + bx.max.z) / 2);
-    this._cmpLabels = [{ pos: top(mainBox), text: (store.design.name || '현재 도면').trim() }, { pos: top(nb), text: c.title }];
-    // 두 집이 다 들어오게 그림자 범위·카메라 맞춤
-    const all = mainBox.clone().union(nb);
+    const m3 = store.design.model3d;   // 같은 제품 형태 비교면 이름표도 '기본형'처럼 짧게
+    const labels = [{ pos: top(mainBox), text: c.family && m3 && m3.variant ? m3.variant : (store.design.name || '현재 도면').trim() }], lamps = [];
+    const all = mainBox.clone();
+    let edge = mainBox.max.x;
+    const gap = 4000;
+    for (const it of c.items) {
+      const spec = this._model3dSpec(it.design);
+      const src = spec.available ? this._model3dNode(spec.url) : null;   // 처음이면 불러오기 시작 → 다 받으면 다시 그림
+      if (!src) continue;
+      if (!it.node || it.url !== spec.url) { it.node = this._cloneModel3d(src); it.url = spec.url; }
+      const node = it.node;
+      const optD = c.sameOptions && store.design.model3d
+        ? { ...it.design, model3d: { ...it.design.model3d, options: store.design.model3d.options || {} } } : it.design;
+      this._applyModel3dOptions(node, optD);
+      node.traverse((o) => this._m3dVis(o, true));
+      node.position.set(0, 0, 0); node.updateMatrixWorld(true);
+      const cb = new THREE.Box3().setFromObject(node);
+      node.position.set(edge + gap - cb.min.x, 0, (mainBox.min.z + mainBox.max.z) / 2 - (cb.min.z + cb.max.z) / 2);
+      root.add(node);
+      node.updateMatrixWorld(true);
+      const nb = new THREE.Box3().setFromObject(node);
+      edge = nb.max.x; all.union(nb);
+      // 비교 집 밤 실내등 위치 (GLB 원점 = 그 도면 방들의 북서쪽 모서리)
+      const cd = it.design, cF = Math.max(0, +cd.foundationHeight || 0), cH = cd.ceilingHeight || 2400;
+      const cr = (Array.isArray(cd.floors) && cd.floors.length ? cd.floors[0].rooms : cd.rooms) || [];
+      for (const r of cr.filter((q) => !OPEN_ROOM_TYPES.includes(q.type)).slice(0, c.items.length > 1 ? 4 : 10))   // 여러 채면 집마다 등 수를 줄여 가볍게
+        lamps.push(new THREE.Vector3(node.position.x + r.x + r.w / 2 - spec.ox, cF + cH - 180, node.position.z + r.y + r.d / 2 - spec.oy));
+      labels.push({ pos: top(nb), text: it.title });
+    }
+    if (labels.length < 2) return this._syncCmpLabels();
+    this._cmpLamps = lamps; this._cmpLabels = labels;
+    // 모든 집이 다 들어오게 그림자 범위·카메라 맞춤
     const ext = Math.max(Math.abs(all.min.x), Math.abs(all.max.x), Math.abs(all.min.z), Math.abs(all.max.z));
     this._fitShadow({ w: Math.max(0, ext * 2 - 5000), h: 0 });   // 반경 ≈ ext + 1.5m
     const ab = { w: all.max.x - all.min.x, h: all.max.z - all.min.z };
@@ -612,6 +630,14 @@ export class Viewer3D {
     });
   }
 
+  // 실물 모델 부품 보이기 — 지붕(천장 포함)은 '지붕' 토글, 2층 부품은 '2층 걷어내기'(지붕도 같이 걷힘)
+  _m3dVis(o, cmp) {
+    const u = o.userData; if (!u) return;
+    if (u.upper && !cmp) this._m3dHasUpper = true;
+    if (u.upper) o.visible = !this.hideUpper;
+    else if (u.roof) o.visible = this.showRoof && !this.hideUpper;
+  }
+  setHideUpper(on) { this.hideUpper = !!on; this.dirty = true; }
   // 제품 옵션(model3d.optionSets) → 실물 모델 부품에 적용. 고른 게 없으면(orig) 블렌더 원래 마감 그대로
   _applyModel3dOptions(node, d) {
     const m = d.model3d, sel = m.options || {}, byPart = new Map();
@@ -624,7 +650,7 @@ export class Viewer3D {
       if (!o.isMesh) return;
       const u = o.userData;
       if (!u.m3dOrig) u.m3dOrig = o.material;
-      const hit = byPart.get(o.name);
+      const hit = byPart.get(o.name) || (o.name.startsWith('2층_') ? byPart.get(o.name.slice(3)) : null);   // 2층 부품도 같은 옵션
       const base = flat.has(o.name) && u.m3dOrig.map ? this._m3dCached(u.m3dOrig.uuid + '|flat', () => this._m3dFlat(u.m3dOrig)) : u.m3dOrig;
       o.material = (!hit || hit.ch.id === 'orig') ? base
         : this._m3dCached(base.uuid + '|' + hit.set.key + '|' + hit.ch.id, () => this._m3dVariant(base, hit.ch));

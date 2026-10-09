@@ -1363,31 +1363,9 @@ function buildFinish() {
       prodEl.querySelectorAll('.po-chip').forEach((b) => b.onclick = () => {
         store.commit((dd) => { if (dd.model3d) dd.model3d.options = { ...(dd.model3d.options || {}), [b.dataset.k]: b.dataset.id }; });
       });
-      // 형태 바꾸기 — 같은 제품의 다른 형태 템플릿으로 (고른 색 옵션은 그대로 이어감)
-      prodEl.querySelectorAll('.po-var').forEach((b) => b.onclick = () => {
-        if (b.classList.contains('on')) return;
-        const nd = instantiateTemplate(b.dataset.tid); if (!nd) return;
-        if (nd.model3d) nd.model3d.options = { ...(m3.options || {}) };
-        const wasCmp = _viewer.compare && _viewer.compare.family === m3.family;
-        store.loadInto(nd);
-        if (_editor) _editor.applyInitialView();
-        if (_viewer) { _viewer._needCam = true; if (wasCmp) showFamily(); }
-        flash(`${nd.model3d.variant} — ${nd.name}`);
-      });
-      const showFamily = () => {
-        const cur = store.design.model3d;
-        const others = familyVariants(cur.family).filter((v) => v.variant !== cur.variant)
-          .map((v) => { const d2 = instantiateTemplate(v.id); return { design: d2, title: v.variant }; });
-        _viewer.setCompare(others, '', { sameOptions: true });
-        _viewer.compare.family = cur.family;
-        renderCards();
-      };
+      prodEl.querySelectorAll('.po-var').forEach((b) => b.onclick = () => switchVariant(b.dataset.tid));
       const allBtn = prodEl.querySelector('#po-all');
-      if (allBtn) allBtn.onclick = () => {
-        if (_viewer.compare && _viewer.compare.family === m3.family) { _viewer.setCompare(null); renderCards(); return; }
-        showFamily();
-        flash('같은 색으로 형태만 다르게 나란히 세웠어요 — 해·시간·지붕 걷기도 함께 적용돼요');
-      };
+      if (allBtn) allBtn.onclick = () => toggleFamilyView();
       return;
     }
     const match = (label) => !query || label.includes(query);
@@ -1985,6 +1963,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
     });
   };
   store.subscribe(syncFloorTabs); syncFloorTabs();
+  store.subscribe(syncVariantBar);
   refreshUndo();
 
   $('tb-new').onclick = () => { if (confirm('빈 새 도면을 시작할까요? 저장하지 않은 변경은 사라집니다.')) { store.newDesign(); editor.fit(); viewer._needCam = true; viewer.dirty = true; } };
@@ -2128,6 +2107,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
         flash(`자동 생성 모델로 보여드려요 (${s.reason} 변경) — 실물 모델은 원래 형태일 때만 표시돼요. 되돌리기: Ctrl+Z`);
       }
       if (_refreshFinish && (!m3dPrev || m3dPrev.using !== s.using)) _refreshFinish();
+      syncVariantBar();
       // 🏢 2층 걷어내기 — 2층 부품이 있는 실물 모델(2층 구조)일 때만
       const upBtn = $('view-upper');
       if (upBtn) {
@@ -3250,6 +3230,59 @@ function flash(msg) {
   el.classList.add('show');
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// ── 같은 제품의 형태(기본형·ㄱ자형·2층형) ─────────────────────────────
+//   3D 화면 위 형태 바(#variant-bar)와 마감재 패널의 '형태 선택'이 함께 씀
+function familyOn() {
+  const m3 = store.design && store.design.model3d;
+  return !!(_viewer && _viewer.compare && m3 && _viewer.compare.family === m3.family);
+}
+// 형태 바꾸기 — 같은 제품의 다른 형태 템플릿으로 (고른 색 옵션은 그대로 이어감)
+function switchVariant(tid) {
+  const m3 = store.design.model3d;
+  if (!m3) return;
+  const nd = instantiateTemplate(tid); if (!nd || !nd.model3d || nd.model3d.variant === m3.variant) return;
+  nd.model3d.options = { ...(m3.options || {}) };
+  const wasCmp = familyOn();
+  store.loadInto(nd);
+  if (_editor) _editor.applyInitialView();
+  if (_viewer) { _viewer._needCam = true; if (wasCmp) toggleFamilyView(true); }
+  flash(`${nd.model3d.variant} — ${nd.name}`);
+}
+// N가지 형태 나란히 보기 (같은 색) — on 생략 시 토글
+function toggleFamilyView(on) {
+  if (!_viewer) return;
+  const cur = store.design.model3d;
+  if (on === undefined) on = !familyOn();
+  if (!on || !cur || !cur.family) { _viewer.setCompare(null); }
+  else {
+    const others = familyVariants(cur.family).filter((v) => v.variant !== cur.variant)
+      .map((v) => ({ design: instantiateTemplate(v.id), title: v.variant }));
+    _viewer.setCompare(others, '', { sameOptions: true });
+    _viewer.compare.family = cur.family;
+    flash('같은 색으로 형태만 다르게 나란히 세웠어요 — 해·시간·지붕 걷기도 함께 적용돼요');
+  }
+  if (_refreshFinish) _refreshFinish();
+  syncVariantBar();
+}
+// 3D 화면 위 형태 바 — 형태가 여러 개인 제품(실물 모델)일 때만
+function syncVariantBar() {
+  const bar = document.getElementById('variant-bar');
+  if (!bar) return;
+  const m3 = store.design && store.design.model3d;
+  const fam = m3 && m3.family ? familyVariants(m3.family) : [];
+  const show = fam.length > 1;   // 3D 화면(stage-3d) 안에 있어 2D 에선 함께 숨겨짐
+  bar.classList.toggle('hidden', !show);
+  if (!show) return;
+  const on = familyOn();
+  const key = fam.map((v) => v.id).join('|') + '#' + m3.variant + '#' + on;
+  if (bar.dataset.key === key) return;
+  bar.dataset.key = key;
+  bar.innerHTML = `<span class="vb-lb">형태</span>${fam.map((v) => `<button type="button" class="vb-btn ${v.variant === m3.variant ? 'on' : ''}" data-tid="${esc(v.id)}" title="${esc(v.summary)}">${esc(v.variant)}</button>`).join('')}
+    <button type="button" class="vb-btn vb-all ${on ? 'on' : ''}">${on ? '나란히 끄기' : `🏘️ ${fam.length}종 나란히`}</button>`;
+  bar.querySelectorAll('.vb-btn[data-tid]').forEach((b) => b.onclick = () => switchVariant(b.dataset.tid));
+  bar.querySelector('.vb-all').onclick = () => toggleFamilyView();
 }
 
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

@@ -93,3 +93,30 @@ create policy "seum log insert (self)" on public.seum_activity_log
 drop policy if exists "seum log read (admin)" on public.seum_activity_log;
 create policy "seum log read (admin)" on public.seum_activity_log
   for select to authenticated using (public.is_seum_admin());
+
+-- 5) 모델 영상 (Supabase Storage) ---------------------------------------------
+-- 홈플래너 관리자 > 🎬 모델 영상 에서 올리는 드론샷 소개 영상 저장소.
+-- 누구나(고객 포함) 재생할 수 있게 공개 읽기, 올리기·바꾸기·지우기는 관리자만.
+-- file_size_limit: 파일 하나 최대 크기(바이트). 무료 플랜은 프로젝트 전체 한도가 50MB 라
+--   더 큰 파일은 Supabase > Project Settings > Storage 의 'Upload file size limit' 도 함께 올려야 함(Pro 플랜).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('planner-videos', 'planner-videos', true, 524288000,
+        array['video/mp4', 'video/webm', 'video/quicktime'])
+on conflict (id) do update set public = true, file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "planner videos read" on storage.objects;
+create policy "planner videos read" on storage.objects
+  for select using (bucket_id = 'planner-videos');
+
+drop policy if exists "planner videos insert (admin)" on storage.objects;
+create policy "planner videos insert (admin)" on storage.objects
+  for insert to authenticated with check (bucket_id = 'planner-videos' and public.is_seum_admin());
+
+drop policy if exists "planner videos update (admin)" on storage.objects;
+create policy "planner videos update (admin)" on storage.objects
+  for update to authenticated using (bucket_id = 'planner-videos' and public.is_seum_admin());
+
+drop policy if exists "planner videos delete (admin)" on storage.objects;
+create policy "planner videos delete (admin)" on storage.objects
+  for delete to authenticated using (bucket_id = 'planner-videos' and public.is_seum_admin());

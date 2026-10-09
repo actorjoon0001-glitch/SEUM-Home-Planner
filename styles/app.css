@@ -627,3 +627,33 @@ body {
 .variant-bar .vb-all { border-left: 1px solid var(--line); border-radius: 0 9px 9px 0; margin-left: 2px; }
 .variant-bar .vb-all.on { background: #fdf2f4; color: #c8102e; }
 @media (max-width: 640px) { .variant-bar { top: auto; bottom: 120px; } .variant-bar .vb-btn { padding: 7px 10px; font-size: 12.5px; } }
+
+/* 🎬 모델 영상 — 카드 ▶ 버튼 · 재생 창 · 관리자 목록 */
+.dash-card .dc-play { position: absolute; right: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: rgba(0,0,0,.62); color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; backdrop-filter: blur(2px); }
+.dash-card .dc-play span { font-size: 11px; }
+.dash-card .dc-play:hover { background: #c8102e; }
+.vp-video { background: #1f2329 !important; color: #fff !important; }
+.vid-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(10,12,16,.82); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.vid-box { width: min(1280px, 100%); background: #000; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.vid-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #15181d; color: #fff; font-size: 14px; }
+.vid-x { border: 0; background: rgba(255,255,255,.12); color: #fff; width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+.vid-x:hover { background: #c8102e; }
+.vid-box video { display: block; width: 100%; max-height: calc(100vh - 120px); background: #000; }
+.vid-list { display: flex; flex-direction: column; gap: 10px; }
+.vid-row { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.vid-ph { width: 132px; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: #eef1f4; flex: none; }
+.vid-ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vid-info { flex: 1; min-width: 0; }
+.vid-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.vid-stat { font-size: 12px; color: var(--muted); margin-top: 4px; word-break: break-all; }
+.vid-prog { position: relative; height: 18px; margin-top: 8px; background: #eef1f4; border-radius: 9px; overflow: hidden; }
+.vid-prog.hidden { display: none; }
+.vid-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #e2384f, #c8102e); transition: width .2s; }
+.vid-pct { position: relative; font-size: 11px; font-weight: 700; color: #3a3f47; padding-left: 8px; line-height: 18px; }
+.vid-acts { display: flex; gap: 6px; flex: none; }
+.vid-btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 12px; font-family: inherit; font-size: 12.5px; font-weight: 600; color: #3a3f47; cursor: pointer; white-space: nowrap; }
+.vid-btn:hover { border-color: #c9ccd0; }
+.vid-btn.primary { background: #c8102e; border-color: #c8102e; color: #fff; }
+.vid-btn.danger { color: #c8102e; border-color: #e6b3ba; }
+.vid-btn:disabled { opacity: .5; cursor: default; }
+@media (max-width: 640px) { .vid-row { flex-wrap: wrap; } .vid-ph { width: 96px; } .vid-acts { width: 100%; justify-content: flex-end; } }

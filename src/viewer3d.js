@@ -550,7 +550,8 @@ export class Viewer3D {
     const mainBox = new THREE.Box3().setFromObject(house);
     if (!c || mainBox.isEmpty()) return this._syncCmpLabels();
     const top = (bx) => new THREE.Vector3((bx.min.x + bx.max.x) / 2, bx.max.y + 700, (bx.min.z + bx.max.z) / 2);
-    const labels = [{ pos: top(mainBox), text: (store.design.name || '현재 도면').trim() }], lamps = [];
+    const m3 = store.design.model3d;   // 같은 제품 형태 비교면 이름표도 '기본형'처럼 짧게
+    const labels = [{ pos: top(mainBox), text: c.family && m3 && m3.variant ? m3.variant : (store.design.name || '현재 도면').trim() }], lamps = [];
     const all = mainBox.clone();
     let edge = mainBox.max.x;
     const gap = 4000;

@@ -146,7 +146,11 @@ for o in list(bpy.data.objects):
 #   · 창·문 위 인방 아랫면처럼 좁은 면(폭 0.5m 이하)은 남김
 #   · 평평한 윗덮개는 벽 두께(--ceiling-wall)만큼 가장자리를 남기고, 안쪽 천장 높이까지 턱을 내려 벽 윗면을 막음
 #     (덮개를 통째로 떼면 벽 두께 속이 비어 보임)
-CEIL_PREFIX = tuple(p.strip() for p in A.ceiling_split.split(',') if p.strip())
+# 항목마다 '이름:높이' 로 따로 줄 수 있음 (2층 구조: 1층 천장 2.6m, 2층 천장 5.5m 등). 높이 없으면 --ceiling-z
+CEIL_Z = {}
+for _p in [p.strip() for p in A.ceiling_split.split(',') if p.strip()]:
+    _n, _, _z = _p.partition(':'); CEIL_Z[_n] = float(_z) if _z else A.ceiling_z
+CEIL_PREFIX = tuple(CEIL_Z)
 if CEIL_PREFIX:
     import bmesh
     for o in [o for o in bpy.data.objects if o.type == 'MESH' and o.name.startswith(CEIL_PREFIX)]:
@@ -157,9 +161,10 @@ if CEIL_PREFIX:
             return (min(w.z for w in ws), max(w.z for w in ws), min(w.x for w in ws), max(w.x for w in ws),
                     min(w.y for w in ws), max(w.y for w in ws), (R @ f.normal).normalized().z)
         top = []
+        cz = next(CEIL_Z[k] for k in CEIL_PREFIX if o.name.startswith(k))
         for f in bm.faces:
             z0, z1, x0, x1, y0, y1, nz = info(f)
-            if z0 >= A.ceiling_z and abs(nz) > 0.3 and min(x1 - x0, y1 - y0) > 0.5: top.append(f)
+            if z0 >= cz and abs(nz) > 0.3 and min(x1 - x0, y1 - y0) > 0.5: top.append(f)
         if not top or len(top) == len(bm.faces): bm.free(); continue
         downs = [info(f) for f in top if info(f)[6] < -0.3]
         flat_up = [f for f in top if info(f)[6] > 0.995]   # 경사 덮개(박공)는 통째로 뗌

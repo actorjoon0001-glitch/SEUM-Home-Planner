@@ -74,7 +74,7 @@ for o in sc.objects: o.matrix_world = _mw[o]
 vl.update()
 if _anim: print("애니메이션 고정: 프레임", sc.frame_current, "부품", len(_anim))
 # 다른 장면 전용 부품은 위치를 굳힌 다음에 지움 (장면에 안 보이는 리그가 부모일 수 있어 먼저 지우면 부품이 튐)
-_keep = set(sc.objects)
+_keep = set(vl.objects)   # 뷰 레이어에서 제외(체크 해제)한 컬렉션의 부품도 빠짐
 _gone = [o for o in bpy.data.objects if o not in _keep]
 for o in _gone: bpy.data.objects.remove(o, do_unlink=True)
 if _gone: print("다른 장면 부품 제외:", len(_gone))

@@ -12,6 +12,7 @@ import { swatchDataURL, extKind, ROTATABLE } from './textures.js';
 import { initAiChat } from './aichat.js';
 import { initFacePaint } from './facepaint.js';
 import { openPhotoRender } from './photoRender.js';
+import { loadPanos, panosOf, openPano } from './pano.js';
 import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
@@ -206,7 +207,7 @@ function enterEditor(loadFn) {
 }
 // onDelete: 휴지통으로 보내기(관리자) — { hard: true } 면 이 기기 저장처럼 바로 삭제
 // photo: 대표 사진(온라인 카탈로그와 같은 이미지) — 있으면 도면 미리보기 대신 사진 / code: 카탈로그 모델명
-function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null, photo = null, code = null, codeNote = null, video = null } = {}) {
+function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMove = null, photo = null, code = null, codeNote = null, video = null, pano = null } = {}) {
   const card = document.createElement('div');
   card.className = 'dash-card' + (photo ? ' dc-has-photo' : '');
   if (photo) {
@@ -219,6 +220,12 @@ function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMov
       pb.innerHTML = '<span>▶</span> 영상';
       pb.onclick = (e) => { e.stopPropagation(); openVideo(video.url, (code ? code + ' · ' : '') + name); };
       ph.appendChild(pb);
+    }
+    if (pano) {    // 📷 360 실사 — 카탈로그에 올린 360 카메라 사진으로 실내 둘러보기
+      const qb = document.createElement('button'); qb.type = 'button'; qb.className = 'dc-pano'; qb.title = '전시장 실내 360° 실사 사진 둘러보기';
+      qb.innerHTML = '<span>360°</span> 실사';
+      qb.onclick = (e) => { e.stopPropagation(); openPano(pano, (code ? code + ' · ' : '') + name); };
+      ph.appendChild(qb);
     }
     card.appendChild(ph);
   }
@@ -343,7 +350,7 @@ async function renderDash() {
     //   관리자가 휴지통에 넣은 내장 템플릿은 숨김 (설정 행의 trashedBuiltin / deletedBuiltin)
     const items = [];
     const hidden = await builtinHidden();
-    await loadVideos();                                // 모델 영상(관리자가 올린 드론샷) — 카드 ▶ 버튼
+    await Promise.all([loadVideos(), loadPanos()]);   // 모델 영상(관리자가 올린 드론샷) ▶ · 카탈로그 360 실사 📷
     const overrides = await builtinShowroomMap();     // 내장 템플릿 전시장 이동 override
     const known = await knownShowrooms();             // 사용자가 만든 전시장(빈 전시장도 표시)
     // 도면을 특정 전시장으로 이동 실행 (apply 는 항목별 저장 함수) — 드래그·버튼 공용
@@ -402,7 +409,7 @@ async function renderDash() {
       for (const it of groups[room]) {
         const card = projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del, {
           onMove: admin ? () => moveByPrompt(it.apply, it.showroom) : null,
-          photo: it.photo, code: it.code, codeNote: it.codeNote, video: it.tid ? videoOf(it.tid) : null,
+          photo: it.photo, code: it.code, codeNote: it.codeNote, video: it.tid ? videoOf(it.tid) : null, pano: it.code && !it.codeNote ? panosOf(it.code) : null,
         });
         if (admin) {
           card.draggable = true;
@@ -643,6 +650,17 @@ function syncVideoBtn() {
   const v = videoOf(tid);
   b.classList.toggle('hidden', !v);
   if (v) b.onclick = () => { const t = listTemplates().find((x) => x.id === tid); openVideo(v.url, t ? (t.code ? t.code + ' · ' : '') + t.title : ''); };
+}
+
+// 3D 화면 '📷 360 실사' — 지금 도면이 카탈로그에 360 사진이 있는 전시 모델이면 표시
+//   (쌍둥이 ㄱ자·2층처럼 변형 모델은 사진이 원형과 달라 숨김)
+function syncPanoBtn() {
+  const b = document.getElementById('view-pano'); if (!b) return;
+  const tid = templateIdOf(store.design);
+  const t = tid ? listTemplates().find((x) => x.id === tid) : null;
+  const list = t && t.code && !t.codeNote ? panosOf(t.code) : null;
+  b.classList.toggle('hidden', !list);
+  if (list) b.onclick = () => openPano(list, (t.code ? t.code + ' · ' : '') + t.title);
 }
 
 // 접속 기록 — 시각(KST) 포맷 + 기기(UA) 라벨
@@ -2056,6 +2074,8 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   store.subscribe(syncFloorTabs); syncFloorTabs();
   store.subscribe(syncVariantBar);
   store.subscribe(syncVideoBtn);
+  store.subscribe(syncPanoBtn);
+  loadPanos().then(syncPanoBtn);   // 카탈로그 360 사진 목록 — 받으면 📷 버튼 표시
   loadVideos();   // 모델 영상 목록(설정 행) — 다 받으면 🎬 버튼 표시
   refreshUndo();
 

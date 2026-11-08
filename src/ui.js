@@ -13,6 +13,7 @@ import { initAiChat } from './aichat.js';
 import { initFacePaint } from './facepaint.js';
 import { openPhotoRender } from './photoRender.js';
 import { loadPanos, panosOf, openPano, panoRooms } from './pano.js';
+import { loadCatalogMaterials, catalogMaterials, catalogPick, catalogLabel } from './catalogMats.js';
 import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
@@ -1410,7 +1411,8 @@ function buildFinish() {
     <div id="fin-product" class="hidden"></div>
     <div id="fin-generic">
     <div class="fin-search"><input id="fin-q" type="text" placeholder="🔍 마감재 검색 (예: 벽돌, 목재)"></div>
-    <div class="tool-group-label">외장재 (벽 마감)</div>
+    <div id="fin-cat"></div>
+    <div class="tool-group-label" style="margin-top:12px">외장재 (벽 마감) <small class="muted">기본 질감</small></div>
     <div class="mat-grid" id="fin-ext"></div>
     <div id="fin-dir-wrap">
       <div class="tool-group-label" style="margin-top:12px">사이딩 시공 방향</div>
@@ -1481,10 +1483,38 @@ function buildFinish() {
           return `<div class="tool-group-label" style="margin-top:10px">${esc(set.label)} <small class="muted">${esc(cur.label)}</small></div>
             <div class="po-row">${set.choices.map((c) => `<button type="button" class="po-chip ${c.id === cur.id ? 'on' : ''}" data-k="${esc(set.key)}" data-id="${esc(c.id)}" title="${esc(c.label)}">
               <span class="po-sw" style="background:${sw(c)}"></span><span class="po-lb">${esc(c.label)}</span></button>`).join('')}</div>`;
-        }).join('')}`;
+        }).join('')}
+        <div id="po-cat"></div>`;
       prodEl.querySelectorAll('.po-chip').forEach((b) => b.onclick = () => {
-        store.commit((dd) => { if (dd.model3d) dd.model3d.options = { ...(dd.model3d.options || {}), [b.dataset.k]: b.dataset.id }; });
+        store.commit((dd) => {
+          if (!dd.model3d) return;
+          dd.model3d.options = { ...(dd.model3d.options || {}), [b.dataset.k]: b.dataset.id };
+          if (dd.model3d.catalogMats) { const cm = { ...dd.model3d.catalogMats }; delete cm[b.dataset.k]; dd.model3d.catalogMats = cm; }   // 색을 고르면 카탈로그 외장재 해제
+        });
       });
+      // 🧱 실제 외장재(카탈로그) — 외장·포인트 벽에 실제 자재 사진을 입힘
+      const tsets = m3.optionSets.filter((st) => st.key === 'wall' || st.key === 'accent');
+      const catEl = prodEl.querySelector('#po-cat');
+      if (tsets.length && catEl) {
+        if (!tsets.some((st) => st.key === _catTarget)) _catTarget = tsets[0].key;
+        const cms = m3.catalogMats || {};
+        // 고른 자재가 있는 쪽은 색 칩 대신 자재 이름 표시
+        tsets.forEach((st) => { if (cms[st.key]) {
+          const lb = [...prodEl.querySelectorAll('.tool-group-label')].find((x) => x.textContent.startsWith(st.label));
+          if (lb) { lb.querySelector('small').textContent = '🧱 ' + catalogLabel(cms[st.key]); lb.nextElementSibling.querySelectorAll('.po-chip').forEach((x) => x.classList.remove('on')); }
+        } });
+        renderCatalogPicker(catEl, {
+          targets: tsets.map((st) => ({ key: st.key, label: st.label })), target: _catTarget,
+          onTarget: (k) => { _catTarget = k; renderCards(); },
+          cur: cms[_catTarget] || null, origLabel: '블렌더 원래 마감(색 옵션)',
+          set: (pick) => store.commit((dd) => {
+            if (!dd.model3d) return;
+            const cm = { ...(dd.model3d.catalogMats || {}) };
+            if (pick) cm[_catTarget] = pick; else delete cm[_catTarget];
+            dd.model3d.catalogMats = cm;
+          }),
+        });
+      }
       prodEl.querySelectorAll('.po-var').forEach((b) => b.onclick = () => switchVariant(b.dataset.tid));
       const allBtn = prodEl.querySelector('#po-all');
       if (allBtn) allBtn.onclick = () => toggleFamilyView();
@@ -1497,9 +1527,16 @@ function buildFinish() {
       `<button class="mat-card ${k === ex.material ? 'on' : ''}" data-mat="${k}">
         <img class="mat-thumb" src="${extThumb(k, ex.dir)}" alt=""><span class="mat-name">${l}</span></button>`).join('')
       || `<p class="panel-sub small">검색 결과가 없습니다.</p>`;
+    if (ex.catalog) extEl.querySelectorAll('.mat-card').forEach((b) => b.classList.remove('on'));   // 카탈로그 자재가 우선
     extEl.querySelectorAll('.mat-card').forEach((b) => b.onclick = () => {
-      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.material = b.dataset.mat; dd.exterior.color = EXTERIOR_MATERIALS[b.dataset.mat].color; });
+      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.material = b.dataset.mat; dd.exterior.color = EXTERIOR_MATERIALS[b.dataset.mat].color; delete dd.exterior.catalog; });
       showExterior();
+    });
+    // 🧱 실제 취급 외장재(온라인 카탈로그) — 고르면 벽 전체에 실제 자재 사진
+    const finCat = wrap.querySelector('#fin-cat');
+    if (finCat) renderCatalogPicker(finCat, {
+      cur: ex.catalog || null, origLabel: '기본 질감', query,
+      set: (pick) => { store.commit((dd) => { dd.exterior = dd.exterior || {}; if (pick) dd.exterior.catalog = pick; else delete dd.exterior.catalog; }); showExterior(); },
     });
     // 시공 방향(가로/세로) — 가로 줄 사이딩(메탈·시멘트·세라믹)일 때만 표시
     const dirWrap = wrap.querySelector('#fin-dir-wrap');
@@ -1544,7 +1581,7 @@ function buildFinish() {
     const exSw = wrap.querySelector('#fin-ex-sw');
     exSw.innerHTML = EXTERIOR_PALETTE.map((c) => `<button class="sw ${c === ex.color ? 'on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('');
     exSw.querySelectorAll('.sw').forEach((b) => b.onclick = () => {
-      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.color = b.dataset.c; }); showExterior();
+      store.commit((dd) => { dd.exterior = dd.exterior || {}; dd.exterior.color = b.dataset.c; delete dd.exterior.catalog; }); showExterior();
     });
     wrap.querySelectorAll('#fin-ridge .seg-btn').forEach((b) => {
       b.classList.toggle('active', (effRoof.ridge === 'x' ? 'x' : 'z') === b.dataset.ridge);
@@ -1603,6 +1640,64 @@ function buildFinish() {
   renderCards();
   store.subscribe(renderCards);
   _refreshFinish = renderCards;   // 실물 모델 켜짐/꺼짐이 바뀌면 다시 그림
+  loadCatalogMaterials().then(() => renderCards());   // 카탈로그 외장재 목록 받으면 다시 그림
+}
+
+// ── 🧱 실제 취급 외장재 고르기 (온라인 카탈로그) ─────────────────────
+//   opt: { targets?, target?, onTarget?, cur, origLabel, set(pick|null), query? }
+let _catTarget = 'wall';
+let _catQ = '';
+function renderCatalogPicker(el, opt) {
+  const all = catalogMaterials();
+  if (!all.length) { el.innerHTML = ''; return; }
+  const cur = opt.cur;
+  const short = (n) => (/\(([^)]+)\)/.exec(n) || [])[1] || n;   // '메탈사이딩(롱스톤)' → '롱스톤'
+  // 카드 표시: 'ST-01-001(화이트)' → 품번 ST-01-001 / '화이트 롱스톤', '디렉톤_실크화이트(NW3641K)' → NW3641K / '디렉톤 실크화이트'
+  const parts = (it) => {
+    const m = /^([^(]*)(?:\(([^)]*)\)?)?/.exec(it.code || '') || [];
+    const a = (m[1] || '').trim(), p = (m[2] || '').trim();
+    if (/^[A-Z]{2,}\d/.test(p)) return { code: p, color: a.replace(/_/g, ' ') };   // 세라믹: 이름(품번)
+    return { code: a || p || short(it.name), color: a ? (p ? `${p} ${short(it.name)}` : short(it.name)) : short(it.name) };
+  };
+  const codeOf = (it) => parts(it).code;
+  const colorOf = (it) => parts(it).color;
+  el.innerHTML = `
+    <div class="cm-box">
+      <div class="cm-head">🧱 실제 외장재 <small>온라인 카탈로그 ${all.length}종</small></div>
+      <p class="panel-sub small" style="margin:2px 0 8px">세움이 실제 시공하는 자재 사진을 벽에 그대로 입혀요.</p>
+      ${opt.targets && opt.targets.length > 1 ? `<div class="seg cm-tgt">${opt.targets.map((t) => `<button type="button" class="seg-btn ${t.key === opt.target ? 'active' : ''}" data-k="${esc(t.key)}">${esc(t.label)}</button>`).join('')}</div>` : ''}
+      <div class="cm-cur">${cur ? `<img src="${esc(cur.image)}" alt=""><span><b>${esc(cur.code || '')}</b><br><small>${esc(cur.name)}${cur.spec ? ' · ' + esc(cur.spec) : ''}</small></span><button type="button" class="cm-reset" title="카탈로그 자재 빼고 원래대로">원래대로</button>`
+        : `<span class="muted small">지금: ${esc(opt.origLabel || '기본')}</span>`}</div>
+      ${cur ? `<div class="cm-scale"><span>무늬 크기</span><input type="range" min="0.4" max="2.5" step="0.05" value="${+cur.scale || 1}"><b>${Math.round((+cur.scale || 1) * 100)}%</b></div>` : ''}
+      <input class="cm-q" type="text" placeholder="🔍 자재 검색 (예: 롱스톤, 우드, 그레이)" value="${esc(_catQ)}">
+      <div class="cm-grid"></div>
+    </div>`;
+  const grid = el.querySelector('.cm-grid');
+  const drawGrid = () => {
+    const q = (_catQ || opt.query || '').trim();
+    const list = all.filter((it) => !q || `${it.name} ${it.code} ${it.spec}`.includes(q));
+    grid.innerHTML = list.map((it) => `<button type="button" class="cm-card ${cur && cur.id === it.id ? 'on' : ''}" data-id="${esc(it.id)}" title="${esc(it.name)} ${esc(it.code)} ${esc(it.spec)}">
+        <img src="${esc(it.image)}" alt="" loading="lazy" draggable="false">
+        ${/세로/.test(it.spec) ? '<i class="cm-v">세로</i>' : ''}
+        <span class="cm-c">${esc(codeOf(it))}</span><span class="cm-n">${esc(colorOf(it) || short(it.name))}</span></button>`).join('')
+      || '<p class="panel-sub small">검색 결과가 없습니다.</p>';
+    grid.querySelectorAll('.cm-card').forEach((b) => { b.onclick = () => {
+      const it = all.find((x) => x.id === b.dataset.id); if (!it) return;
+      opt.set(catalogPick(it, cur && cur.id === it.id ? cur.scale : 1));
+      if (_viewer && !_viewer.active && _dash && _dash.onModeChange) _dash.onModeChange('3d');
+    }; });
+  };
+  drawGrid();
+  const qi = el.querySelector('.cm-q');
+  qi.oninput = () => { _catQ = qi.value; drawGrid(); };
+  el.querySelectorAll('.cm-tgt .seg-btn').forEach((b) => { b.onclick = () => opt.onTarget && opt.onTarget(b.dataset.k); });
+  const rs = el.querySelector('.cm-reset'); if (rs) rs.onclick = () => opt.set(null);
+  const sl = el.querySelector('.cm-scale input');
+  if (sl) {
+    const lab = el.querySelector('.cm-scale b');
+    sl.oninput = () => { lab.textContent = Math.round(+sl.value * 100) + '%'; };
+    sl.onchange = () => opt.set({ ...cur, scale: +sl.value });
+  }
 }
 
 function openingForm(o) {

@@ -699,3 +699,31 @@ body {
 .pr-btn:hover small { background: rgba(255,255,255,.25); color: #fff; }
 #stage-3d.has-pano-rooms .stage-hint { display: none; }
 @media (max-width: 900px) { .pano-rooms { left: 12px; right: 12px; bottom: 50px; justify-content: flex-start; } .pr-btn { height: 30px; padding: 0 10px; font-size: 12px; } .pr-tag { height: 30px; } }
+
+/* 🧱 실제 외장재(온라인 카탈로그) 고르기 */
+.cm-box { margin: 14px 0 4px; padding: 12px; border: 1px solid #ece3e5; border-radius: 12px; background: #fffafa; }
+.cm-head { font-size: 13.5px; font-weight: 800; color: #23272e; }
+.cm-head small { font-size: 11px; font-weight: 600; color: #c8102e; margin-left: 4px; }
+.cm-tgt { margin-bottom: 8px; flex-wrap: wrap; }
+.cm-cur { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px; border-radius: 9px; background: #fff; border: 1px solid #eceef1; margin-bottom: 8px; }
+.cm-cur img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex: none; }
+.cm-cur span { flex: 1; min-width: 0; font-size: 12px; line-height: 1.35; }
+.cm-cur small { color: #6b7079; }
+.cm-reset { flex: none; border: 1px solid #e3e5e9; background: #fff; border-radius: 7px; padding: 5px 8px; font-family: inherit; font-size: 11.5px; cursor: pointer; }
+.cm-reset:hover { border-color: #c8102e; color: #c8102e; }
+.cm-scale { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 8px; }
+.cm-scale span { flex: none; white-space: nowrap; }
+.cm-scale input { min-width: 0; }
+.cm-scale input { flex: 1; }
+.cm-scale b { width: 38px; text-align: right; font-size: 11.5px; }
+.cm-q { width: 100%; box-sizing: border-box; height: 32px; border: 1px solid #e3e5e9; border-radius: 8px; padding: 0 10px; font-family: inherit; font-size: 12.5px; margin-bottom: 8px; }
+.cm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-height: 340px; overflow-y: auto; padding-right: 2px; }
+.cm-card { position: relative; padding: 0; border: 2px solid transparent; border-radius: 9px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px #e6e8eb; cursor: pointer; text-align: left; font-family: inherit; }
+.cm-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: #eef1f4; }
+.cm-card .cm-c { display: block; padding: 3px 4px 0; font-size: 10px; letter-spacing: -.2px; font-weight: 800; color: #c8102e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-card .cm-n { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding: 0 4px 4px; font-size: 10.5px; line-height: 1.3; min-height: 2.6em; color: #4a4f57; overflow: hidden; word-break: keep-all; }
+.cm-card .cm-v { position: absolute; top: 4px; right: 4px; font-style: normal; font-size: 9.5px; font-weight: 700; background: rgba(0,0,0,.6); color: #fff; padding: 1px 5px; border-radius: 6px; }
+.cm-card:hover { box-shadow: 0 0 0 1px #c8102e; }
+.cm-card.on { border-color: #c8102e; }
+/* 마감재 패널 안의 숨김 처리 (실물 모델이면 일반 마감재 숨김 · 세로 시공/지붕 대상 선택 등) */
+#finish-body .hidden { display: none !important; }

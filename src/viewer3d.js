@@ -13,6 +13,7 @@ import { store } from './store.js';
 import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES, model3dSig } from './data.js';
 import { rotateRoomsInDesign, moveRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 import * as TEX from './textures.js';
+import { catalogWallMaterial, setCatalogTexHook } from './catalogMats.js';
 TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 (2D UI 는 three 의존 제거됨)
 
 const WALL_T = 100; // 벽 두께 mm
@@ -35,6 +36,7 @@ export class Viewer3D {
     this.container = container;
     this.active = false;
     this.dirty = true;
+    setCatalogTexHook(() => { this.dirty = true; });   // 카탈로그 외장재 사진이 받아지면 다시 그림
 
     this.scene = new THREE.Scene();
     this.scene.background = this._skyTexture();
@@ -562,7 +564,7 @@ export class Viewer3D {
       if (!it.node || it.url !== spec.url) { it.node = this._cloneModel3d(src); it.url = spec.url; }
       const node = it.node;
       const optD = c.sameOptions && store.design.model3d
-        ? { ...it.design, model3d: { ...it.design.model3d, options: store.design.model3d.options || {} } } : it.design;
+        ? { ...it.design, model3d: { ...it.design.model3d, options: store.design.model3d.options || {}, catalogMats: store.design.model3d.catalogMats || {} } } : it.design;
       this._applyModel3dOptions(node, optD);
       node.traverse((o) => this._m3dVis(o, true));
       node.position.set(0, 0, 0); node.updateMatrixWorld(true);
@@ -641,9 +643,10 @@ export class Viewer3D {
   // 제품 옵션(model3d.optionSets) → 실물 모델 부품에 적용. 고른 게 없으면(orig) 블렌더 원래 마감 그대로
   _applyModel3dOptions(node, d) {
     const m = d.model3d, sel = m.options || {}, byPart = new Map();
+    const cms = m.catalogMats || {};           // 🧱 카탈로그 실제 외장재 (외장·포인트 벽) — 색 옵션보다 우선
     const flat = new Set(m.flatParts || []);   // 가는 부품(루버 날개)이라 구운 무늬가 조각나 보이는 재질 → 평균색 단색
     for (const set of m.optionSets || []) {
-      const ch = set.choices.find((c) => c.id === sel[set.key]) || set.choices[0];
+      const ch = cms[set.key] ? { id: 'cat', cat: cms[set.key] } : (set.choices.find((c) => c.id === sel[set.key]) || set.choices[0]);
       for (const part of set.parts) byPart.set(part, { set, ch });
     }
     node.traverse((o) => {
@@ -653,6 +656,7 @@ export class Viewer3D {
       const hit = byPart.get(o.name) || (o.name.startsWith('2층_') ? byPart.get(o.name.slice(3)) : null);   // 2층 부품도 같은 옵션
       const base = flat.has(o.name) && u.m3dOrig.map ? this._m3dCached(u.m3dOrig.uuid + '|flat', () => this._m3dFlat(u.m3dOrig)) : u.m3dOrig;
       o.material = (!hit || hit.ch.id === 'orig') ? base
+        : hit.ch.cat ? catalogWallMaterial(hit.ch.cat, u.m3dOrig.side)
         : this._m3dCached(base.uuid + '|' + hit.set.key + '|' + hit.ch.id, () => this._m3dVariant(base, hit.ch));
     });
   }
@@ -1317,8 +1321,10 @@ export class Viewer3D {
             const C2 = [a[0] + (c[0] - a[0]) * ub, a[1] + (c[1] - a[1]) * ub];
             // 개구부는 '원래 외벽선'에서 찾고 마감 박스만 off 만큼 평행이동 → 겹침 없이 창/문 구멍 유지.
             //   구간 이음매(내부 경계)는 끝 연장 0, 진짜 모서리(0/1)만 T 만큼 연장해 코너를 메움.
+            const useCat = ex.catalog && !cover && !(fo && (fo.material || fo.color));   // 면별 지정이 없는 면은 카탈로그 자재
             this._buildCarvedEdge(A2, C2, H, T, 0, b,
-              (segLen, h) => TEX.exteriorMaterial(segMat, segCol, segLen, h, sDef.roughness, sDef.metalness, ex.dir),
+              useCat ? () => catalogWallMaterial(ex.catalog)
+                : (segLen, h) => TEX.exteriorMaterial(segMat, segCol, segLen, h, sDef.roughness, sDef.metalness, ex.dir),
               { shift: [nx * off, nz * off], tol: off + 350, userData: { extFace: key },
                 extA: ua <= 0.0001 ? T : 0, extB: ub >= 0.9999 ? T : 0 });
           }
@@ -1332,7 +1338,8 @@ export class Viewer3D {
     const rooms = d.rooms.filter((r) => !OPEN_ROOM_TYPES.includes(r.type));
     const inAnyRoom = (x, y) => rooms.some((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.d);
 
-    const mat = (len, h) => TEX.exteriorMaterial(ex.material, col, len, h, mDef.roughness, mDef.metalness, ex.dir);
+    const mat = ex.catalog ? () => catalogWallMaterial(ex.catalog)
+      : (len, h) => TEX.exteriorMaterial(ex.material, col, len, h, mDef.roughness, mDef.metalness, ex.dir);
     // 한 외벽에 외장 마감을 입힘 — 창/문 개구부 자리는 비워(뚫어) 둠
     const cladEdge = (r, side, wallH) => {
       const [px, pz] = this._p(r.x, r.y, b);
@@ -1507,11 +1514,12 @@ export class Viewer3D {
     const ex = d.exterior || {};
     const exDef = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.cement;
     const fillMat = (len, h) => this.showExterior
-      ? TEX.exteriorMaterial(ex.material || 'cement', ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness, ex.dir)
+      ? (ex.catalog ? catalogWallMaterial(ex.catalog) : TEX.exteriorMaterial(ex.material || 'cement', ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness, ex.dir))
       : this._wallMat();
     // 박공 삼각면 재질 — 지붕별 gableColor 지정 시 그 색으로(외장재 질감 유지), 없으면 외장과 동일
     const gableCol = roof.gableColor || null;
     const gableMat = (len, h) => {
+      if (this.showExterior && ex.catalog && !gableCol) return catalogWallMaterial(ex.catalog);
       if (this.showExterior) return TEX.exteriorMaterial(ex.material || 'cement', gableCol || ex.color || exDef.color, len, h, exDef.roughness, exDef.metalness, ex.dir);
       return gableCol ? new THREE.MeshStandardMaterial({ color: gableCol, roughness: 0.85 }) : this._wallMat();
     };

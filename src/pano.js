@@ -3,10 +3,7 @@
 //     → 카탈로그 관리자에서 360 사진을 올리면 홈플래너에도 자동으로 나타남
 //   · 뷰어: three.js 구(球) 안쪽에 등장방형(equirectangular) 사진을 입혀 드래그로 둘러보기
 import * as THREE from 'three';
-
-const CATALOG_URL = 'https://aypugjvzvwinnmpquguj.supabase.co';
-// 카탈로그 공개(anon) 키 — 카탈로그 사이트(js/supabase-config.js)에 이미 공개된 읽기 전용 키
-const CATALOG_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5cHVnanZ6dndpbm5tcHF1Z3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NjQ0ODIsImV4cCI6MjA4OTE0MDQ4Mn0.yLBG31-8VGWai9Rpv9RtVxZwwWMsKI_syGs0QN7PkUU';
+import { catalogGet, catalogThumb } from './catalog.js';
 
 let _panos = null;      // { 모델명(대문자): [{ url, label }] }
 let _loading = null;
@@ -16,12 +13,7 @@ const norm = (s) => String(s || '').trim().toUpperCase();
 export function loadPanos(force) {
   if (_panos && !force) return Promise.resolve(_panos);
   if (_loading && !force) return _loading;
-  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = setTimeout(() => { try { ctl && ctl.abort(); } catch { /* noop */ } }, 6000);
-  _loading = fetch(`${CATALOG_URL}/rest/v1/models?select=name,slug,panorama_images`, {
-    headers: { apikey: CATALOG_KEY, Authorization: `Bearer ${CATALOG_KEY}` },
-    signal: ctl ? ctl.signal : undefined,
-  }).then((r) => (r.ok ? r.json() : []))
+  _loading = catalogGet('models?select=name,slug,panorama_images')
     .then((rows) => {
       const map = {};
       for (const r of rows || []) {
@@ -34,7 +26,7 @@ export function loadPanos(force) {
       return map;
     })
     .catch(() => (_panos = _panos || {}))
-    .finally(() => { clearTimeout(timer); _loading = null; });
+    .finally(() => { _loading = null; });
   return _loading;
 }
 
@@ -64,11 +56,7 @@ export function panoRooms(list) {
 
 export function panosOf(code) { return (code && _panos && _panos[norm(code)]) || null; }
 
-// 탭용 작은 미리보기 — Supabase 이미지 변환(render) 주소로 바꿔 가볍게
-function thumbOf(url) {
-  const m = /\/storage\/v1\/object\/public\/(.+)$/.exec(url);
-  return m ? `${CATALOG_URL}/storage/v1/render/image/public/${m[1]}?width=240&height=120&resize=cover&quality=60` : url;
-}
+const thumbOf = (url) => catalogThumb(url, 240, 120);   // 탭용 작은 미리보기
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

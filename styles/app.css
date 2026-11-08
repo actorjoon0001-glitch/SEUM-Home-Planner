@@ -657,3 +657,33 @@ body {
 .vid-btn.danger { color: #c8102e; border-color: #e6b3ba; }
 .vid-btn:disabled { opacity: .5; cursor: default; }
 @media (max-width: 640px) { .vid-row { flex-wrap: wrap; } .vid-ph { width: 96px; } .vid-acts { width: 100%; justify-content: flex-end; } }
+
+/* 📷 360 실사 — 카드 버튼 · 3D 버튼 · 둘러보기 창 */
+.dash-card .dc-pano { position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: rgba(0,0,0,.62); color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; backdrop-filter: blur(2px); }
+.dash-card .dc-pano span { font-size: 11px; color: #ffd36b; }
+.dash-card .dc-pano:hover { background: #c8102e; }
+.vp-pano { background: #0f5b46 !important; color: #fff !important; }
+.pano-overlay { position: fixed; inset: 0; z-index: 9999; background: #0b0d10; display: flex; flex-direction: column; color: #fff; }
+.pano-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #15181d; font-size: 14px; flex: none; }
+.pano-head b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pano-cur { font-size: 12.5px; color: #aeb4bd; white-space: nowrap; }
+.pano-sp { flex: 1; }
+.pano-btn { border: 0; background: rgba(255,255,255,.12); color: #fff; height: 32px; min-width: 32px; padding: 0 10px; border-radius: 8px; font-family: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.pano-btn:hover { background: rgba(255,255,255,.22); }
+.pano-btn.on { background: #0f5b46; }
+.pano-x:hover { background: #c8102e; }
+.pano-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.pano-stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.pano-stage canvas:active { cursor: grabbing; }
+.pano-load { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); background: rgba(0,0,0,.6); padding: 10px 16px; border-radius: 10px; font-size: 13px; pointer-events: none; }
+.pano-load.hidden { display: none; }
+.pano-hint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(0,0,0,.45); padding: 5px 12px; border-radius: 14px; font-size: 12px; color: #dfe3e8; pointer-events: none; white-space: nowrap; }
+.pano-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border: 0; border-radius: 10px; background: rgba(0,0,0,.4); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; }
+.pano-nav:hover { background: rgba(0,0,0,.65); }
+.pano-prev { left: 12px; } .pano-next { right: 12px; }
+.pano-tabs { display: flex; gap: 8px; padding: 10px 12px; background: #15181d; overflow-x: auto; flex: none; scrollbar-width: thin; }
+.pano-tab { flex: none; width: 128px; padding: 0; border: 2px solid transparent; border-radius: 9px; overflow: hidden; background: #22262d; color: #dfe3e8; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; text-align: left; }
+.pano-tab img { display: block; width: 100%; height: 56px; object-fit: cover; background: #2b3038; }
+.pano-tab span { display: block; padding: 4px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pano-tab.on { border-color: #ffd36b; color: #fff; }
+@media (max-width: 640px) { .pano-tab { width: 96px; } .pano-tab img { height: 44px; } .pano-hint { display: none; } .pano-auto { display: none; } .pano-nav { width: 36px; height: 52px; font-size: 24px; } }

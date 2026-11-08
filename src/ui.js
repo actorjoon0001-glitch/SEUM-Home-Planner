@@ -12,7 +12,7 @@ import { swatchDataURL, extKind, ROTATABLE } from './textures.js';
 import { initAiChat } from './aichat.js';
 import { initFacePaint } from './facepaint.js';
 import { openPhotoRender } from './photoRender.js';
-import { loadPanos, panosOf, openPano } from './pano.js';
+import { loadPanos, panosOf, openPano, panoRooms } from './pano.js';
 import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
@@ -660,7 +660,20 @@ function syncPanoBtn() {
   const t = tid ? listTemplates().find((x) => x.id === tid) : null;
   const list = t && t.code && !t.codeNote ? panosOf(t.code) : null;
   b.classList.toggle('hidden', !list);
-  if (list) b.onclick = () => openPano(list, (t.code ? t.code + ' · ' : '') + t.title);
+  const title = t ? (t.code ? t.code + ' · ' : '') + t.title : '';
+  if (list) b.onclick = () => openPano(list, title);
+  // 3D 아래 '공간별 360' 버튼 줄 — 거실·주방·안방… 누르면 그 공간 360 사진으로 바로
+  const bar = document.getElementById('pano-rooms'); if (!bar) return;
+  const rooms = list ? panoRooms(list) : [];
+  const sig = rooms.length ? tid + '|' + rooms.map((r) => r.room + r.start).join(',') : '';
+  if (bar.dataset.sig !== sig) {
+    bar.dataset.sig = sig;
+    bar.innerHTML = rooms.length ? `<span class="pr-tag">360°</span>` + rooms.map((r) =>
+      `<button type="button" class="pr-btn" data-i="${r.start}" title="${esc(r.room)} 360° 실사로 들어가기">${esc(r.room)}${r.count > 1 ? `<small>${r.count}</small>` : ''}</button>`).join('') : '';
+    bar.querySelectorAll('.pr-btn').forEach((x) => { x.onclick = () => openPano(list, title, +x.dataset.i); });
+  }
+  bar.classList.toggle('hidden', !rooms.length);
+  const st = document.getElementById('stage-3d'); if (st) st.classList.toggle('has-pano-rooms', rooms.length > 0);
 }
 
 // 접속 기록 — 시각(KST) 포맷 + 기기(UA) 라벨

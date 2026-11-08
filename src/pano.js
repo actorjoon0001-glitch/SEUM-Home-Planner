@@ -45,10 +45,21 @@ function labelPanos(list) {
   list.forEach((p) => { const l = (p.label || '').trim(); if (l) total[l] = (total[l] || 0) + 1; });
   return list.map((p, i) => {
     const l = (p.label || '').trim();
-    if (!l) return { url: p.url, label: `장면 ${i + 1}` };
+    if (!l) return { url: p.url, label: `장면 ${i + 1}`, room: '' };
     seen[l] = (seen[l] || 0) + 1;
-    return { url: p.url, label: total[l] > 1 ? `${l} ${seen[l]}` : l };
+    return { url: p.url, label: total[l] > 1 ? `${l} ${seen[l]}` : l, room: l };
   });
+}
+
+// 공간(방 이름)별 묶음 — [{ room, start(첫 사진 번호), count }] · 카탈로그에 적은 순서대로
+export function panoRooms(list) {
+  const out = [];
+  (list || []).forEach((p, i) => {
+    if (!p.room) return;
+    const g = out.find((x) => x.room === p.room);
+    if (g) g.count++; else out.push({ room: p.room, start: i, count: 1 });
+  });
+  return out;
 }
 
 export function panosOf(code) { return (code && _panos && _panos[norm(code)]) || null; }

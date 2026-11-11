@@ -14,6 +14,7 @@ import { initFacePaint } from './facepaint.js';
 import { openPhotoRender } from './photoRender.js';
 import { loadPanos, panosOf, openPano, panoRooms } from './pano.js';
 import { loadCatalogMaterials, catalogMaterials, catalogPick, catalogLabel } from './catalogMats.js';
+import { loadCatalogShowrooms, LEGACY_ROOM } from './catalog.js';
 import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
@@ -351,7 +352,7 @@ async function renderDash() {
     //   관리자가 휴지통에 넣은 내장 템플릿은 숨김 (설정 행의 trashedBuiltin / deletedBuiltin)
     const items = [];
     const hidden = await builtinHidden();
-    await Promise.all([loadVideos(), loadPanos()]);   // 모델 영상(관리자가 올린 드론샷) ▶ · 카탈로그 360 실사 📷
+    await Promise.all([loadVideos(), loadPanos(), loadCatalogShowrooms()]);   // 모델 영상(관리자가 올린 드론샷) ▶ · 카탈로그 360 실사 📷
     const overrides = await builtinShowroomMap();     // 내장 템플릿 전시장 이동 override
     const known = await knownShowrooms();             // 사용자가 만든 전시장(빈 전시장도 표시)
     // 도면을 특정 전시장으로 이동 실행 (apply 는 항목별 저장 함수) — 드래그·버튼 공용
@@ -369,12 +370,18 @@ async function renderDash() {
       if (name == null) return;
       doMove(apply, name, curRoom);
     };
+    // 전시장 = 온라인 카탈로그 기준 — 카탈로그 모델(code)이 전시된 전시장에 카드 배치 (여러 곳이면 각 전시장에 모두)
+    //   카탈로그에 없는 도면만 예전 방식(관리자 이동 · 템플릿 기본값)
+    const cat = await loadCatalogShowrooms();
+    const legacy = (r) => { const n = String(r || '').trim(); return LEGACY_ROOM[n] || n; };
     for (const t of listTemplates()) {
       if (hidden.has(t.id)) continue;
       let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
-      const sr = (overrides[t.id] != null ? overrides[t.id] : (t.showroom || '')).trim();
-      items.push({
+      const catRooms = (cat && t.code && cat.byCode[t.code.toUpperCase()]) || [];
+      const rooms = catRooms.length ? catRooms : [legacy(overrides[t.id] != null ? overrides[t.id] : t.showroom)];
+      for (const sr of rooms) items.push({
         title: t.title, showroom: sr, data: d, photo: t.photo, code: t.code, codeNote: t.codeNote, tid: t.id,
+        fromCatalog: catRooms.length > 0,
         apply: (room) => setBuiltinShowroom(t.id, room),
         open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }),
         del: admin ? () => adminAct(() => trashBuiltin(t.id), '휴지통으로 보냈어요') : null,
@@ -384,7 +391,7 @@ async function renderDash() {
       try {
         const rows = await cloud.listTemplates();
         for (const r of rows) items.push({
-          title: r.name, showroom: (r.data && r.data.showroom || '').trim(), data: r.data,
+          title: r.name, showroom: legacy(r.data && r.data.showroom), data: r.data,
           apply: (room) => cloud.setTemplateShowroom(r, room),
           open: () => enterEditor(() => store.loadInto(r.data)),
           del: admin ? () => adminAct(() => cloud.setTrashed(r, true), '휴지통으로 보냈어요') : null,   // 삭제는 관리자만
@@ -396,12 +403,16 @@ async function renderDash() {
     const groups = {};
     for (const it of items) { const k = it.showroom || '기타'; (groups[k] = groups[k] || []).push(it); }
     for (const k of known) { if (!(k in groups)) groups[k] = []; }   // 빈 전시장도 표시(이동 대상)
+    for (const k of (cat && cat.order) || []) { if (!(k in groups)) groups[k] = []; }   // 카탈로그 전시장은 비어도 표시
+    // 순서: 카탈로그 전시장(카탈로그 표시 순서) → 그 밖의 이름(가나다) → 기타
+    const catOrder = (cat && cat.order) || [];
+    const roomRank = (k) => { const i = catOrder.indexOf(k); return i >= 0 ? i : (k === '기타' ? 1e6 : 1e3); };
     const dropInto = async (room) => {
       const it = _dragTpl; if (!it || !admin) return;
       const target = room === '기타' ? '' : room;
       await doMove(it.apply, target, it.showroom);
     };
-    for (const room of Object.keys(groups).sort()) {
+    for (const room of Object.keys(groups).sort((a, b) => roomRank(a) - roomRank(b) || a.localeCompare(b, 'ko'))) {
       const sec = document.createElement('section');
       sec.className = 'showroom-group'; sec.dataset.room = room;
       sec.innerHTML = `<h3 class="dash-group">🏢 ${esc(room)}${admin ? ' <small class="sg-drop">여기로 도면을 끌어다 놓기</small>' : ''}</h3>`;
@@ -409,10 +420,11 @@ async function renderDash() {
       if (!groups[room].length) cards.innerHTML = `<p class="dash-empty" style="grid-column:1/-1">이 전시장은 비어 있어요. ${admin ? '카드를 여기로 <b>드래그</b>해 옮기세요.' : ''}</p>`;
       for (const it of groups[room]) {
         const card = projectCard(it.title, it.data, `🏢 ${room}`, it.open, it.del, {
-          onMove: admin ? () => moveByPrompt(it.apply, it.showroom) : null,
+          onMove: admin && !it.fromCatalog ? () => moveByPrompt(it.apply, it.showroom) : null,   // 카탈로그 연동 도면은 카탈로그에서 전시장 관리
           photo: it.photo, code: it.code, codeNote: it.codeNote, video: it.tid ? videoOf(it.tid) : null, pano: it.code && !it.codeNote ? panosOf(it.code) : null,
         });
-        if (admin) {
+        if (admin && it.fromCatalog) card.title = '전시장은 온라인 카탈로그 기준 — 카탈로그 관리자에서 모델 전시장을 바꾸면 여기도 바뀌어요';
+        if (admin && !it.fromCatalog) {
           card.draggable = true;
           // 내부 캔버스·버튼이 드래그를 가로채지 않도록(이미지 드래그 방지)
           card.querySelectorAll('canvas, img, button').forEach((el) => { el.setAttribute('draggable', 'false'); el.draggable = false; });

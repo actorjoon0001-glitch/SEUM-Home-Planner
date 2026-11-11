@@ -226,7 +226,7 @@ const T = [
     photo: 'models/thumbs/seum-hwangto.jpg', code: 'CUBE-H3-BW',
     title: '세움 황토찜질방 (3,000×4,000)',
     category: '농막',
-    showroom: '본점',
+    showroom: '김포 본사전시장',
     tags: ['세움도면', '황토찜질방', '찜질방', '3000x4000', '외쪽지붕', '포치', '본점'],
     base: {
       // 계획안-B (블렌더 실물 모델): 캐스터+하부프레임 위 바닥 350 · 우드톤 강판사이딩 · 징크 박공지붕(용마루 앞뒤)
@@ -306,7 +306,7 @@ const T = [
     photo: 'models/thumbs/seum-15.jpg', code: 'STAY15-BK',
     title: '세움 15평 단독 (7,000×7,000)',
     category: '주택',
-    showroom: '본점',
+    showroom: '김포 제1전시장',
     tags: ['세움도면', '15평', '49㎡', '단독주택', '7000x7000', '데크', '포치'],
     base: {
       name: '세움 15평 단독 (7,000×7,000)',
@@ -405,7 +405,7 @@ const T = [
     photo: 'models/thumbs/seum-shelter-10.jpg', code: 'FOREST10-E',
     title: '세움 체류형 쉼터 10평 (33㎡)',
     category: '체류형 쉼터',
-    showroom: '마곡 박람회',
+    showroom: '김포 제1전시장',
     tags: ['세움도면', '체류형쉼터', '10평', '33㎡', '마곡박람회', '폴딩도어', '데크', '루버강판'],
     base: {
       name: '세움 체류형 쉼터 10평 (33㎡)',
@@ -494,7 +494,7 @@ const T = [
     photo: 'models/thumbs/twin-10.jpg', code: 'FOREST10-BK',
     title: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
     category: '농막',
-    showroom: '본점',
+    showroom: '김포 본사전시장',
     tags: ['쌍둥이', '10평', '6평', '4평', '데크', '브리즈웨이', '농막'],
     base: {
       name: '세움 쌍둥이 10평 (6평+4평 · 중앙데크)',
@@ -561,7 +561,7 @@ const T = [
     photo: 'models/thumbs/twin-10-L.jpg', code: 'FOREST10-BK', codeNote: 'ㄱ자 변형',
     title: '세움 쌍둥이 10평 ㄱ자형 (6평+4평 · 데크 감싸기)',
     category: '농막',
-    showroom: '본점',
+    showroom: '김포 본사전시장',
     tags: ['쌍둥이', '10평', 'ㄱ자', '6평', '4평', '데크', '농막'],
     base: {
       name: '세움 쌍둥이 10평 ㄱ자형',
@@ -620,7 +620,7 @@ const T = [
     photo: 'models/thumbs/twin-10-2f.jpg?v=2', code: 'FOREST10-BK', codeNote: '2층 변형',
     title: '세움 쌍둥이 10평 2층형 (4평 위 6평 · 외부 계단)',
     category: '농막',
-    showroom: '본점',
+    showroom: '김포 본사전시장',
     tags: ['쌍둥이', '10평', '2층', '복층', '6평', '4평', '데크', '농막'],
     base: {
       name: '세움 쌍둥이 10평 2층형',
@@ -748,7 +748,7 @@ const T = [
     photo: 'models/thumbs/seum-bonjeom-19.jpg', code: 'STAY19-BK',
     title: '세움 본점 19평 (9,000×7,000) + 포치 7평 · 데크 4평',
     category: '주택',
-    showroom: '본점',
+    showroom: '김포 본사전시장',
     tags: ['세움도면', '본점', '19평', '9000x7000', '포치', '데크', '박공'],
     base: {
       name: '세움 본점 19평 (9,000×7,000)',
@@ -862,7 +862,7 @@ const T = [
     photo: 'models/thumbs/seum-24.jpg', code: 'STAY24-WB',
     title: '세움 24평 (12,080×7,080) + 포치 · 데크',
     category: '주택',
-    showroom: '본점',
+    showroom: '김포 제1전시장',
     tags: ['세움도면', '24평', '12080x7080', '포치', '데크', '박공', '드레스룸', '욕실2'],
     base: {
       name: '세움 24평 (12,080×7,080)',

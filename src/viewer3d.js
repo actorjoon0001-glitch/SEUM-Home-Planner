@@ -774,6 +774,8 @@ export class Viewer3D {
     }
     if (!ops.length && !gone.length) return;
     house.updateMatrixWorld(true);
+    // 실물 모델의 실제 바닥 높이 — 도면 기준(기초 위 60)과 다를 수 있어 창 높이를 여기에 맞춤
+    const dy = this._m3dFloorDy(node, house, b, m3d);
     const holes = [];   // [min, max, kind]
     const cx0 = (bb.x0 + bb.x1) / 2, cy0 = (bb.y0 + bb.y1) / 2;
     const toWorldBox = (px, pz, pl, nx, ny, u0, u1, y0, y1, s0, s1, kind) => {
@@ -796,20 +798,27 @@ export class Viewer3D {
       const f = frame(o); if (!f) continue;
       const { pl, nx, ny, px, pz } = f;
       const w = o.w || 900, sill = o.sill || 0, oh = o.h || 1200;
-      const yMid = sill + oh / 2 + 60;
+      const yMid = sill + oh / 2 + 60 + dy;
       const wall = this._m3dWallNear(node, house, b, pl, nx, ny, yMid, m3d.url, w); if (!wall) continue;
       const isDoor = (WINDOW_TYPES[o.winType] || {}).glass === false || sill < 100;
-      const M = 80;                                                   // 창 둘레 몰딩까지 덮는 여유
-      const yBot = 60 + Math.max(0, sill - M), yTop = Math.min(60 + sill + oh + M, 60 + H - 10);
-      const hw = w / 2 + M;
+      const M = 110;                                                  // 창틀·몰딩까지 덮는 여유
+      // 도면 수치가 실물과 조금 다를 수 있어 실물 모델 벽을 광선으로 훑어 실제 창 구멍 범위를 찾음
+      const sc = this._m3dScanOpening(node, house, b, pl, nx, ny, o, dy, H, m3d.url);
+      console.log('[hybrid] gone wall', JSON.stringify({ sIn: Math.round(wall.sIn), sOut: Math.round(wall.sOut), nx, ny, ux: pl.ux, uy: pl.uy, px: Math.round(px), pz: Math.round(pz) }));
+      const floorY = 60 + dy;
+      let u0 = -w / 2, u1 = w / 2, yo0 = floorY + sill, yo1 = floorY + sill + oh;
+      if (sc) { u0 = sc.u0; u1 = sc.u1; yo0 = sc.y0; yo1 = sc.y1; }
+      const doorish = isDoor || yo0 - floorY < 150;
+      const yBot = doorish ? floorY : Math.max(floorY, yo0 - M), yTop = Math.min(yo1 + M, floorY + H - 10);
+      const ua = u0 - M, ub = u1 + M, uc = (ua + ub) / 2, hw = (ub - ua) / 2;
       // 숨김 상자 — 메움판보다 살짝 작게(틈 안 생기게), 바깥 몰딩·안쪽 문짝(열린 각도)까지
-      toWorldBox(px, pz, pl, nx, ny, -hw + 10, hw - 10, yBot + (sill > M ? 10 : 0), yTop - 10,
-        wall.sIn - (isDoor ? w + 60 : 40), wall.sOut + 160, 1);
+      toWorldBox(px, pz, pl, nx, ny, ua + 10, ub - 10, yBot + (doorish ? 0 : 10), yTop - 10,
+        wall.sIn - (doorish ? (u1 - u0) + 60 : 40), wall.sOut + 160, 1);
       // 메움판 — 바깥면은 실물 외장(카탈로그 자재면 그 자재), 안쪽면은 실내 벽 색
-      const mats = this._patchMats(d, wall, w, yTop - yBot);
+      const mats = this._patchMats(d, wall, ub - ua, yTop - yBot);
       const depth = wall.sOut - wall.sIn + 4, sMid = (wall.sIn + wall.sOut) / 2;
       const g = new THREE.Group();
-      g.position.set(px + nx * sMid, (yBot + yTop) / 2, pz + ny * sMid); g.rotation.y = -Math.atan2(pl.uy, pl.ux);
+      g.position.set(px + nx * sMid + pl.ux * uc, (yBot + yTop) / 2, pz + ny * sMid + pl.uy * uc); g.rotation.y = -Math.atan2(pl.uy, pl.ux);
       const outPlus = (nx * -pl.uy + ny * pl.ux) > 0;   // 상자 +z 가 바깥인지
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, yTop - yBot, depth),
         [mats.side, mats.side, mats.side, mats.side, outPlus ? mats.out : mats.in, outPlus ? mats.in : mats.out]);
@@ -821,14 +830,14 @@ export class Viewer3D {
     for (const o of ops) {
       const f = frame(o); if (!f) continue;
       const { pl, nx, ny, px, pz } = f;
-      const yMid = (o.sill || 0) + (o.h || 1200) / 2 + 60;
+      const yMid = (o.sill || 0) + (o.h || 1200) / 2 + 60 + dy;
       const wall = this._m3dWallNear(node, house, b, pl, nx, ny, yMid, m3d.url, o.w || 900);
       const before = this.modelGroup.children.length;
       this._buildOpening(o, b);
       if (!wall) continue;   // 실물 모델 벽이 아닌 곳(추가한 방 벽) — 자동 벽에 이미 뚫림
       const sMid = (wall.sIn + wall.sOut) / 2, depth = wall.sOut - wall.sIn;
       const sWin = Math.max(wall.sIn + 80, wall.sOut - 110);   // 창틀은 실제 시공처럼 바깥면 쪽에
-      for (const ch of this.modelGroup.children.slice(before)) { ch.position.x += nx * sWin; ch.position.z += ny * sWin; }
+      for (const ch of this.modelGroup.children.slice(before)) { ch.position.x += nx * sWin; ch.position.z += ny * sWin; ch.position.y += dy; }
       const hw = (o.w || 900) / 2, hh = (o.h || 1200) / 2;
       toWorldBox(px, pz, pl, nx, ny, -hw, hw, yMid - hh, yMid + hh, wall.sIn - 40, wall.sOut + 40, 0);
       // 벽 두께 마감(창 둘레 안쪽 판) — 구멍으로 벽 속이 보이지 않게
@@ -846,7 +855,66 @@ export class Viewer3D {
     holes.length = Math.min(holes.length, HOLE_MAX);
     holes.forEach(([mn, mx, k], i) => { HOLES.min.value[i].set(mn.x, mn.y, mn.z, k); HOLES.max.value[i].set(mx.x, mx.y, mx.z, k); });
     HOLES.n.value = holes.length;
+    console.log('[hybrid] holes', JSON.stringify(holes.map(([a, c, k]) => [k, a.toArray().map(Math.round), c.toArray().map(Math.round)])));
+    if (window.__dbgHoles) for (const [a, c, k] of holes) { const hb = new THREE.Box3Helper(new THREE.Box3(a.clone(), c.clone()), k ? 0xff0000 : 0x00ff00); root.add(hb); }
     node.traverse((x) => { if (x.isMesh) for (const mt of Array.isArray(x.material) ? x.material : [x.material]) patchHoleMaterial(mt); });
+  }
+  // 실물 모델 바닥 윗면 높이 − 도면 바닥(60) — 원래 방 가운데들에서 아래로 광선을 쏴 중앙값 (모델별 캐시)
+  _m3dFloorDy(node, house, b, m3d) {
+    const key = m3d.url + '|' + (this._foundationH || 0);
+    const c = this._floorDyCache || (this._floorDyCache = new Map());
+    if (c.has(key)) return c.get(key);
+    const ys = [], rc = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0);
+    for (const r of m3d.baseRooms) {
+      if (OPEN_ROOM_TYPES.includes(r.type)) continue;
+      for (const [fx, fy] of [[0.5, 0.5], [0.25, 0.3], [0.75, 0.7]]) {
+        const [px, pz] = this._p(r.x + r.w * fx, r.y + r.d * fy, b);
+        const o = house.localToWorld(new THREE.Vector3(px, 1300, pz));
+        rc.set(o, down); rc.far = 2600;
+        const h = rc.intersectObject(node, true).find((x) => x.face && Math.abs(x.face.normal.y) > 0.5 && x.distance > 300);
+        if (h) ys.push(house.worldToLocal(h.point.clone()).y);
+      }
+    }
+    // 바닥은 가장 낮은 쪽 무리(가구 윗면 제외) — 아래쪽 1/3 지점의 값
+    ys.sort((p, q) => p - q);
+    const v = ys.length ? ys[Math.floor((ys.length - 1) / 3)] - 60 : 0;
+    const dy = Math.abs(v) > 1500 ? 0 : Math.round(v);
+    console.log('[hybrid] floor dy', dy, ys.map(Math.round).join(','));
+    c.set(key, dy);
+    return dy;
+  }
+  // 실물 모델 벽에서 원래 창·문 구멍(유리·빈 곳)의 실제 범위 찾기 — 세로로 훑고, 그 높이에서 가로로 훑음
+  //   반환 { u0, u1 (창 중심 기준 벽 방향 mm), y0, y1 (집 좌표 높이) } · 못 찾으면 null
+  _m3dScanOpening(node, house, b, pl, nx, ny, o, dy, H, url) {
+    const key = ['scan', url, Math.round(pl.cx), Math.round(pl.cy), o.w, o.h, o.sill, dy].join('|');
+    const c = this._wallHitCache || (this._wallHitCache = new Map());
+    if (c.has(key)) return c.get(key);
+    const at = (u) => ({ ...pl, cx: pl.cx + pl.ux * u, cy: pl.cy + pl.uy * u });
+    const open = (u, y) => !this._m3dWallAt(node, house, b, at(u), nx, ny, y, url);
+    const floorY = 60 + dy, STEP = 40, w = o.w || 900;
+    let res = null;
+    for (const uc of [0, -w / 4, w / 4]) {
+      const ys = [];
+      for (let y = floorY + 30; y < floorY + H - 30; y += STEP) if (open(uc, y)) ys.push(y);
+      if (ys.length < 3) continue;
+      // 가장 긴 연속 구간 (창 하나)
+      let best = [ys[0], ys[0]], cur = [ys[0], ys[0]];
+      for (let i = 1; i < ys.length; i++) {
+        if (ys[i] - ys[i - 1] <= STEP * 2.5) cur[1] = ys[i]; else cur = [ys[i], ys[i]];
+        if (cur[1] - cur[0] > best[1] - best[0]) best = [...cur];
+      }
+      const ym = (best[0] + best[1]) / 2, lim = w / 2 + 900;
+      let ua = uc, ub = uc;
+      // 가운데 창살(멀리언)은 건너뛰며 양옆으로 (빈 곳이 3칸 안에 다시 나오면 계속)
+      const grow = (u, sgn) => { for (;;) { let nxt = null; for (let k = 1; k <= 3; k++) { const t = u + sgn * STEP * k; if (Math.abs(t) < lim && open(t, ym)) { nxt = t; break; } } if (nxt == null) return u; u = nxt; } };
+      ua = grow(uc, -1); ub = grow(uc, 1);
+      if (ub - ua < 200) continue;
+      res = { u0: ua - STEP / 2, u1: ub + STEP / 2, y0: best[0] - STEP / 2, y1: best[1] + STEP / 2 };
+      break;
+    }
+    console.log('[hybrid] scan', o.winType, JSON.stringify(res && Object.fromEntries(Object.entries(res).map(([k, v]) => [k, Math.round(v)]))));
+    c.set(key, res);
+    return res;
   }
   // 창 자리 가운데가 비어 있으면(원래 창이 있던 곳 등) 옆 벽에서 두께를 잼
   _m3dWallNear(node, house, b, pl, nx, ny, yMid, url, w) {
@@ -914,7 +982,7 @@ export class Viewer3D {
       res = { sOut: R - tOut, sIn: Math.min(R - hIn.distance, R - tOut - 60),
         outObj: hits[0].object, outMat: matOf(hits[0]), inMat: hIn !== hits[0] ? matOf(hIn) : null };
     }
-    if (c.size > 400) c.clear();
+    if (c.size > 4000) c.clear();
     c.set(key, res);
     return res;
   }

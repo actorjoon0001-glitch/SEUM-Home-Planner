@@ -10,7 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES, model3dSig, model3dSigKeys } from './data.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES, model3dSig, model3dSigKeys, rid } from './data.js';
 import { rotateRoomsInDesign, moveRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 import * as TEX from './textures.js';
 import { catalogWallMaterial, setCatalogTexHook } from './catalogMats.js';
@@ -2720,7 +2720,64 @@ export class Viewer3D {
     return null;
   }
   _inModel3d(o) { for (; o; o = o.parent) if (o.name === 'model3d') return true; return false; }
+  // ✏️ 방 그리기 (3D) — 바닥에서 대각선으로 끌면 방 생성. 좌클릭=그리기, 우클릭 드래그=화면 회전
+  setDrawRoom(type) {
+    this.drawRoomType = type || null;
+    const mb = this.controls.mouseButtons;
+    if (!this._mbOrig) this._mbOrig = { LEFT: mb.LEFT, RIGHT: mb.RIGHT };
+    if (this.drawRoomType) { mb.LEFT = -1; mb.RIGHT = THREE.MOUSE.ROTATE; }
+    else { mb.LEFT = this._mbOrig.LEFT; mb.RIGHT = this._mbOrig.RIGHT; this._endDrawRect(false); }
+    this.renderer.domElement.style.cursor = this.drawRoomType ? 'crosshair' : '';
+  }
+  _drawRectUpdate() {
+    const r = this._drawRect; if (!r) return;
+    const x0 = Math.min(r.ax, r.cx), x1 = Math.max(r.ax, r.cx), y0 = Math.min(r.ay, r.cy), y1 = Math.max(r.ay, r.cy);
+    const S = (v) => Math.round(v / 100) * 100, w = S(x1) - S(x0), dd = S(y1) - S(y0);
+    const b = this._bounds(), F = this._foundationH || 0;
+    if (!this._drawMesh) {
+      const g = new THREE.Group();
+      const fill = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.28, depthWrite: false }));
+      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0x7c3aed }));
+      fill.renderOrder = edge.renderOrder = 999; g.add(fill, edge);
+      this.scene.add(g); this._drawMesh = g;
+      const lab = document.createElement('div'); lab.className = 'draw3d-size';
+      this.container.appendChild(lab); this._drawLab = lab;
+    }
+    const H = (store.design.ceilingHeight || 2400);
+    this._drawMesh.visible = w > 0 && dd > 0;
+    this._drawMesh.scale.set(Math.max(1, w), H, Math.max(1, dd));
+    this._drawMesh.position.set(S(x0) + w / 2 - b.cx, F + 60 + H / 2, S(y0) + dd / 2 - b.cz);
+    this._drawLab.textContent = `${w.toLocaleString()} × ${dd.toLocaleString()} mm`;
+    this._drawLab.style.left = r.px + 14 + 'px'; this._drawLab.style.top = r.py + 14 + 'px';
+    this._needsRender = true;
+  }
+  _endDrawRect(commit) {
+    const r = this._drawRect; this._drawRect = null;
+    if (this._drawMesh) { this.scene.remove(this._drawMesh); this._drawMesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this._drawMesh = null; }
+    if (this._drawLab) { this._drawLab.remove(); this._drawLab = null; }
+    this.controls.enabled = true; this._needsRender = true;
+    if (!commit || !r) return;
+    const S = (v) => Math.round(v / 100) * 100;
+    const x0 = S(Math.min(r.ax, r.cx)), x1 = S(Math.max(r.ax, r.cx)), y0 = S(Math.min(r.ay, r.cy)), y1 = S(Math.max(r.ay, r.cy));
+    const w = x1 - x0, dd = y1 - y0;
+    if (w < 300 || dd < 300) return;   // 너무 작으면 무시 (2D 와 같음)
+    const type = this.drawRoomType;
+    store.commit((d) => {
+      const room = { id: rid(), type, name: '', x: x0, y: y0, w, d: dd };
+      d.rooms.push(room);
+      store.selectedRoom = room.id; store.selectedFurniture = store.selectedOpening = null;
+    });
+  }
   _edDown(e) {
+    if (this.drawRoomType) {   // 방 그리기 — 좌클릭 드래그만 그리기(우클릭은 회전)
+      if (e.button !== 0) return;
+      const g = this._groundHit(e); if (!g) return;
+      const rc = this.renderer.domElement.getBoundingClientRect();
+      this._drawRect = { ax: g.x, ay: g.y, cx: g.x, cy: g.y, px: e.clientX - rc.left, py: e.clientY - rc.top };
+      this.controls.enabled = false;
+      this._drawRectUpdate();
+      return;
+    }
     // 면별 외장재 모드: 클릭=면 전체, 드래그=드래그한 폭만큼 자재 띠
     if (this.faceMode && e.button === 0) {
       // 1) 선택된 띠의 조절 핸들을 잡으면 → 가장자리 드래그로 폭 조절
@@ -2818,6 +2875,13 @@ export class Viewer3D {
     this._gesture = { x0: e.clientX, y0: e.clientY, roomId: roomId || null, model3d: !!(pick && pick.model3d), moved: false };
   }
   _edMove(e) {
+    if (this._drawRect) {
+      const g = this._groundHit(e); if (!g) return;
+      const rc = this.renderer.domElement.getBoundingClientRect();
+      Object.assign(this._drawRect, { cx: g.x, cy: g.y, px: e.clientX - rc.left, py: e.clientY - rc.top });
+      this._drawRectUpdate();
+      return;
+    }
     if (this._bandDrag) {   // 선택한 띠의 한쪽 가장자리를 끌어 폭 조절
       const bd = this._bandDrag; const u = this._faceUAt(e, bd.key);
       if (u != null) {
@@ -2871,6 +2935,7 @@ export class Viewer3D {
     }
   }
   _edUp() {
+    if (this._drawRect) { this._endDrawRect(true); return; }
     if (this._bandDrag) {   // 띠 폭 조절 종료 — u0/u1 정규화(뒤집힘 보정)
       const bd = this._bandDrag; this._bandDrag = null;
       store.liveEnd(); this.controls.enabled = true;

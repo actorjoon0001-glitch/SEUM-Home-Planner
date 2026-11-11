@@ -126,6 +126,13 @@ async function stitch(cx, cy, urlOf, zs) {
   await Promise.all(jobs);
   if (ok < total * 0.85) throw new Error(`타일 ${total - ok}/${total}장 실패`);
   ctx.getImageData(0, 0, 1, 1);   // 교차출처 오염(taint)되면 여기서 예외 → 다른 소스로
+  // 사진이 아니라 한 가지 색(오류·'자료 없음' 타일)이면 실패로 보고 다음 소스로
+  const sm = document.createElement('canvas'); sm.width = sm.height = 48;
+  const sx = sm.getContext('2d', { willReadFrequently: true }); sx.drawImage(cv, 0, 0, 48, 48);
+  const px = sx.getImageData(0, 0, 48, 48).data; let m = 0, m2 = 0; const N = px.length / 4;
+  for (let i = 0; i < px.length; i += 4) { const L = px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11; m += L; m2 += L * L; }
+  const sd = Math.sqrt(Math.max(0, m2 / N - (m / N) ** 2));
+  if (sd < 7) throw new Error(`사진 대신 빈 타일(단색) — 해당 지역 자료 없음 또는 키 권한 문제`);
   return cv;
 }
 // VWorld 타일이 왜 안 되는지 한 장으로 확인 (CORS 차단 / HTTP 상태)

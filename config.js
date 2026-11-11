@@ -24,4 +24,8 @@ window.SEUM_CONFIG = {
   //   발급: https://account.mapbox.com (무료·카드 불필요). public 토큰(pk....) 붙여넣기.
   //   설정하면 '부지(땅)' 창에서 지번/도로명 주소검색 → 위성사진 자동 로드.
   mapboxToken: '',
+
+  // 구글 지도 API 키 (Map Tiles API) — 넣으면 부지(땅) 위성 사진을 구글 최신·고해상도 사진으로
+  //   (구글 클라우드 콘솔에서 '웹사이트 제한: seum-home-planner.netlify.app/*' 로 잠근 키)
+  googleMapsKey: '',
 };

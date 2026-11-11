@@ -71,9 +71,9 @@ function texOf(url) {
 
 const _matCache = new Map();
 // 카탈로그 외장재 재질 — c: catalogPick 결과. 무늬는 벽면 방향 기준 월드 좌표(mm)로 반복
-export function catalogWallMaterial(c, side = THREE.DoubleSide) {
+export function catalogWallMaterial(c, side = THREE.DoubleSide, tag = '') {
   const scale = Math.max(0.3, Math.min(3, +c.scale || 1));
-  const key = `${c.image}|${scale}|${side}`;
+  const key = `${c.image}|${scale}|${side}|${tag}`;   // tag: 같은 자재라도 따로 쓰는 재질(예: 메움판)
   if (_matCache.has(key)) return _matCache.get(key);
   const map = texOf(c.image);
   const m = new THREE.MeshStandardMaterial({ map, roughness: 0.72, metalness: 0.0, side, envMapIntensity: 0.7 });

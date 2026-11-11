@@ -778,7 +778,8 @@ export class Viewer3D {
       this._buildOpening(o, b);
       if (!wall) continue;   // 실물 모델 벽이 아닌 곳(추가한 방 벽) — 자동 벽에 이미 뚫림
       const sMid = (wall.sIn + wall.sOut) / 2, depth = wall.sOut - wall.sIn;
-      for (const ch of this.modelGroup.children.slice(before)) { ch.position.x += nx * sMid; ch.position.z += ny * sMid; }
+      const sWin = Math.max(wall.sIn + 80, wall.sOut - 110);   // 창틀은 실제 시공처럼 바깥면 쪽에
+      for (const ch of this.modelGroup.children.slice(before)) { ch.position.x += nx * sWin; ch.position.z += ny * sWin; }
       // 구멍 상자(집 좌표) → 월드 AABB
       const [px, pz] = this._p(pl.cx, pl.cy, b);
       const hw = (o.w || 900) / 2, hh = (o.h || 1200) / 2, s0 = wall.sIn - 40, s1 = wall.sOut + 40;

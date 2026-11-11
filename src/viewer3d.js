@@ -451,9 +451,10 @@ export class Viewer3D {
     // 실물 모델은 캐시해서 계속 재사용 → 아래 일괄 해제에 휩쓸리지 않게 먼저 떼어냄
     for (const e of Object.values(this._m3dCache || {})) if (e.node && e.node.parent) e.node.parent.remove(e.node);
     for (const it of (this.compare && this.compare.items) || []) if (it.node && it.node.parent) it.node.parent.remove(it.node);
+    if (this._siteOv && this._siteOv.group.parent) this._siteOv.group.parent.remove(this._siteOv.group);   // 부지 경계·건물도 재사용
     // 기존 제거 — 지오메트리는 매번 새로 만들므로 GPU 메모리도 함께 해제 (편집할수록 느려지는 것 방지)
     //   (재질·텍스처는 textures.js 캐시를 공유하므로 해제하지 않음)
-    this.modelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    this.modelGroup.traverse((o) => { if (o.geometry && !o.isSprite) o.geometry.dispose(); });   // 글씨판(Sprite)은 공용 지오메트리라 두기
     this.modelGroup.clear();
     const d = store.design;
     const b = this._bounds();
@@ -469,7 +470,12 @@ export class Viewer3D {
     if (site && site.image) {
       const wMM = (site.widthM || 20) * 1000;
       const hMM = wMM * (site.aspect || 1);            // aspect = 이미지 세로/가로
-      const tex = new THREE.TextureLoader().load(site.image, () => { this._needsRender = true; });
+      // 같은 땅 사진은 한 번만 디코딩 (돌리거나 옮길 때마다 다시 읽으면 잠깐 검게 보임)
+      if (!this._siteTex || this._siteTex.src !== site.image) {
+        if (this._siteTex) this._siteTex.tex.dispose();
+        this._siteTex = { src: site.image, tex: new THREE.TextureLoader().load(site.image, () => { this._needsRender = true; }) };
+      }
+      const tex = this._siteTex.tex;
       if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();   // 비스듬히 볼 때도 땅 사진이 뭉개지지 않게
       // 위성 사진은 이미 햇빛이 찍힌 사진 → 3D 조명을 또 비추면 하얗게 바램. 원래 색 그대로(조명·톤매핑 없이)
@@ -492,7 +498,17 @@ export class Viewer3D {
       this.modelGroup.add(grass);
       const pc = site.parcel;
       this._siteParcelLabel = pc ? `${pc.jibun}  ${(pc.areaM2 || 0).toLocaleString()}㎡ (${((pc.areaM2 || 0) / 3.305785).toFixed(0)}평)` : '';
-      if (site.vec) this._buildSiteOverlay(site.vec, ground.position, -(site.rot || 0) * Math.PI / 180, { cad: !site.hideCad, bld: !site.hideBld });
+      if (site.vec) {
+        // 집을 옮기거나 돌릴 때마다 수백 개 경계·건물을 다시 만들지 않게 — 바뀐 게 없으면 그대로 다시 붙임
+        const vid = this._vecIds || (this._vecIds = new WeakMap());
+        if (!vid.has(site.vec)) vid.set(site.vec, (this._vecN = (this._vecN || 0) + 1));
+        const key = [vid.get(site.vec), site.rot || 0, !!site.hideCad, !!site.hideBld, ground.position.x, ground.position.z, this._siteParcelLabel].join('|');
+        if (!this._siteOv || this._siteOv.key !== key) {
+          if (this._siteOv) this._siteOv.group.traverse((o) => { if (o.geometry && !o.isSprite) o.geometry.dispose(); });
+          this._siteOv = { key, group: this._buildSiteOverlay(site.vec, ground.position, -(site.rot || 0) * Math.PI / 180, { cad: !site.hideCad, bld: !site.hideBld }) };
+        }
+        this.modelGroup.add(this._siteOv.group);
+      }
     } else {
       // 부지 이미지가 없으면 잔디 마당 — 지평선까지 넓게 깔고 안개로 자연스럽게 사라지게
       const G = M * 16 + 300000;
@@ -845,7 +861,7 @@ export class Viewer3D {
       label(this._siteParcelLabel, sx / tgt.length, minZ - 1500, 1500, true);
     }
     if (show.cad) for (const l of (vec.labels || []).slice(0, 80)) label(l.t, l.x, l.y, 300, false);
-    this.modelGroup.add(g);
+    return g;
   }
 
   // 화면에서 늘 같은 크기로 보이는 글씨 판 — kind: 'house'(빨강) · 'dim'(흰 바탕)
@@ -892,6 +908,12 @@ export class Viewer3D {
     // 집 위 평수
     const top = this._textSprite('🏠 ' + parts.join(' · '), 'house');
     top.position.set((ax + bx) / 2, F + H + 2600, (az + bz) / 2); g.add(top);
+    // 건폐율 = 건축면적 / 대지면적 — 건축면적은 실내(본채) 바닥면적으로 어림 (포치·데크 제외)
+    const land = d.site && d.site.parcel && d.site.parcel.areaM2;
+    if (land > 0 && sum.in > 0) {
+      const cov = this._textSprite(`건폐율 ${(sum.in / land * 100).toFixed(1)}%  (건축 ${sum.in.toFixed(1)}㎡ / 대지 ${Math.round(land).toLocaleString()}㎡)`, 'dim');
+      cov.position.set((ax + bx) / 2, F + H + 1500, (az + bz) / 2); g.add(cov);
+    }
     // 치수선 — 북쪽(가로)·서쪽(세로)으로 1.2m 띄워 땅 위에
     const OFF = 1200, y = 40, parts3 = [];   // 치수선은 땅 위 (기초 높이와 무관)
     const bar = (p, q) => {

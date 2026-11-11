@@ -2879,10 +2879,22 @@ function syncSiteBar() {
   src.textContent = s.source ? (s.source === 'Google' ? '위성: © Google' : `위성: ${s.source}${s.source !== 'VWorld' ? '(대체)' : ''}${s.srcZoom && s.srcZoom < 19 ? ' 저해상도' : ''}`) : '';
   src.title = s.srcNote ? '위성 사진 참고: ' + s.srcNote : '';
   const tv = bar.querySelector('.sb-turn-v');
-  if (tv) { const r = ((360 - (+s.rot || 0)) % 360 + 360) % 360; tv.textContent = r > 180 ? `${r - 360}°` : `${r}°`; }
+  if (tv && document.activeElement !== tv) { const r = ((360 - (+s.rot || 0)) % 360 + 360) % 360; tv.value = r > 180 ? r - 360 : r; }
   if (bar._wired) return;
   bar.querySelectorAll('.sb-tg').forEach((b) => { b.onclick = () => { const k = b.dataset.k; setSite({ [k]: !(store.design.site || {})[k] }); }; });
-  bar.querySelectorAll('.sb-turn').forEach((b) => { b.onclick = () => turnHouseOnSite(+b.dataset.d); });
+  // 1°씩 — 누르고 있으면 점점 빠르게 계속 돌아감
+  bar.querySelectorAll('.sb-turn').forEach((b) => {
+    let t = null, n = 0;
+    const stop = () => { clearTimeout(t); t = null; };
+    const step = () => { turnHouseOnSite(+b.dataset.d); n++; t = setTimeout(step, n < 4 ? 260 : n < 15 ? 110 : 50); };
+    b.onpointerdown = (e) => { e.preventDefault(); n = 0; step(); };
+    b.onpointerup = b.onpointerleave = b.onpointercancel = stop;
+  });
+  const tvIn = bar.querySelector('.sb-turn-v');
+  if (tvIn) {
+    tvIn.onchange = () => { const a = Math.round(+tvIn.value || 0); setSite({ rot: ((360 - a) % 360 + 360) % 360 }); tvIn.blur(); };
+    tvIn.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); tvIn.onchange(); } });
+  }
   bar._wired = true;
   const q = bar.querySelector('.sb-q'), go = bar.querySelector('.sb-go');
   bar.onsubmit = async (e) => {

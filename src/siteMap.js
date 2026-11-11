@@ -134,12 +134,12 @@ export async function fetchSite(addr, onStep = () => {}) {
   ctx.lineJoin = 'round';
   for (const f of neighbors) {
     if (target && f.pnu && f.pnu === target.pnu) continue;
-    for (const ring of f.rings) { path(ring); ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.6; ctx.stroke(); }
+    for (const ring of f.rings) { path(ring); ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.2; ctx.stroke(); }
     const r0 = f.rings[0]; if (!r0) continue;
     const [lx, ly] = P(centroid(r0));
     if (lx > 0 && ly > 0 && lx < SIZE && ly < SIZE && f.jibun) {
-      ctx.font = '600 13px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.strokeText(f.jibun, lx, ly);
+      ctx.font = '600 8px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.strokeText(f.jibun, lx, ly);
       ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(f.jibun, lx, ly);
     }
   }
@@ -147,17 +147,19 @@ export async function fetchSite(addr, onStep = () => {}) {
   if (target) {
     for (const ring of target.rings) {
       path(ring); ctx.fillStyle = 'rgba(255,214,0,0.12)'; ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 7; ctx.stroke();
-      ctx.strokeStyle = '#ffd600'; ctx.lineWidth = 4; ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 4.5; ctx.stroke();
+      ctx.strokeStyle = '#ffd600'; ctx.lineWidth = 2.5; ctx.stroke();
     }
     const area = target.rings.reduce((a, r) => a + ringArea(r), 0);
     parcel = { jibun: target.jibun, addr: target.addr, pnu: target.pnu, jiga: target.jiga, areaM2: Math.round(area) };
-    const [lx, ly] = P(centroid(target.rings[0]));
+    // 지번·면적 표시 — 필지 북쪽 경계 바로 바깥 (집에 가리지 않게), 글자 높이 약 2.5m
+    const r0 = target.rings[0].map(P);
+    const lx = r0.reduce((a, q) => a + q[0], 0) / r0.length, ly = Math.min(...r0.map((q) => q[1])) - 9;
     const label = `${target.jibun}  ${Math.round(area).toLocaleString()}㎡ (${(area / 3.305785).toFixed(0)}평)`;
-    ctx.font = '800 20px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const tw = ctx.measureText(label).width + 20;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(lx - tw / 2, ly - SIZE * 0.06 - 16, tw, 32);
-    ctx.fillStyle = '#ffd600'; ctx.fillText(label, lx, ly - SIZE * 0.06);
+    ctx.font = '800 11px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const tw = ctx.measureText(label).width + 10;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(lx - tw / 2, ly - 8, tw, 16);
+    ctx.fillStyle = '#ffd600'; ctx.fillText(label, lx, ly);
   }
   // 출처 표기 (사진 구석)
   ctx.font = '11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';

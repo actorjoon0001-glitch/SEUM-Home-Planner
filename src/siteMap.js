@@ -140,26 +140,37 @@ async function probe(url) {
   try { const r = await fetch(url, { mode: 'cors' }); return r.ok ? `HTTP ${r.status}(이미지 처리 실패)` : `HTTP ${r.status}`; }
   catch { return 'CORS/네트워크 차단'; }
 }
+// 선명도 — 밝기 라플라시안 평균(2px 간격). 낮은 해상도를 늘려 붙인 흐린 사진은 값이 작음
+function sharpness(cv) {
+  const W = cv.width, H = cv.height, d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const L = (x, y) => { const i = (y * W + x) * 4; return d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; };
+  let sum = 0, n = 0;
+  for (let y = 2; y < H - 2; y += 2) for (let x = 2; x < W - 2; x += 2) { sum += Math.abs(4 * L(x, y) - L(x - 1, y) - L(x + 1, y) - L(x, y - 1) - L(x, y + 1)); n++; }
+  return n ? sum / n : 0;
+}
+// 위성 사진 — VWorld·Esri 를 함께 받아 더 또렷한 쪽을 씀 (지역마다 어느 쪽이 좋은지 다름)
 async function satellite(cx, cy) {
   const key = vworldKey();
   const vw = (z, x, y) => `https://api.vworld.kr/req/wmts/1.0.0/${key}/Satellite/${z}/${y}/${x}.jpeg`;
   const esri = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
-  const sources = [
-    ...(key ? [{ name: 'VWorld', url: vw, z: 19 }, { name: 'VWorld', url: vw, z: 18 }] : []),
-    { name: 'Esri', url: esri, z: 19 }, { name: 'Esri', url: esri, z: 18 },
-  ];
   const notes = [];
-  for (const s of sources) {
-    try {
-      const canvas = await stitch(cx, cy, s.url, s.z);
-      return { canvas, source: s.name, zoom: s.z, note: notes.join(' · ') };
-    } catch (e) {
+  const get = async (name, url, z) => {
+    try { const canvas = await stitch(cx, cy, url, z); return { canvas, source: name, zoom: z, sharp: sharpness(canvas) }; }
+    catch (e) {
       let why = e.message;
-      if (s.name === 'VWorld' && s.z === 19) why += ' / ' + await probe(vw(19, Math.floor(cx / TILE), Math.floor(cy / TILE)));
-      notes.push(`${s.name}${s.z}: ${why}`);
+      if (name === 'VWorld' && z === 19) why += ' / ' + await probe(vw(19, Math.floor(cx / TILE), Math.floor(cy / TILE)));
+      notes.push(`${name}${z}: ${why}`); return null;
     }
-  }
-  throw new Error('위성 사진을 불러오지 못했습니다 (' + notes.join(' · ') + ')');
+  };
+  // 1차: VWorld 19 · Esri 19 동시에
+  let got = (await Promise.all([key ? get('VWorld', vw, 19) : null, get('Esri', esri, 19)])).filter(Boolean);
+  // 둘 다 실패하면 한 단계 낮은 줌
+  if (!got.length) got = (await Promise.all([key ? get('VWorld', vw, 18) : null, get('Esri', esri, 18)])).filter(Boolean);
+  if (!got.length) throw new Error('위성 사진을 불러오지 못했습니다 (' + notes.join(' · ') + ')');
+  got.sort((p, q) => q.sharp - p.sharp);
+  const best = got[0];
+  for (const o of got.slice(1)) notes.push(`${o.source}${o.zoom}: 덜 또렷함(${o.sharp.toFixed(1)} < ${best.sharp.toFixed(1)})`);
+  return { canvas: best.canvas, source: best.source, zoom: best.zoom, note: notes.join(' · ') };
 }
 
 // 언샤프 마스크(3×3) — amount 0~1

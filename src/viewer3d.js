@@ -472,7 +472,7 @@ export class Viewer3D {
       // 사진 밖은 잔디로 이어서 땅 끝이 허공에 뜨지 않게
       const G = Math.max(wMM, hMM) * 6 + 300000;
       const grass = new THREE.Mesh(new THREE.PlaneGeometry(G, G), TEX.groundMaterial(G));
-      grass.rotation.x = -Math.PI / 2; grass.position.y = -12; grass.receiveShadow = true;
+      grass.rotation.x = -Math.PI / 2; grass.position.y = -400; grass.receiveShadow = true;   // 멀리서 땅 사진과 겹쳐 줄무늬 지지 않게 충분히 아래
       grass.userData.isGround = true; grass.visible = !this.underside;
       this.modelGroup.add(grass);
       const pc = site.parcel;

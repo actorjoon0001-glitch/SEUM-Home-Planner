@@ -2197,6 +2197,7 @@ function buildToolbar({ editor, viewer, onModeChange }) {
   store.subscribe(syncVariantBar);
   store.subscribe(syncVideoBtn);
   store.subscribe(syncPanoBtn);
+  store.subscribe(syncSiteBar); syncSiteBar();   // 3D 위 부지 바
   loadPanos().then(syncPanoBtn);   // 카탈로그 360 사진 목록 — 받으면 📷 버튼 표시
   loadVideos();   // 모델 영상 목록(설정 행) — 다 받으면 🎬 버튼 표시
   refreshUndo();
@@ -2858,6 +2859,36 @@ async function fetchSiteByAddress(addr, onStep) {
   return { ...site, cx: b ? b.cx : 0, cy: b ? b.cz : 0 };
 }
 function siteState() { return store.design.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }; }
+// 3D 화면 위 부지 바 — 지금 땅(지번·면적) + 다른 지번 바로 검색
+function syncSiteBar() {
+  const bar = document.getElementById('site-bar'); if (!bar) return;
+  const s = store.design.site;
+  bar.classList.toggle('hidden', !(s && s.image));
+  if (!(s && s.image)) return;
+  const cur = bar.querySelector('.sb-cur');
+  const txt = s.parcel ? `${s.parcel.addr || s.addr || ''} · ${(s.parcel.areaM2 || 0).toLocaleString()}㎡(${((s.parcel.areaM2 || 0) / 3.305785).toFixed(0)}평)` : (s.addr || '올린 사진');
+  if (cur.textContent !== txt) cur.textContent = txt;
+  if (bar._wired) return;
+  bar._wired = true;
+  const q = bar.querySelector('.sb-q'), go = bar.querySelector('.sb-go');
+  bar.onsubmit = async (e) => {
+    e.preventDefault();
+    const addr = q.value.trim(); if (!addr) { q.focus(); return; }
+    go.disabled = true;
+    const step = (t) => { go.textContent = t.replace(/ 중…$/, '…'); };
+    try {
+      const site = await fetchSiteByAddress(addr, step);
+      setSite({ ...site, query: addr });
+      flash(site.parcel ? `${site.parcel.jibun} 필지를 불러왔어요` : '부지를 불러왔습니다 (지적도 없이 위성 사진만)');
+      q.value = '';
+      if (_viewer) _viewer._needCam = true;
+    } catch (err) { alert('부지 검색 실패: ' + (err.message || err)); }
+    finally { go.disabled = false; go.textContent = '검색'; }
+  };
+  bar.querySelector('.sb-x').onclick = () => { if (confirm('불러온 땅(위성 사진)을 지울까요?')) clearSite(); };
+  // 3D 조작 단축키(Esc·F 등)가 입력 중에 먹지 않게
+  q.addEventListener('keydown', (e) => e.stopPropagation());
+}
 function setSite(patch) {
   store.commit((d) => { d.site = { ...(d.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }), ...patch }; });
   if (_viewer) _viewer.dirty = true;

@@ -893,7 +893,7 @@ export class Viewer3D {
     const top = this._textSprite('🏠 ' + parts.join(' · '), 'house');
     top.position.set((ax + bx) / 2, F + H + 2600, (az + bz) / 2); g.add(top);
     // 치수선 — 북쪽(가로)·서쪽(세로)으로 1.2m 띄워 땅 위에
-    const OFF = 1200, y = F + 40, parts3 = [];
+    const OFF = 1200, y = 40, parts3 = [];   // 치수선은 땅 위 (기초 높이와 무관)
     const bar = (p, q) => {
       const dx = q[0] - p[0], dz = q[1] - p[1], len = Math.hypot(dx, dz);
       const geo = new THREE.BoxGeometry(len, 30, 45); geo.rotateY(-Math.atan2(dz, dx)); geo.translate((p[0] + q[0]) / 2, y, (p[1] + q[1]) / 2); parts3.push(geo);
@@ -901,7 +901,7 @@ export class Viewer3D {
     const tick = (x, z, alongX) => { const geo = new THREE.BoxGeometry(alongX ? 45 : 700, 30, alongX ? 700 : 45); geo.translate(x, y, z); parts3.push(geo); };
     bar([ax, az - OFF], [bx, az - OFF]); tick(ax, az - OFF, true); tick(bx, az - OFF, true);
     bar([ax - OFF, az], [ax - OFF, bz]); tick(ax - OFF, az, false); tick(ax - OFF, bz, false);
-    const lm = new THREE.Mesh(mergeGeometries(parts3), this._m3dCached('|dim-line', () => new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.95 })));
+    const lm = new THREE.Mesh(mergeGeometries(parts3), this._m3dCached('|dim-line', () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })));   // 집에 가려지게
     lm.renderOrder = 25; lm.userData.isGround = true; g.add(lm); parts3.forEach((x) => x.dispose());
     const mm = (v) => `${(v / 1000).toFixed(1)}m`;
     const lw = this._textSprite(`가로 ${mm(x1 - x0)}`, 'dim'); lw.position.set((ax + bx) / 2, y + 200, az - OFF); g.add(lw);

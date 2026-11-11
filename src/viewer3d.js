@@ -451,9 +451,10 @@ export class Viewer3D {
     // 실물 모델은 캐시해서 계속 재사용 → 아래 일괄 해제에 휩쓸리지 않게 먼저 떼어냄
     for (const e of Object.values(this._m3dCache || {})) if (e.node && e.node.parent) e.node.parent.remove(e.node);
     for (const it of (this.compare && this.compare.items) || []) if (it.node && it.node.parent) it.node.parent.remove(it.node);
+    if (this._siteOv && this._siteOv.group.parent) this._siteOv.group.parent.remove(this._siteOv.group);   // 부지 경계·건물도 재사용
     // 기존 제거 — 지오메트리는 매번 새로 만들므로 GPU 메모리도 함께 해제 (편집할수록 느려지는 것 방지)
     //   (재질·텍스처는 textures.js 캐시를 공유하므로 해제하지 않음)
-    this.modelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    this.modelGroup.traverse((o) => { if (o.geometry && !o.isSprite) o.geometry.dispose(); });   // 글씨판(Sprite)은 공용 지오메트리라 두기
     this.modelGroup.clear();
     const d = store.design;
     const b = this._bounds();
@@ -497,7 +498,17 @@ export class Viewer3D {
       this.modelGroup.add(grass);
       const pc = site.parcel;
       this._siteParcelLabel = pc ? `${pc.jibun}  ${(pc.areaM2 || 0).toLocaleString()}㎡ (${((pc.areaM2 || 0) / 3.305785).toFixed(0)}평)` : '';
-      if (site.vec) this._buildSiteOverlay(site.vec, ground.position, -(site.rot || 0) * Math.PI / 180, { cad: !site.hideCad, bld: !site.hideBld });
+      if (site.vec) {
+        // 집을 옮기거나 돌릴 때마다 수백 개 경계·건물을 다시 만들지 않게 — 바뀐 게 없으면 그대로 다시 붙임
+        const vid = this._vecIds || (this._vecIds = new WeakMap());
+        if (!vid.has(site.vec)) vid.set(site.vec, (this._vecN = (this._vecN || 0) + 1));
+        const key = [vid.get(site.vec), site.rot || 0, !!site.hideCad, !!site.hideBld, ground.position.x, ground.position.z, this._siteParcelLabel].join('|');
+        if (!this._siteOv || this._siteOv.key !== key) {
+          if (this._siteOv) this._siteOv.group.traverse((o) => { if (o.geometry && !o.isSprite) o.geometry.dispose(); });
+          this._siteOv = { key, group: this._buildSiteOverlay(site.vec, ground.position, -(site.rot || 0) * Math.PI / 180, { cad: !site.hideCad, bld: !site.hideBld }) };
+        }
+        this.modelGroup.add(this._siteOv.group);
+      }
     } else {
       // 부지 이미지가 없으면 잔디 마당 — 지평선까지 넓게 깔고 안개로 자연스럽게 사라지게
       const G = M * 16 + 300000;
@@ -850,7 +861,7 @@ export class Viewer3D {
       label(this._siteParcelLabel, sx / tgt.length, minZ - 1500, 1500, true);
     }
     if (show.cad) for (const l of (vec.labels || []).slice(0, 80)) label(l.t, l.x, l.y, 300, false);
-    this.modelGroup.add(g);
+    return g;
   }
 
   // 화면에서 늘 같은 크기로 보이는 글씨 판 — kind: 'house'(빨강) · 'dim'(흰 바탕)

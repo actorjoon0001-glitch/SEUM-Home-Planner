@@ -5,6 +5,22 @@ const LS_KEY = 'seum-homeplanner:current';
 const LS_LIST = 'seum-homeplanner:saved';
 const LS_TPL = 'seum-homeplanner:my-templates'; // 내 기본 도면(이 기기)
 
+// 되돌리기 기록용 — 땅 사진처럼 큰 데이터(수 MB)는 기록마다 복사하지 않고 메모리에 한 번만 두고 꼬리표로 대신
+const BIG_MIN = 100000;
+const _big = new Map(), _bigRev = new Map();
+let _bigN = 0;
+const pack = (k, v) => {
+  if (typeof v === 'string' && v.length > BIG_MIN && v.startsWith('data:')) {
+    let id = _bigRev.get(v);
+    if (!id) { id = 'b' + (_bigN++); _big.set(id, v); _bigRev.set(v, id); }
+    return '@@big:' + id;
+  }
+  return v;
+};
+const unpack = (k, v) => (typeof v === 'string' && v.startsWith('@@big:') && _big.has(v.slice(6)) ? _big.get(v.slice(6)) : v);
+const snap = (d) => JSON.stringify(d, pack);
+const unsnap = (s) => JSON.parse(s, unpack);
+
 class Store {
   constructor() {
     this.design = normalize(this._load() || createDefaultDesign());
@@ -27,21 +43,21 @@ class Store {
 
   // --- 되돌리기 스냅샷 ---
   snapshot() {
-    this._history.push(JSON.stringify(this.design));
+    this._history.push(snap(this.design));
     if (this._history.length > 60) this._history.shift();
     this._future = [];
   }
   undo() {
     if (!this._history.length) return;
-    this._future.push(JSON.stringify(this.design));
-    this.design = JSON.parse(this._history.pop());
+    this._future.push(snap(this.design));
+    this.design = unsnap(this._history.pop());
     this._clampSelection();
     this.emit();
   }
   redo() {
     if (!this._future.length) return;
-    this._history.push(JSON.stringify(this.design));
-    this.design = JSON.parse(this._future.pop());
+    this._history.push(snap(this.design));
+    this.design = unsnap(this._future.pop());
     this._clampSelection();
     this.emit();
   }
@@ -139,7 +155,17 @@ class Store {
   }
 
   // --- 영속화 ---
-  persist() { this._syncActiveFloor(); try { localStorage.setItem(LS_KEY, JSON.stringify(this.design)); } catch (e) {} }
+  // 브라우저 저장 — 연속 변경(돌리기·이동)마다 수 MB 를 쓰지 않게 잠깐 모았다가 한 번에
+  persist() {
+    this._syncActiveFloor();
+    clearTimeout(this._persistT);
+    this._persistT = setTimeout(() => this._persistNow(), 500);
+    if (!this._unloadHook && typeof window !== 'undefined') {
+      this._unloadHook = true;
+      window.addEventListener('pagehide', () => { if (this._persistT) this._persistNow(); });
+    }
+  }
+  _persistNow() { clearTimeout(this._persistT); this._persistT = null; try { localStorage.setItem(LS_KEY, JSON.stringify(this.design)); } catch (e) {} }
   _load() {
     try { const s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; }
   }

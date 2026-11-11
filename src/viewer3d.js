@@ -1712,7 +1712,11 @@ export class Viewer3D {
       const L = horiz ? r.w : r.d;
       const ops = this._collectOps(r, side, L);
       const rects = this._wallRects(L, ops, wallH, T); // 끝을 T 늘려 모서리 메움
-      for (const [a, bEnd, yLo, yHi] of rects) {
+      const wallTop = 60 + wallH;
+      for (const [a, bEnd, yLo, yHi0] of rects) {
+        // 벽 윗면과 외장 윗면이 같은 높이에서 겹치면 깜빡임(z-fighting) → 외장을 6mm 올려 벽 위를 덮음
+        //   (모서리에서 겹치는 두 면끼리도 같은 높이면 깜빡이므로 남북 6 · 동서 7mm 로 살짝 다르게)
+        const yHi = yHi0 >= wallTop - 1 ? yHi0 + (horiz ? 6 : 7) : yHi0;
         const len = bEnd - a, h = yHi - yLo;
         if (len < 1 || h < 1) continue;
         let cx, cz, w, dep;

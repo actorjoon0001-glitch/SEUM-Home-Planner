@@ -18,14 +18,15 @@ TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 
 
 const WALL_T = 100; // 벽 두께 mm
 
-// 실물 모델 벽 구멍(추가한 창·문) — 월드 좌표 상자 안의 실물 모델 면을 셰이더에서 잘라냄 (모든 재질이 같은 uniform 공유)
-const HOLE_MAX = 12;
+// 실물 모델 벽 구멍 — 월드 좌표 상자 안의 실물 모델 면을 셰이더에서 잘라냄 (모든 재질이 같은 uniform 공유)
+//   상자 종류(min.w): 0 = 추가한 창·문 구멍(메움판도 함께 뚫림) · 1 = 뺀 창·문 숨김(실물 모델만, 메움판은 그대로)
+const HOLE_MAX = 16;
 const HOLES = {
   n: { value: 0 },
-  min: { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector3()) },
-  max: { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector3()) },
+  min: { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector4()) },
+  max: { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector4()) },
 };
-function patchHoleMaterial(mat) {
+function patchHoleMaterial(mat, isPatch = false) {
   if (!mat || mat.userData.holePatched) return;
   mat.userData.holePatched = true;
   const prev = mat.onBeforeCompile, prevKey = mat.customProgramCacheKey;
@@ -36,14 +37,15 @@ function patchHoleMaterial(mat) {
       .replace('#include <common>', '#include <common>\nvarying vec3 vHoleW;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvHoleW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vHoleW;\nuniform int uHoleN;\nuniform vec3 uHoleMin[${HOLE_MAX}];\nuniform vec3 uHoleMax[${HOLE_MAX}];`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vHoleW;\nuniform int uHoleN;\nuniform vec4 uHoleMin[${HOLE_MAX}];\nuniform vec4 uHoleMax[${HOLE_MAX}];`)
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
         for (int i = 0; i < ${HOLE_MAX}; i++) {
           if (i >= uHoleN) break;
-          if (all(greaterThan(vHoleW, uHoleMin[i])) && all(lessThan(vHoleW, uHoleMax[i]))) discard;
+          ${isPatch ? 'if (uHoleMin[i].w > 0.5) continue;' : ''}
+          if (all(greaterThan(vHoleW, uHoleMin[i].xyz)) && all(lessThan(vHoleW, uHoleMax[i].xyz))) discard;
         }`);
   };
-  mat.customProgramCacheKey = function () { return (prevKey ? prevKey.call(this) : '') + '|holes'; };
+  mat.customProgramCacheKey = function () { return (prevKey ? prevKey.call(this) : '') + (isPatch ? '|holes-patch' : '|holes'); };
   mat.needsUpdate = true;
 }
 const SKY_TOP = '#a9c6e3', SKY_HORIZON = '#e8eef3';   // 하늘 그라데이션 (지평선색 = 안개색)
@@ -573,7 +575,7 @@ export class Viewer3D {
     const baseRooms = allRooms.slice(0, nBase);
     const bb = bbox(baseRooms);
     let reason = '';
-    const extraOpenings = [];
+    const extraOpenings = [], removedOpenings = [];
     if (!fits(bb)) reason = '도면 크기';
     else if (m.roofType && roof.type !== m.roofType) reason = '지붕 모양';
     else if (m.roofType && (roof.ridge === 'x' ? 'x' : 'z') !== (m.ridge || 'z')) reason = '용마루 방향';
@@ -588,13 +590,20 @@ export class Viewer3D {
           const n = left.get(key) || 0;
           if (n > 0) left.set(key, n - 1); else extraOpenings.push(o);
         }
-        if ([...left.values()].some((n) => n > 0)) reason = '창·문 배치';
+        // 원래 있던 창·문을 빼거나 옮기거나 크기를 바꿈 → 원래 자리는 벽으로 메움 (키로 원래 위치 복원)
+        for (const [key, n] of left) for (let i = 0; i < n; i++) {
+          const [ri, side, pos10, winType, w, h, sill] = key.split(':');
+          const room = allRooms[+ri];
+          if (!room || +ri >= nBase || !side) { reason = '창·문 배치'; break; }
+          removedOpenings.push({ id: 'removed-' + key + '-' + i, roomId: room.id, side, pos: +pos10 * 10, winType, w: +w, h: +h, sill: +sill });
+        }
       }
     }
     if (!reason && (this.faceMode || (d.exteriorFaces && Object.keys(d.exteriorFaces).length))) reason = '면별 외장재';
     const extraRooms = multi ? [] : allRooms.slice(nBase);
     return { available: !reason, mismatch: !!reason, reason, url: m.url, label: m.label || '', ox: bb.x0, oy: bb.y0,
-      baseBox: bb, baseRooms, extraRooms: reason ? [] : extraRooms, extraOpenings: reason ? [] : extraOpenings };
+      baseBox: bb, baseRooms, extraRooms: reason ? [] : extraRooms, extraOpenings: reason ? [] : extraOpenings,
+      removedOpenings: reason ? [] : removedOpenings };
   }
 
   // 🏘️ 주택 비교 — 다른 제품(실물 모델)을 지금 집 동쪽에 4m 씩 띄워 나란히 세움. 해·시간·방위는 함께 적용
@@ -727,8 +736,8 @@ export class Viewer3D {
   //   · 추가한 창·문: 실물 모델 벽에 구멍을 내고(셰이더로 잘라냄) 창틀·유리·문짝 + 벽 두께 마감
   _buildHybrid(d, b, H, F, m3d, root, house, node) {
     HOLES.n.value = 0;
-    const rooms = m3d.extraRooms || [], ops = m3d.extraOpenings || [];
-    if (!rooms.length && !ops.length) return;
+    const rooms = m3d.extraRooms || [], ops = m3d.extraOpenings || [], gone = m3d.removedOpenings || [];
+    if (!rooms.length && !ops.length && !gone.length) return;
     const bb = m3d.baseBox, TOL = 60;
     const inBase = (r) => { const cx = r.x + r.w / 2, cy = r.y + r.d / 2; return cx > bb.x0 && cx < bb.x1 && cy > bb.y0 && cy < bb.y1; };
     const outRooms = rooms.filter((r) => !inBase(r));
@@ -763,31 +772,65 @@ export class Viewer3D {
       }
       if (F > 0) { const mg = this.modelGroup; this.modelGroup = root; this._buildFoundation({ ...d, outline: null, rooms: outRooms }, b, F); this.modelGroup = mg; }
     }
-    if (!ops.length) return;
-    // 추가한 창·문 — 실물 모델 벽을 찾아(광선) 두께만큼 구멍 + 창틀을 벽 두께 가운데에
+    if (!ops.length && !gone.length) return;
     house.updateMatrixWorld(true);
-    const holes = [];
+    const holes = [];   // [min, max, kind]
     const cx0 = (bb.x0 + bb.x1) / 2, cy0 = (bb.y0 + bb.y1) / 2;
-    for (const o of ops) {
-      const pl = this._openingWorld(o); if (!pl || pl.free) continue;
-      let nx = -pl.uy, ny = pl.ux;   // 벽 법선(도면) — 실물 모델 중심 반대쪽이 바깥
+    const toWorldBox = (px, pz, pl, nx, ny, u0, u1, y0, y1, s0, s1, kind) => {
+      const mn = new THREE.Vector3(Infinity, Infinity, Infinity), mx = new THREE.Vector3(-Infinity, -Infinity, -Infinity), v = new THREE.Vector3();
+      for (const su of [u0, u1]) for (const sv of [y0, y1]) for (const sn of [s0, s1]) {
+        v.set(px + pl.ux * su + nx * sn, sv, pz + pl.uy * su + ny * sn); house.localToWorld(v); mn.min(v); mx.max(v);
+      }
+      holes.push([mn, mx, kind]);
+    };
+    const frame = (o) => {   // 창·문 공통: 벽선 위치·바깥 법선
+      const pl = this._openingWorld(o); if (!pl || pl.free) return null;
+      let nx = -pl.uy, ny = pl.ux;   // 실물 모델 중심 반대쪽이 바깥 (실내 칸막이는 아무 쪽이나)
       if ((pl.cx - cx0) * nx + (pl.cy - cy0) * ny < 0) { nx = -nx; ny = -ny; }
+      const [px, pz] = this._p(pl.cx, pl.cy, b);
+      return { pl, nx, ny, px, pz };
+    };
+
+    // 1) 뺀(옮긴·크기 바꾼) 원래 창·문 — 실물 모델의 그 자리(창틀·유리·문짝)를 숨기고 벽 메움판으로 채움
+    for (const o of gone) {
+      const f = frame(o); if (!f) continue;
+      const { pl, nx, ny, px, pz } = f;
+      const w = o.w || 900, sill = o.sill || 0, oh = o.h || 1200;
+      const yMid = sill + oh / 2 + 60;
+      const wall = this._m3dWallNear(node, house, b, pl, nx, ny, yMid, m3d.url, w); if (!wall) continue;
+      const isDoor = (WINDOW_TYPES[o.winType] || {}).glass === false || sill < 100;
+      const M = 80;                                                   // 창 둘레 몰딩까지 덮는 여유
+      const yBot = 60 + Math.max(0, sill - M), yTop = Math.min(60 + sill + oh + M, 60 + H - 10);
+      const hw = w / 2 + M;
+      // 숨김 상자 — 메움판보다 살짝 작게(틈 안 생기게), 바깥 몰딩·안쪽 문짝(열린 각도)까지
+      toWorldBox(px, pz, pl, nx, ny, -hw + 10, hw - 10, yBot + (sill > M ? 10 : 0), yTop - 10,
+        wall.sIn - (isDoor ? w + 60 : 40), wall.sOut + 160, 1);
+      // 메움판 — 바깥면은 실물 외장(카탈로그 자재면 그 자재), 안쪽면은 실내 벽 색
+      const mats = this._patchMats(d, wall, w, yTop - yBot);
+      const depth = wall.sOut - wall.sIn + 4, sMid = (wall.sIn + wall.sOut) / 2;
+      const g = new THREE.Group();
+      g.position.set(px + nx * sMid, (yBot + yTop) / 2, pz + ny * sMid); g.rotation.y = -Math.atan2(pl.uy, pl.ux);
+      const outPlus = (nx * -pl.uy + ny * pl.ux) > 0;   // 상자 +z 가 바깥인지
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, yTop - yBot, depth),
+        [mats.side, mats.side, mats.side, mats.side, outPlus ? mats.out : mats.in, outPlus ? mats.in : mats.out]);
+      mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh);
+      this.modelGroup.add(g);
+    }
+
+    // 2) 추가한 창·문 — 실물 모델 벽을 찾아(광선) 두께만큼 구멍 + 창틀은 바깥면 쪽에 + 벽 두께 마감
+    for (const o of ops) {
+      const f = frame(o); if (!f) continue;
+      const { pl, nx, ny, px, pz } = f;
       const yMid = (o.sill || 0) + (o.h || 1200) / 2 + 60;
-      const wall = this._m3dWallAt(node, house, b, pl, nx, ny, yMid, m3d.url);
+      const wall = this._m3dWallNear(node, house, b, pl, nx, ny, yMid, m3d.url, o.w || 900);
       const before = this.modelGroup.children.length;
       this._buildOpening(o, b);
       if (!wall) continue;   // 실물 모델 벽이 아닌 곳(추가한 방 벽) — 자동 벽에 이미 뚫림
       const sMid = (wall.sIn + wall.sOut) / 2, depth = wall.sOut - wall.sIn;
       const sWin = Math.max(wall.sIn + 80, wall.sOut - 110);   // 창틀은 실제 시공처럼 바깥면 쪽에
       for (const ch of this.modelGroup.children.slice(before)) { ch.position.x += nx * sWin; ch.position.z += ny * sWin; }
-      // 구멍 상자(집 좌표) → 월드 AABB
-      const [px, pz] = this._p(pl.cx, pl.cy, b);
-      const hw = (o.w || 900) / 2, hh = (o.h || 1200) / 2, s0 = wall.sIn - 40, s1 = wall.sOut + 40;
-      const mn = new THREE.Vector3(Infinity, Infinity, Infinity), mx = new THREE.Vector3(-Infinity, -Infinity, -Infinity), v = new THREE.Vector3();
-      for (const su of [-hw, hw]) for (const sv of [-hh, hh]) for (const sn of [s0, s1]) {
-        v.set(px + pl.ux * su + nx * sn, yMid + sv, pz + pl.uy * su + ny * sn); house.localToWorld(v); mn.min(v); mx.max(v);
-      }
-      holes.push([mn, mx]);
+      const hw = (o.w || 900) / 2, hh = (o.h || 1200) / 2;
+      toWorldBox(px, pz, pl, nx, ny, -hw, hw, yMid - hh, yMid + hh, wall.sIn - 40, wall.sOut + 40, 0);
       // 벽 두께 마감(창 둘레 안쪽 판) — 구멍으로 벽 속이 보이지 않게
       const lin = new THREE.Group(); lin.position.set(px + nx * sMid, yMid, pz + ny * sMid); lin.rotation.y = -Math.atan2(pl.uy, pl.ux);
       const lm = this._m3dCached('|hole-lining', () => new THREE.MeshStandardMaterial({ color: '#ebe8e2', roughness: 0.8 }));
@@ -798,10 +841,55 @@ export class Viewer3D {
       this.modelGroup.add(lin);
     }
     if (!holes.length) return;
+    // 추가 구멍(0)을 먼저 — 칸이 모자라면 숨김(1)부터 버림
+    holes.sort((p, q) => p[2] - q[2]);
     holes.length = Math.min(holes.length, HOLE_MAX);
-    holes.forEach(([mn, mx], i) => { HOLES.min.value[i].copy(mn); HOLES.max.value[i].copy(mx); });
+    holes.forEach(([mn, mx, k], i) => { HOLES.min.value[i].set(mn.x, mn.y, mn.z, k); HOLES.max.value[i].set(mx.x, mx.y, mx.z, k); });
     HOLES.n.value = holes.length;
     node.traverse((x) => { if (x.isMesh) for (const mt of Array.isArray(x.material) ? x.material : [x.material]) patchHoleMaterial(mt); });
+  }
+  // 창 자리 가운데가 비어 있으면(원래 창이 있던 곳 등) 옆 벽에서 두께를 잼
+  _m3dWallNear(node, house, b, pl, nx, ny, yMid, url, w) {
+    for (const off of [0, w / 2 + 300, -(w / 2 + 300), w / 2 + 700, -(w / 2 + 700)]) {
+      const r = this._m3dWallAt(node, house, b, { ...pl, cx: pl.cx + pl.ux * off, cy: pl.cy + pl.uy * off }, nx, ny, yMid, url);
+      if (r) return r;
+    }
+    return null;
+  }
+  // 메움판 재질 — 바깥: 카탈로그 자재(고른 경우) 또는 실물 외장 평균색의 사이딩 질감, 안쪽: 실내 벽 평균색
+  _patchMats(d, wall, len, h) {
+    const cms = (d.model3d && d.model3d.catalogMats) || {};
+    const part = wall.outObj ? wall.outObj.name.replace(/^2층_/, '') : '';
+    const set = ((d.model3d && d.model3d.optionSets) || []).find((st) => st.parts.includes(part));
+    const avg = (mat) => this._m3dCached((mat ? mat.uuid : 'none') + '|avg', () => {
+      if (!mat) return '#e9e7e2';
+      if (!mat.map || !mat.map.image) return '#' + mat.color.getHexString(THREE.SRGBColorSpace);
+      // 구운 질감 평균색 — 아틀라스 빈 곳(검정)은 빼고
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(mat.map.image, 0, 0, 64, 64);
+      const px = ctx.getImageData(0, 0, 64, 64).data; let r = 0, g = 0, bl = 0, n = 0, r2 = 0, g2 = 0, b2 = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        r2 += px[i]; g2 += px[i + 1]; b2 += px[i + 2];
+        if (px[i] + px[i + 1] + px[i + 2] > 18) { r += px[i]; g += px[i + 1]; bl += px[i + 2]; n++; }
+      }
+      const N = px.length / 4;
+      const c = n > N * 0.05 ? new THREE.Color().setRGB(r / n / 255, g / n / 255, bl / n / 255, THREE.SRGBColorSpace)
+        : new THREE.Color().setRGB(r2 / N / 255, g2 / N / 255, b2 / N / 255, THREE.SRGBColorSpace);
+      c.multiply(mat.color);
+      return '#' + c.getHexString(THREE.SRGBColorSpace);
+    });
+    let out;
+    if (set && cms[set.key]) out = catalogWallMaterial(cms[set.key], THREE.DoubleSide, 'patch');
+    else {
+      const col = avg(wall.outMat), ex = d.exterior || {};
+      const def = EXTERIOR_MATERIALS[ex.material] || EXTERIOR_MATERIALS.metal;
+      out = this._m3dCached('patch-out|' + col + '|' + (ex.material || '') + '|' + (ex.dir || ''), () =>
+        TEX.exteriorMaterial(ex.material || 'metal', col, len, h, def.roughness, def.metalness, ex.dir).clone());
+    }
+    const inn = this._m3dCached('patch-in|' + avg(wall.inMat), () => new THREE.MeshStandardMaterial({ color: avg(wall.inMat), roughness: 0.9 }));
+    for (const m of [out, inn]) patchHoleMaterial(m, true);
+    return { out, in: inn, side: inn };
   }
   // 창·문 자리에서 실물 모델 벽의 바깥면·안쪽면 찾기 (벽선 기준 바깥 +, 안 −) — 결과 캐시
   _m3dWallAt(node, house, b, pl, nx, ny, yMid, url) {
@@ -814,13 +902,17 @@ export class Viewer3D {
     const dir = t.clone().sub(o).normalize();
     const rc = new THREE.Raycaster(o, dir, 0, R + 700);
     const shown = (x) => { for (let p = x; p; p = p.parent) if (!p.visible) return false; return true; };
-    const hits = rc.intersectObject(node, true).filter((h) => shown(h.object) && !(h.object.material && h.object.material.transparent));
+    const matOf = (h) => (Array.isArray(h.object.material) ? h.object.material[(h.face && h.face.materialIndex) || 0] : h.object.material);
+    // 벽선 근처(바깥 350 ~ 안 450)에서 맞은 면만 — 앞에 가구·다른 벽이 있어도 이 벽을 찾음
+    const hits = rc.intersectObject(node, true).filter((h) => shown(h.object) && !(matOf(h) && matOf(h).transparent)
+      && h.distance >= R - 350 && h.distance <= R + 450);
     let res = null;
-    if (hits.length && hits[0].distance > R - 700) {
+    if (hits.length) {
       const tOut = hits[0].distance;
-      let tIn = tOut;
-      for (const h of hits) if (h.distance <= tOut + 450) tIn = h.distance;
-      res = { sOut: R - tOut, sIn: Math.min(R - tIn, R - tOut - 60) };
+      let hIn = hits[0];
+      for (const h of hits) if (h.distance <= tOut + 450) hIn = h;
+      res = { sOut: R - tOut, sIn: Math.min(R - hIn.distance, R - tOut - 60),
+        outObj: hits[0].object, outMat: matOf(hits[0]), inMat: hIn !== hits[0] ? matOf(hIn) : null };
     }
     if (c.size > 400) c.clear();
     c.set(key, res);

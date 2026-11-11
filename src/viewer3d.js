@@ -190,7 +190,7 @@ export class Viewer3D {
 
   // 햇빛 그림자 범위를 현재 도면 크기에 맞춤 — 작은 집일수록 그림자가 또렷해짐
   _fitShadow(b) {
-    const s = Math.max(b.w, b.h) / 2 + 4000;
+    const s = Math.max(b.w, b.h) / 2 + 4000 + Math.hypot(b.hx || 0, b.hz || 0);   // 땅 위에서 옮긴 만큼 그림자 범위도
     const sun = this.sun;
     this._shadowS = s;
     // 해 방향은 실제 계산값(계절·시각·집 방위) — 기본(봄·가을 오후 2시, 정남향)은 앞-왼쪽 위에서 비춤
@@ -430,7 +430,15 @@ export class Viewer3D {
       maxX = Math.max(maxX, px); maxY = Math.max(maxY, py);
     }
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 8000; maxY = 8000; }
-    return { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cz: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY };
+    const b = { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cz: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY, hx: 0, hz: 0 };
+    // 땅(부지)을 깔았으면 3D 원점을 땅 기준점에 고정 → 집을 끌면 땅 위에서 집만 움직임
+    //   (집 중심이 원점이면 집 전체를 옮길 때 화면이 같이 따라가 잡은 점이 미끄러짐)
+    const st = d.site;
+    if (st && st.image && st.cx != null && st.cy != null) {
+      b.hx = b.cx - st.cx; b.hz = b.cz - st.cy;   // 땅 기준점에서 집 중심까지
+      b.cx = st.cx; b.cz = st.cy;
+    }
+    return b;
   }
 
   // 평면 좌표(mm) → 3D 좌표 (중심 원점). x→x, y(plan)→z
@@ -1354,8 +1362,9 @@ export class Viewer3D {
   resetCamera(b) {
     b = b || this._bounds();
     const dist = Math.max(b.w, b.h) * 1.1 + 5000;
-    this.camera.position.set(dist * 0.65, dist * 0.8, dist * 0.85);
-    this.controls.target.set(0, 0, 0);
+    const hx = b.hx || 0, hz = b.hz || 0;   // 땅 기준 원점이면 집 쪽을 봄
+    this.camera.position.set(hx + dist * 0.65, dist * 0.8, hz + dist * 0.85);
+    this.controls.target.set(hx, 0, hz);
     this._aerialZoomLimits(b);        // 휠 줌 범위 제한 → 집 통과·무한 축소로 사라지는 것 방지
     this.controls.update();
   }
@@ -1363,6 +1372,7 @@ export class Viewer3D {
     const m = Math.max(b.w, b.h);
     this.controls.minDistance = m * 0.32 + 2500;   // 가까이 당겨 디테일 확인 (바닥 속으로는 안 들어가게)
     this.controls.maxDistance = m * 2.4 + 18000;   // 멀리 밀어도 집이 점처럼 작아지지 않게
+    if (store.design.site && store.design.site.image) this.controls.maxDistance = Math.max(this.controls.maxDistance, 160000);   // 땅 전체 둘러보기
   }
 
   _buildRoom(room, b, ceilH) {
@@ -3149,6 +3159,21 @@ export class Viewer3D {
     }
 
     const roomId = pick && pick.roomId;
+
+    // 땅(부지) 위에서는 집을 눌러 바로 끌면 집 전체가 땅 위를 이동 (먼저 클릭할 필요 없음)
+    const site = store.design.site;
+    if (site && site.image && roomId && !e.shiftKey) {
+      const ids = store.design.rooms.map((r) => r.id);
+      const anchor = store.design.rooms.find((r) => r.id === roomId);
+      const g = this._groundHit(e);
+      if (anchor && g) {
+        this.selRooms = new Set(ids);
+        if (store.selectedRoom !== roomId) { store.selectedRoom = roomId; store.selectedFurniture = null; store.selectedOpening = null; store.emit(); }
+        this.controls.enabled = false;
+        this._edrag = { mode: 'group', ids, anchorId: roomId, dx: g.x - anchor.x, dy: g.y - anchor.y };
+        return;
+      }
+    }
 
     // Shift+클릭 = 다중 선택 토글 (건물 통째 이동/회전)
     if (e.shiftKey && roomId) {

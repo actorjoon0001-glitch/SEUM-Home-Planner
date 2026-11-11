@@ -1346,7 +1346,12 @@ function buildSunPanel(viewer) {
     syncLamp(); viewer.applyDaylight(); save();
   };
   syncLamp();
-  faceEl.onchange = () => { const front = +faceEl.value; store.commit((d) => { d.northDeg = (180 - front + 360) % 360; }); };
+  faceEl.onchange = () => {
+    const front = +faceEl.value, nd = (180 - front + 360) % 360;
+    const st = store.design.site;
+    if (st && (st.parcel || st.vec)) setSite({ rot: nd });   // 땅을 깔았으면 땅도 그 방향으로 돌림
+    else store.commit((d) => { d.northDeg = nd; });
+  };
   let timer = 0;
   playEl.onclick = () => {
     if (timer) { clearInterval(timer); timer = 0; playEl.textContent = '▶'; return; }
@@ -2856,7 +2861,8 @@ async function fetchSiteByAddress(addr, onStep) {
   const site = mapboxToken() ? await mapboxFetchSite(addr) : await fetchSite(addr, onStep);
   // 땅을 지금 집 중심에 맞춰 도면 좌표에 고정 (이후 집을 옮기면 땅 위에서 움직임)
   const b = _viewer && _viewer._bounds ? _viewer._bounds() : null;
-  return { ...site, cx: b ? b.cx : 0, cy: b ? b.cz : 0 };
+  // 새 땅은 지금 집 중심에 (b.hx/hz: 이미 땅이 있으면 그 기준점에서 집까지)
+  return { ...site, cx: b ? b.cx + (b.hx || 0) : 0, cy: b ? b.cz + (b.hz || 0) : 0 };
 }
 function siteState() { return store.design.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }; }
 // 3D 화면 위 부지 바 — 지금 땅(지번·면적) + 다른 지번 바로 검색
@@ -2872,8 +2878,11 @@ function syncSiteBar() {
   const src = bar.querySelector('.sb-src');
   src.textContent = s.source ? (s.source === 'Google' ? '위성: © Google' : `위성: ${s.source}${s.source !== 'VWorld' ? '(대체)' : ''}${s.srcZoom && s.srcZoom < 19 ? ' 저해상도' : ''}`) : '';
   src.title = s.srcNote ? '위성 사진 참고: ' + s.srcNote : '';
+  const tv = bar.querySelector('.sb-turn-v');
+  if (tv) { const r = ((360 - (+s.rot || 0)) % 360 + 360) % 360; tv.textContent = r > 180 ? `${r - 360}°` : `${r}°`; }
   if (bar._wired) return;
   bar.querySelectorAll('.sb-tg').forEach((b) => { b.onclick = () => { const k = b.dataset.k; setSite({ [k]: !(store.design.site || {})[k] }); }; });
+  bar.querySelectorAll('.sb-turn').forEach((b) => { b.onclick = () => turnHouseOnSite(+b.dataset.d); });
   bar._wired = true;
   const q = bar.querySelector('.sb-q'), go = bar.querySelector('.sb-go');
   bar.onsubmit = async (e) => {
@@ -2895,8 +2904,17 @@ function syncSiteBar() {
   q.addEventListener('keydown', (e) => e.stopPropagation());
 }
 function setSite(patch) {
-  store.commit((d) => { d.site = { ...(d.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }), ...patch }; });
+  store.commit((d) => {
+    d.site = { ...(d.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }), ...patch };
+    // 주소로 불러온 땅 사진은 위쪽이 북쪽 → 땅을 돌린 만큼이 곧 북쪽 방향(해·그림자도 같이)
+    if (d.site.parcel || d.site.vec) d.northDeg = ((+d.site.rot || 0) % 360 + 360) % 360;
+  });
   if (_viewer) _viewer.dirty = true;
+}
+// 땅 위에서 집 방향 돌리기 — 집 대신 땅·북쪽을 반대로 돌림 (집은 그대로, 상대 방향만 바뀜)
+function turnHouseOnSite(deg) {
+  const s = store.design.site; if (!s) return;
+  setSite({ rot: Math.round((((+s.rot || 0) - deg) % 360 + 360) % 360) });
 }
 function clearSite() { store.commit((d) => { d.site = null; }); if (_viewer) _viewer.dirty = true; }
 

@@ -27,5 +27,5 @@ window.SEUM_CONFIG = {
 
   // 구글 지도 API 키 (Map Tiles API) — 넣으면 부지(땅) 위성 사진을 구글 최신·고해상도 사진으로
   //   (구글 클라우드 콘솔에서 '웹사이트 제한: seum-home-planner.netlify.app/*' 로 잠근 키)
-  googleMapsKey: '',
+  googleMapsKey: 'AIzaSyBzWd8B8UYvlxP45aknxdWeZX_jVIr48W8',
 };

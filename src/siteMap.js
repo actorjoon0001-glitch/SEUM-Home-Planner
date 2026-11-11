@@ -18,7 +18,8 @@ async function googleSession() {
   if (_gSession && _gSession.until > Date.now()) return _gSession.token;
   const r = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(googleKey())}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mapType: 'satellite', language: 'ko-KR', region: 'KR' }),
+    // region 은 넣지 않음 — 'KR' 이면 구글이 한국 지역을 줌15(흐린 사진)까지만 줌. 기본값이면 고해상도
+    body: JSON.stringify({ mapType: 'satellite', language: 'ko-KR' }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.session) throw new Error('구글 지도 키 오류: ' + ((j.error && j.error.message) || ('HTTP ' + r.status)));
@@ -190,8 +191,13 @@ async function satellite(cx, cy) {
     try {
       const token = await googleSession();
       const gu = (z, x, y) => `https://tile.googleapis.com/v1/2dtiles/${z}/${x}/${y}?session=${token}&key=${encodeURIComponent(googleKey())}`;
-      const got = (await get('Google', gu, ZOOM)) || (ZOOM > 19 ? await get('Google', gu, 19) : null);
-      if (got) {
+      // 지역마다 실제 최대 줌이 달라(줌20이 늘린 사진인 곳도 있음) 20·19 를 함께 받아 더 또렷한 쪽
+      const cand = (await Promise.all([get('Google', gu, ZOOM), ZOOM > 19 ? get('Google', gu, 19) : null])).filter(Boolean)
+        .sort((p, q) => q.sharp - p.sharp);
+      const got = cand[0];
+      if (!got && ZOOM > 19) { const g18 = await get('Google', gu, 18); if (g18) cand.push(g18); }
+      if (cand[0]) {
+        const got = cand[0];
         const [w, n] = fromPx(cx - SIZE / 2, cy - SIZE / 2, ZOOM), [e, s] = fromPx(cx + SIZE / 2, cy + SIZE / 2, ZOOM);
         got.copyright = await googleCopyright(token, got.zoom, [w, s, e, n]);
         return { ...got, note: notes.join(' · ') };

@@ -2874,7 +2874,7 @@ function syncSiteBar() {
   const cur = bar.querySelector('.sb-cur');
   const txt = s.parcel ? `${s.parcel.addr || s.addr || ''} · ${(s.parcel.areaM2 || 0).toLocaleString()}㎡(${((s.parcel.areaM2 || 0) / 3.305785).toFixed(0)}평)` : (s.addr || '올린 사진');
   if (cur.textContent !== txt) cur.textContent = txt;
-  bar.querySelectorAll('.sb-tg').forEach((b) => { b.classList.toggle('on', !s[b.dataset.k]); b.classList.toggle('hidden', !s.vec); });
+  bar.querySelectorAll('.sb-tg').forEach((b) => { b.classList.toggle('on', !s[b.dataset.k]); b.classList.toggle('hidden', !s.vec && b.dataset.k !== 'hideDims'); });
   const src = bar.querySelector('.sb-src');
   src.textContent = s.source ? (s.source === 'Google' ? '위성: © Google' : `위성: ${s.source}${s.source !== 'VWorld' ? '(대체)' : ''}${s.srcZoom && s.srcZoom < 19 ? ' 저해상도' : ''}`) : '';
   src.title = s.srcNote ? '위성 사진 참고: ' + s.srcNote : '';

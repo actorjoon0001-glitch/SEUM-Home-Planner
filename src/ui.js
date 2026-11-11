@@ -2870,7 +2870,7 @@ function syncSiteBar() {
   if (cur.textContent !== txt) cur.textContent = txt;
   bar.querySelectorAll('.sb-tg').forEach((b) => { b.classList.toggle('on', !s[b.dataset.k]); b.classList.toggle('hidden', !s.vec); });
   const src = bar.querySelector('.sb-src');
-  src.textContent = s.source ? `위성: ${s.source}${s.source !== 'VWorld' ? '(대체)' : ''}${s.srcZoom && s.srcZoom < 19 ? ' 저해상도' : ''}` : '';
+  src.textContent = s.source ? (s.source === 'Google' ? '위성: © Google' : `위성: ${s.source}${s.source !== 'VWorld' ? '(대체)' : ''}${s.srcZoom && s.srcZoom < 19 ? ' 저해상도' : ''}`) : '';
   src.title = s.srcNote ? '위성 사진 참고: ' + s.srcNote : '';
   if (bar._wired) return;
   bar.querySelectorAll('.sb-tg').forEach((b) => { b.onclick = () => { const k = b.dataset.k; setSite({ [k]: !(store.design.site || {})[k] }); }; });
@@ -2920,7 +2920,7 @@ function openSiteDialog() {
         <div><span>면적</span><b>${(s.parcel.areaM2 || 0).toLocaleString()}㎡ · ${((s.parcel.areaM2 || 0) / 3.305785).toFixed(1)}평</b> <small class="muted">(지적도 경계로 계산한 대략값)</small></div>
         ${s.parcel.jiga ? `<div><span>공시지가</span><b>${Number(s.parcel.jiga).toLocaleString()}원/㎡</b></div>` : ''}
       </div>` : ''}
-      ${s && s.image && s.source ? `<div class="site-src"><img src="${s.image}" alt="받은 위성 사진"><div><b>위성 사진: ${esc(s.source === 'VWorld' ? '국토부 VWorld 항공사진' : 'Esri 세계 위성(대체)')}${s.srcZoom && s.srcZoom < 19 ? ' · 저해상도' : ''}</b>${s.srcNote ? `<small>참고: ${esc(s.srcNote)}</small>` : ''}</div></div>` : ''}
+      ${s && s.image && s.source ? `<div class="site-src"><img src="${s.image}" alt="받은 위성 사진"><div><b>위성 사진: ${esc(s.source === 'Google' ? 'Google 위성' : s.source === 'VWorld' ? '국토부 VWorld 항공사진' : 'Esri 세계 위성(대체)')}${s.srcZoom && s.srcZoom < 19 ? ' · 저해상도' : ''}</b>${s.srcNote ? `<small>참고: ${esc(s.srcNote)}</small>` : ''}</div></div>` : ''}
       <div class="fld"><span>또는 위성/항공 사진 직접 올리기 (네이버지도·구글어스 캡처)</span>
         <input id="site-file" type="file" accept="image/*"></div>
       ${s && s.image ? `

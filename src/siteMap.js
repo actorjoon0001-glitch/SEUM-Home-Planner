@@ -4,11 +4,35 @@
 //   · 위성 사진: VWorld 위성 타일 → 안 되면 Esri 세계 위성 타일로 대신
 //   · 필지 경계(빨강) + 이웃 필지 선(흰색) + 지번을 사진에 그려 넣어, 고객이 "내 땅"을 바로 확인
 
-const ZOOM = 19;          // 약 0.24m/픽셀 (위도 37° 기준)
-const SIZE = 1280;        // 결과 사진 한 변(px) → 약 300m 범위
+// 결과 사진 축척 — 구글 키가 있으면 줌20(약 0.12m/픽셀 · 2048px ≈ 240m), 없으면 줌19(0.24m · 1280px ≈ 300m)
+let ZOOM = 19;
+let SIZE = 1280;
 const TILE = 256;
 
 function vworldKey() { return (window.SEUM_CONFIG && window.SEUM_CONFIG.vworldKey) || ''; }
+function googleKey() { return (window.SEUM_CONFIG && window.SEUM_CONFIG.googleMapsKey) || ''; }
+
+// 구글 Map Tiles API (2D 위성) — 세션 토큰을 받아 타일 주소에 붙임 (약 2주 유효, 페이지에서 재사용)
+let _gSession = null;
+async function googleSession() {
+  if (_gSession && _gSession.until > Date.now()) return _gSession.token;
+  const r = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(googleKey())}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mapType: 'satellite', language: 'ko-KR', region: 'KR' }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.session) throw new Error('구글 지도 키 오류: ' + ((j.error && j.error.message) || ('HTTP ' + r.status)));
+  _gSession = { token: j.session, until: Date.now() + 6 * 3600 * 1000 };
+  return j.session;
+}
+// 구글 사진 저작권 문구 (표시 의무)
+async function googleCopyright(token, z, bbox) {
+  try {
+    const [w, s, e, n] = bbox;
+    const r = await fetch(`https://tile.googleapis.com/tile/v1/viewport?session=${token}&key=${encodeURIComponent(googleKey())}&zoom=${z}&north=${n}&south=${s}&east=${e}&west=${w}`);
+    const j = await r.json(); return j.copyright || '';
+  } catch { return ''; }
+}
 
 // JSONP 호출 (VWorld 는 브라우저 fetch 를 CORS 로 막지만 JSONP 는 허용)
 let _jp = 0;
@@ -148,7 +172,7 @@ function sharpness(cv) {
   for (let y = 2; y < H - 2; y += 2) for (let x = 2; x < W - 2; x += 2) { sum += Math.abs(4 * L(x, y) - L(x - 1, y) - L(x + 1, y) - L(x, y - 1) - L(x, y + 1)); n++; }
   return n ? sum / n : 0;
 }
-// 위성 사진 — VWorld·Esri 를 함께 받아 더 또렷한 쪽을 씀 (지역마다 어느 쪽이 좋은지 다름)
+// 위성 사진 — 구글(키 있으면) 우선. 없거나 실패하면 VWorld·Esri 를 함께 받아 더 또렷한 쪽
 async function satellite(cx, cy) {
   const key = vworldKey();
   const vw = (z, x, y) => `https://api.vworld.kr/req/wmts/1.0.0/${key}/Satellite/${z}/${y}/${x}.jpeg`;
@@ -158,10 +182,22 @@ async function satellite(cx, cy) {
     try { const canvas = await stitch(cx, cy, url, z); return { canvas, source: name, zoom: z, sharp: sharpness(canvas) }; }
     catch (e) {
       let why = e.message;
-      if (name === 'VWorld' && z === 19) why += ' / ' + await probe(vw(19, Math.floor(cx / TILE), Math.floor(cy / TILE)));
+      if (name === 'VWorld' && z === 19) why += ' / ' + await probe(vw(19, Math.floor(cx / TILE / 2 ** (ZOOM - 19)), Math.floor(cy / TILE / 2 ** (ZOOM - 19))));
       notes.push(`${name}${z}: ${why}`); return null;
     }
   };
+  if (googleKey()) {
+    try {
+      const token = await googleSession();
+      const gu = (z, x, y) => `https://tile.googleapis.com/v1/2dtiles/${z}/${x}/${y}?session=${token}&key=${encodeURIComponent(googleKey())}`;
+      const got = (await get('Google', gu, ZOOM)) || (ZOOM > 19 ? await get('Google', gu, 19) : null);
+      if (got) {
+        const [w, n] = fromPx(cx - SIZE / 2, cy - SIZE / 2, ZOOM), [e, s] = fromPx(cx + SIZE / 2, cy + SIZE / 2, ZOOM);
+        got.copyright = await googleCopyright(token, got.zoom, [w, s, e, n]);
+        return { ...got, note: notes.join(' · ') };
+      }
+    } catch (e) { notes.push('Google: ' + e.message); }
+  }
   // 1차: VWorld 19 · Esri 19 동시에
   let got = (await Promise.all([key ? get('VWorld', vw, 19) : null, get('Esri', esri, 19)])).filter(Boolean);
   // 둘 다 실패하면 한 단계 낮은 줌
@@ -209,10 +245,12 @@ export async function fetchSite(addr, onStep = () => {}) {
   try { target = (await parcels(`POINT(${g.lng} ${g.lat})`, 10))[0] || null; } catch { /* 지적도 없이 진행 */ }
   // 사진 중심 = 필지 중심 (없으면 주소 좌표)
   const [clng, clat] = target && target.rings[0] ? centroid(target.rings[0]) : [g.lng, g.lat];
+  // 구글 키가 있으면 더 촘촘하게(줌20), 없으면 줌19
+  if (googleKey()) { ZOOM = 20; SIZE = 2048; } else { ZOOM = 19; SIZE = 1280; }
   const [cx, cy] = toPx(clng, clat, ZOOM);
   onStep('위성 사진 받는 중…');
-  const { canvas, source, zoom, note } = await satellite(cx, cy);
-  sharpen(canvas, 0.55);   // 위성 사진을 살짝 또렷하게 (확대해 볼 때 덜 뭉개지게) — 선·글씨 그리기 전에
+  const { canvas, source, zoom, note, copyright } = await satellite(cx, cy);
+  if (source !== 'Google') sharpen(canvas, 0.55);   // 위성 사진을 살짝 또렷하게 (확대해 볼 때 덜 뭉개지게) — 선·글씨 그리기 전에
   // 이웃 필지·주변 건물 — 사진에 그리지 않고 3D 로 따로 (확대해도 선·글씨가 또렷하게)
   const [w, n] = fromPx(cx - SIZE / 2, cy - SIZE / 2, ZOOM), [e, s] = fromPx(cx + SIZE / 2, cy + SIZE / 2, ZOOM);
   const box = `BOX(${w},${s},${e},${n})`;
@@ -245,9 +283,12 @@ export async function fetchSite(addr, onStep = () => {}) {
   // 출처 표기 (사진 구석)
   ctx.font = '11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.fillText(source === 'Esri' ? '위성: Esri, Maxar · 지적: 국토교통부 VWorld' : '위성·지적: 국토교통부 VWorld', SIZE - 8, SIZE - 6);
+  const credit = source === 'Google' ? `위성: Google${copyright ? ' · ' + copyright : ''} · 지적: 국토교통부 VWorld`
+    : source === 'Esri' ? '위성: Esri, Maxar · 지적: 국토교통부 VWorld' : '위성·지적: 국토교통부 VWorld';
+  ctx.font = `${Math.round(SIZE / 110)}px sans-serif`;
+  ctx.fillText(credit, SIZE - 8, SIZE - 6);
   return {
     image: canvas.toDataURL('image/jpeg', 0.92), widthM: Math.round(res * SIZE * 10) / 10, aspect: 1,
-    addr: parcel && parcel.addr ? parcel.addr : g.addr, parcel, vec, lng: clng, lat: clat, source, srcZoom: zoom, srcNote: note || '', rot: 0, dx: 0, dy: 0,
+    addr: parcel && parcel.addr ? parcel.addr : g.addr, parcel, vec, lng: clng, lat: clat, source, srcZoom: zoom, srcNote: note || '', credit, rot: 0, dx: 0, dy: 0,
   };
 }

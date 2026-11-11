@@ -785,7 +785,7 @@ function buildRoomPalette() {
     if (!hint) return;
     hint.textContent =
       mode === 'outline' ? '모서리 클릭으로 외벽을 이어 그림(길이 표시). 더블클릭=벽 마침(누적), 시작점 클릭=닫기, Esc=취소'
-      : mode === 'draw' ? '공간을 고르고, 외벽 안에서 대각선으로 드래그해 방을 그리세요'
+      : mode === 'draw' ? '공간을 고르고, 대각선으로 드래그해 방을 그리세요 (3D: 바닥에서 좌클릭 드래그 · 화면 회전은 우클릭 드래그)'
       : mode === 'wall' ? '벽을 클릭하면 트기↔막기 (맞닿은 두 방이 함께 처리됨)'
       : mode === 'measure' ? '두 점을 클릭해 거리를 재세요 (방·외벽 꼭짓점에 자동 스냅). Esc=끝'
       : mode === 'erase' ? '지울 대상을 클릭하세요 — 벽은 선 한 칸씩, 방·가구·창호는 통째로 삭제. Esc=끝'
@@ -798,6 +798,7 @@ function buildRoomPalette() {
     if (_editor) {
       _editor.setDrawOutline(m === 'outline');
       _editor.setDrawRoom(m === 'draw' ? drawType : null);
+      if (_viewer && _viewer.setDrawRoom) _viewer.setDrawRoom(m === 'draw' ? drawType : null);   // 3D 에서도 방 그리기
       _editor.setWallEdit(m === 'wall');
       _editor.setMeasure(m === 'measure');
       _editor.setErase(m === 'erase');
@@ -870,7 +871,7 @@ function buildRoomPalette() {
       e.dataTransfer.effectAllowed = 'copy';
     });
     b.onclick = () => {
-      if (mode === 'draw') { drawType = key; if (_editor) _editor.setDrawRoom(key); syncChips(); }
+      if (mode === 'draw') { drawType = key; if (_editor) _editor.setDrawRoom(key); if (_viewer && _viewer.setDrawRoom) _viewer.setDrawRoom(key); syncChips(); }
       else addRoom(key);
     };
     chips[key] = b;

@@ -66,17 +66,28 @@ export async function geocode(addr) {
 }
 
 // 연속지적도(필지) — POINT 또는 BOX 로 조회. 반환 [{ jibun, addr, pnu, jiga, rings:[[ [lng,lat], … ]] }]
-async function parcels(geomFilter, size = 1000) {
+async function features(data, geomFilter, size = 1000) {
   const key = vworldKey();
-  const url = `https://api.vworld.kr/req/data?service=data&request=GetFeature&version=2.0&data=LP_PA_CBND_BUBUN&format=json&geometry=true&attribute=true&crs=EPSG:4326&size=${size}&key=${key}${domainQ()}&geomFilter=${encodeURIComponent(geomFilter)}`;
+  const url = `https://api.vworld.kr/req/data?service=data&request=GetFeature&version=2.0&data=${data}&format=json&geometry=true&attribute=true&crs=EPSG:4326&size=${size}&key=${key}${domainQ()}&geomFilter=${encodeURIComponent(geomFilter)}`;
   const j = await jsonp(url);
   const r = j && j.response;
   if (!r || r.status !== 'OK') return [];
   const feats = (r.result && r.result.featureCollection && r.result.featureCollection.features) || [];
   return feats.map((f) => {
-    const p = f.properties || {}, g = f.geometry || {};
+    const g = f.geometry || {};
     const polys = g.type === 'MultiPolygon' ? g.coordinates : g.type === 'Polygon' ? [g.coordinates] : [];
-    return { jibun: p.jibun || '', addr: p.addr || '', pnu: p.pnu || '', jiga: p.jiga || '', rings: polys.map((pl) => pl[0]).filter(Boolean) };
+    return { p: f.properties || {}, rings: polys.map((pl) => pl[0]).filter(Boolean) };
+  });
+}
+async function parcels(geomFilter, size = 1000) {
+  return (await features('LP_PA_CBND_BUBUN', geomFilter, size)).map(({ p, rings }) =>
+    ({ jibun: p.jibun || '', addr: p.addr || '', pnu: p.pnu || '', jiga: p.jiga || '', rings }));
+}
+// 주변 건물 (도로명주소 건물) — 지상 층수로 높이 어림
+async function buildings(geomFilter) {
+  return (await features('LT_C_SPBD', geomFilter, 1000)).map(({ p, rings }) => {
+    const fl = +(p.gro_flo_co || p.grnd_flr || p.ground_floor || 0);
+    return { floors: fl > 0 ? Math.min(fl, 40) : 1, name: p.buld_nm || p.bd_nm || '', rings };
   });
 }
 
@@ -122,6 +133,23 @@ async function satellite(cx, cy) {
   throw new Error('위성 사진을 불러오지 못했습니다' + (last ? ` (${last.message})` : ''));
 }
 
+// 언샤프 마스크(3×3) — amount 0~1
+function sharpen(cv, amount) {
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  const src = ctx.getImageData(0, 0, W, H), d = src.data, out = new Uint8ClampedArray(d);
+  const k = amount;
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1; x < W - 1; x++) {
+      const i = (y * W + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const v = d[i + c] * (1 + 4 * k) - k * (d[i - 4 + c] + d[i + 4 + c] + d[i - W * 4 + c] + d[i + W * 4 + c]);
+        out[i + c] = v;
+      }
+    }
+  }
+  src.data.set(out); ctx.putImageData(src, 0, 0);
+}
+
 // 필지 면적(m²) — 작은 범위라 평면 근사
 function ringArea(ring) {
   if (!ring || ring.length < 3) return 0;
@@ -144,52 +172,42 @@ export async function fetchSite(addr, onStep = () => {}) {
   const [cx, cy] = toPx(clng, clat, ZOOM);
   onStep('위성 사진 받는 중…');
   const { canvas, source } = await satellite(cx, cy);
-  // 이웃 필지 선 + 내 필지 강조
-  let neighbors = [];
-  try {
-    const [w, n] = fromPx(cx - SIZE / 2, cy - SIZE / 2, ZOOM), [e, s] = fromPx(cx + SIZE / 2, cy + SIZE / 2, ZOOM);
-    neighbors = await parcels(`BOX(${w},${s},${e},${n})`, 1000);
-  } catch { /* 이웃 선 없이 */ }
+  sharpen(canvas, 0.55);   // 위성 사진을 살짝 또렷하게 (확대해 볼 때 덜 뭉개지게) — 선·글씨 그리기 전에
+  // 이웃 필지·주변 건물 — 사진에 그리지 않고 3D 로 따로 (확대해도 선·글씨가 또렷하게)
+  const [w, n] = fromPx(cx - SIZE / 2, cy - SIZE / 2, ZOOM), [e, s] = fromPx(cx + SIZE / 2, cy + SIZE / 2, ZOOM);
+  const box = `BOX(${w},${s},${e},${n})`;
+  onStep('주변 필지·건물 확인 중…');
+  const [neighbors, blds] = await Promise.all([parcels(box, 1000).catch(() => []), buildings(box).catch(() => [])]);
   const ctx = canvas.getContext('2d');
-  const P = ([lng, lat]) => { const [x, y] = toPx(lng, lat, ZOOM); return [x - (cx - SIZE / 2), y - (cy - SIZE / 2)]; };
-  const path = (ring) => { ctx.beginPath(); ring.forEach((pt, i) => { const [x, y] = P(pt); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.closePath(); };
-  ctx.lineJoin = 'round';
-  for (const f of neighbors) {
-    if (target && f.pnu && f.pnu === target.pnu) continue;
-    for (const ring of f.rings) { path(ring); ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.2; ctx.stroke(); }
-    const r0 = f.rings[0]; if (!r0) continue;
-    const [lx, ly] = P(centroid(r0));
-    if (lx > 0 && ly > 0 && lx < SIZE && ly < SIZE && f.jibun) {
-      ctx.font = '600 8px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.strokeText(f.jibun, lx, ly);
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(f.jibun, lx, ly);
-    }
-  }
+  const res = 156543.03392 * Math.cos(clat * Math.PI / 180) / 2 ** ZOOM;   // m/픽셀
+  // 위경도 → 사진 중심 기준 mm (x 동쪽+, y 남쪽+ = 도면 좌표와 같은 방향)
+  const MM = ([lng, lat]) => { const [x, y] = toPx(lng, lat, ZOOM); return [Math.round((x - cx) * res * 1000), Math.round((y - cy) * res * 1000)]; };
+  const R = SIZE / 2 * res * 1000;
+  const inView = (ring) => ring.some(([x, y]) => Math.abs(x) < R && Math.abs(y) < R);
+  const vec = { target: [], others: [], labels: [], buildings: [] };
   let parcel = null;
   if (target) {
-    for (const ring of target.rings) {
-      path(ring); ctx.fillStyle = 'rgba(255,214,0,0.12)'; ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 4.5; ctx.stroke();
-      ctx.strokeStyle = '#ffd600'; ctx.lineWidth = 2.5; ctx.stroke();
-    }
+    vec.target = target.rings.map((r) => r.map(MM));
     const area = target.rings.reduce((a, r) => a + ringArea(r), 0);
     parcel = { jibun: target.jibun, addr: target.addr, pnu: target.pnu, jiga: target.jiga, areaM2: Math.round(area) };
-    // 지번·면적 표시 — 필지 북쪽 경계 바로 바깥 (집에 가리지 않게), 글자 높이 약 2.5m
-    const r0 = target.rings[0].map(P);
-    const lx = r0.reduce((a, q) => a + q[0], 0) / r0.length, ly = Math.min(...r0.map((q) => q[1])) - 9;
-    const label = `${target.jibun}  ${Math.round(area).toLocaleString()}㎡ (${(area / 3.305785).toFixed(0)}평)`;
-    ctx.font = '800 11px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const tw = ctx.measureText(label).width + 10;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(lx - tw / 2, ly - 8, tw, 16);
-    ctx.fillStyle = '#ffd600'; ctx.fillText(label, lx, ly);
+  }
+  for (const f of neighbors) {
+    if (target && f.pnu && f.pnu === target.pnu) continue;
+    const rings = f.rings.map((r) => r.map(MM)).filter(inView);
+    if (!rings.length) continue;
+    vec.others.push(...rings);
+    if (f.jibun) { const c = centroid(rings[0]); vec.labels.push({ t: f.jibun, x: Math.round(c[0]), y: Math.round(c[1]) }); }
+  }
+  for (const bd of blds) {
+    const rings = bd.rings.map((r) => r.map(MM)).filter(inView);
+    if (rings.length) vec.buildings.push({ f: bd.floors, r: rings[0] });
   }
   // 출처 표기 (사진 구석)
   ctx.font = '11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.fillText(source === 'Esri' ? '위성: Esri, Maxar · 지적: 국토교통부 VWorld' : '위성·지적: 국토교통부 VWorld', SIZE - 8, SIZE - 6);
-  const res = 156543.03392 * Math.cos(clat * Math.PI / 180) / 2 ** ZOOM;   // m/픽셀
   return {
-    image: canvas.toDataURL('image/jpeg', 0.88), widthM: Math.round(res * SIZE * 10) / 10, aspect: 1,
-    addr: parcel && parcel.addr ? parcel.addr : g.addr, parcel, lng: clng, lat: clat, source, rot: 0, dx: 0, dy: 0,
+    image: canvas.toDataURL('image/jpeg', 0.92), widthM: Math.round(res * SIZE * 10) / 10, aspect: 1,
+    addr: parcel && parcel.addr ? parcel.addr : g.addr, parcel, vec, lng: clng, lat: clat, source, rot: 0, dx: 0, dy: 0,
   };
 }

@@ -469,7 +469,12 @@ export class Viewer3D {
     if (site && site.image) {
       const wMM = (site.widthM || 20) * 1000;
       const hMM = wMM * (site.aspect || 1);            // aspect = 이미지 세로/가로
-      const tex = new THREE.TextureLoader().load(site.image, () => { this._needsRender = true; });
+      // 같은 땅 사진은 한 번만 디코딩 (돌리거나 옮길 때마다 다시 읽으면 잠깐 검게 보임)
+      if (!this._siteTex || this._siteTex.src !== site.image) {
+        if (this._siteTex) this._siteTex.tex.dispose();
+        this._siteTex = { src: site.image, tex: new THREE.TextureLoader().load(site.image, () => { this._needsRender = true; }) };
+      }
+      const tex = this._siteTex.tex;
       if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();   // 비스듬히 볼 때도 땅 사진이 뭉개지지 않게
       // 위성 사진은 이미 햇빛이 찍힌 사진 → 3D 조명을 또 비추면 하얗게 바램. 원래 색 그대로(조명·톤매핑 없이)
@@ -892,6 +897,12 @@ export class Viewer3D {
     // 집 위 평수
     const top = this._textSprite('🏠 ' + parts.join(' · '), 'house');
     top.position.set((ax + bx) / 2, F + H + 2600, (az + bz) / 2); g.add(top);
+    // 건폐율 = 건축면적 / 대지면적 — 건축면적은 실내(본채) 바닥면적으로 어림 (포치·데크 제외)
+    const land = d.site && d.site.parcel && d.site.parcel.areaM2;
+    if (land > 0 && sum.in > 0) {
+      const cov = this._textSprite(`건폐율 ${(sum.in / land * 100).toFixed(1)}%  (건축 ${sum.in.toFixed(1)}㎡ / 대지 ${Math.round(land).toLocaleString()}㎡)`, 'dim');
+      cov.position.set((ax + bx) / 2, F + H + 1500, (az + bz) / 2); g.add(cov);
+    }
     // 치수선 — 북쪽(가로)·서쪽(세로)으로 1.2m 띄워 땅 위에
     const OFF = 1200, y = 40, parts3 = [];   // 치수선은 땅 위 (기초 높이와 무관)
     const bar = (p, q) => {

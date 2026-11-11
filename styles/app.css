@@ -746,3 +746,6 @@ body {
 .site-bar .sb-tg.on { background: #fff8d6; border-color: #e8c84a; color: #6b5300; }
 .site-bar .sb-tg.hidden { display: none; }
 .site-bar .sb-src { flex: none; font-size: 11px; color: #8a8f97; white-space: nowrap; cursor: help; }
+.site-src { display: flex; gap: 10px; align-items: center; margin: -4px 0 12px; font-size: 12px; }
+.site-src img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; flex: none; border: 1px solid #e3e5e9; }
+.site-src small { display: block; color: #8a8f97; margin-top: 3px; word-break: break-all; }

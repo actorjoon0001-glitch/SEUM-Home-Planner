@@ -237,6 +237,8 @@ export class Viewer3D {
     const C = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
     this._placeSun();
     this.sun.intensity = 2.6 * BRIGHT.sun * ss(0.0, 0.16, el);
+    // 위성 땅 사진(조명 없는 재질)도 해가 지면 함께 어둡게
+    if (this._ground && this._ground.material && this._ground.material.isMeshBasicMaterial) this._ground.material.color.setScalar(0.12 + 0.88 * amb);
     this.sun.color.copy(C('#fff0dc', '#ffae6a', gold));
     this.sun.castShadow = el > 0.01;
     this.hemi.intensity = 0.06 + 0.39 * amb;
@@ -462,8 +464,13 @@ export class Viewer3D {
       const tex = new THREE.TextureLoader().load(site.image, () => { this._needsRender = true; });
       if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();   // 비스듬히 볼 때도 땅 사진이 뭉개지지 않게
+      // 위성 사진은 이미 햇빛이 찍힌 사진 → 3D 조명을 또 비추면 하얗게 바램. 원래 색 그대로(조명·톤매핑 없이)
       ground = new THREE.Mesh(new THREE.PlaneGeometry(wMM, hMM),
-        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+        new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+      // 집 그림자는 사진 위에 투명한 그림자 판으로 따로 얹음
+      const shade = new THREE.Mesh(new THREE.PlaneGeometry(wMM, hMM), new THREE.ShadowMaterial({ opacity: 0.32 }));
+      shade.position.z = 1; shade.receiveShadow = true; shade.userData.isGround = true;
+      ground.add(shade);
       ground.rotation.x = -Math.PI / 2;
       ground.rotation.z = -(site.rot || 0) * Math.PI / 180;   // 지면 회전
       // 땅은 도면 좌표에 고정(cx,cy = 불러올 때 집 중심) → 집을 끌어 옮기면 땅 위에서 움직임

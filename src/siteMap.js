@@ -296,5 +296,6 @@ export async function fetchSite(addr, onStep = () => {}) {
   return {
     image: canvas.toDataURL('image/jpeg', 0.92), widthM: Math.round(res * SIZE * 10) / 10, aspect: 1,
     addr: parcel && parcel.addr ? parcel.addr : g.addr, parcel, vec, lng: clng, lat: clat, source, srcZoom: zoom, srcNote: note || '', credit, rot: 0, dx: 0, dy: 0,
+    hideBld: source === 'Google',   // 구글 사진엔 실제 건물이 찍혀 있어 회색 블록은 처음엔 끔 (버튼으로 켬)
   };
 }

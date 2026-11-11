@@ -106,31 +106,53 @@ function loadImg(src) {
   return new Promise((ok, no) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => no(new Error('tile')); im.src = src; });
 }
 // 위성 타일을 이어 붙여 cx,cy(전역 픽셀) 중심의 SIZE×SIZE 캔버스
-async function stitch(cx, cy, urlOf) {
+// 위성 타일을 이어 붙여 cx,cy(줌19 전역 픽셀) 중심의 SIZE×SIZE 캔버스
+//   zs: 타일 줌(19 미만이면 확대해 채움) · 타일 몇 장이 빠져도(85% 이상 성공) 사용
+async function stitch(cx, cy, urlOf, zs) {
   const cv = document.createElement('canvas'); cv.width = cv.height = SIZE;
   const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#6f7a5e'; ctx.fillRect(0, 0, SIZE, SIZE);
+  const f = 2 ** (ZOOM - zs), T = TILE * f;
   const x0 = cx - SIZE / 2, y0 = cy - SIZE / 2;
   const jobs = [];
-  for (let ty = Math.floor(y0 / TILE); ty <= Math.floor((y0 + SIZE) / TILE); ty++) {
-    for (let tx = Math.floor(x0 / TILE); tx <= Math.floor((x0 + SIZE) / TILE); tx++) {
-      jobs.push(loadImg(urlOf(ZOOM, tx, ty)).then((im) => ctx.drawImage(im, tx * TILE - x0, ty * TILE - y0, TILE, TILE)));
+  let ok = 0, total = 0;
+  const tryLoad = async (u) => { try { return await loadImg(u); } catch { return loadImg(u + (u.includes('?') ? '&' : '?') + 'r=1'); } };
+  for (let ty = Math.floor(y0 / T); ty <= Math.floor((y0 + SIZE) / T); ty++) {
+    for (let tx = Math.floor(x0 / T); tx <= Math.floor((x0 + SIZE) / T); tx++) {
+      total++;
+      jobs.push(tryLoad(urlOf(zs, tx, ty)).then((im) => { ctx.drawImage(im, tx * T - x0, ty * T - y0, T, T); ok++; }, () => {}));
     }
   }
   await Promise.all(jobs);
-  cv.getContext('2d').getImageData(0, 0, 1, 1);   // 교차출처 오염(taint)되면 여기서 예외 → 다른 소스로
+  if (ok < total * 0.85) throw new Error(`타일 ${total - ok}/${total}장 실패`);
+  ctx.getImageData(0, 0, 1, 1);   // 교차출처 오염(taint)되면 여기서 예외 → 다른 소스로
   return cv;
+}
+// VWorld 타일이 왜 안 되는지 한 장으로 확인 (CORS 차단 / HTTP 상태)
+async function probe(url) {
+  try { const r = await fetch(url, { mode: 'cors' }); return r.ok ? `HTTP ${r.status}(이미지 처리 실패)` : `HTTP ${r.status}`; }
+  catch { return 'CORS/네트워크 차단'; }
 }
 async function satellite(cx, cy) {
   const key = vworldKey();
+  const vw = (z, x, y) => `https://api.vworld.kr/req/wmts/1.0.0/${key}/Satellite/${z}/${y}/${x}.jpeg`;
+  const esri = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
   const sources = [
-    key && { name: 'VWorld', url: (z, x, y) => `https://api.vworld.kr/req/wmts/1.0.0/${key}/Satellite/${z}/${y}/${x}.jpeg` },
-    { name: 'Esri', url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}` },
-  ].filter(Boolean);
-  let last = null;
+    ...(key ? [{ name: 'VWorld', url: vw, z: 19 }, { name: 'VWorld', url: vw, z: 18 }] : []),
+    { name: 'Esri', url: esri, z: 19 }, { name: 'Esri', url: esri, z: 18 },
+  ];
+  const notes = [];
   for (const s of sources) {
-    try { return { canvas: await stitch(cx, cy, s.url), source: s.name }; } catch (e) { last = e; }
+    try {
+      const canvas = await stitch(cx, cy, s.url, s.z);
+      return { canvas, source: s.name, zoom: s.z, note: notes.join(' · ') };
+    } catch (e) {
+      let why = e.message;
+      if (s.name === 'VWorld' && s.z === 19) why += ' / ' + await probe(vw(19, Math.floor(cx / TILE), Math.floor(cy / TILE)));
+      notes.push(`${s.name}${s.z}: ${why}`);
+    }
   }
-  throw new Error('위성 사진을 불러오지 못했습니다' + (last ? ` (${last.message})` : ''));
+  throw new Error('위성 사진을 불러오지 못했습니다 (' + notes.join(' · ') + ')');
 }
 
 // 언샤프 마스크(3×3) — amount 0~1
@@ -171,7 +193,7 @@ export async function fetchSite(addr, onStep = () => {}) {
   const [clng, clat] = target && target.rings[0] ? centroid(target.rings[0]) : [g.lng, g.lat];
   const [cx, cy] = toPx(clng, clat, ZOOM);
   onStep('위성 사진 받는 중…');
-  const { canvas, source } = await satellite(cx, cy);
+  const { canvas, source, zoom, note } = await satellite(cx, cy);
   sharpen(canvas, 0.55);   // 위성 사진을 살짝 또렷하게 (확대해 볼 때 덜 뭉개지게) — 선·글씨 그리기 전에
   // 이웃 필지·주변 건물 — 사진에 그리지 않고 3D 로 따로 (확대해도 선·글씨가 또렷하게)
   const [w, n] = fromPx(cx - SIZE / 2, cy - SIZE / 2, ZOOM), [e, s] = fromPx(cx + SIZE / 2, cy + SIZE / 2, ZOOM);
@@ -208,6 +230,6 @@ export async function fetchSite(addr, onStep = () => {}) {
   ctx.fillText(source === 'Esri' ? '위성: Esri, Maxar · 지적: 국토교통부 VWorld' : '위성·지적: 국토교통부 VWorld', SIZE - 8, SIZE - 6);
   return {
     image: canvas.toDataURL('image/jpeg', 0.92), widthM: Math.round(res * SIZE * 10) / 10, aspect: 1,
-    addr: parcel && parcel.addr ? parcel.addr : g.addr, parcel, vec, lng: clng, lat: clat, source, rot: 0, dx: 0, dy: 0,
+    addr: parcel && parcel.addr ? parcel.addr : g.addr, parcel, vec, lng: clng, lat: clat, source, srcZoom: zoom, srcNote: note || '', rot: 0, dx: 0, dy: 0,
   };
 }

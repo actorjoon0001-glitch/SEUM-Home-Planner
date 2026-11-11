@@ -742,3 +742,7 @@ body {
 .site-bar .sb-x { flex: none; width: 28px; height: 30px; border: 0; background: transparent; color: #8a8f97; font-size: 14px; cursor: pointer; border-radius: 8px; }
 .site-bar .sb-x:hover { background: #fde8eb; color: #c8102e; }
 @media (max-width: 640px) { .site-bar .sb-cur { display: none; } }
+.site-bar .sb-tg { flex: none; height: 30px; padding: 0 9px; border: 1px solid #e3e5e9; border-radius: 8px; background: #fff; color: #8a8f97; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.site-bar .sb-tg.on { background: #fff8d6; border-color: #e8c84a; color: #6b5300; }
+.site-bar .sb-tg.hidden { display: none; }
+.site-bar .sb-src { flex: none; font-size: 11px; color: #8a8f97; white-space: nowrap; cursor: help; }

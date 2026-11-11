@@ -751,7 +751,7 @@ export class Viewer3D {
       for (const r of outRooms) this._buildRoom(r, b, H);
       this._buildInteriorWalls({ ...d, rooms: outRooms }, b, H);
       this._buildRailings({ ...d, rooms: outRooms }, b);
-      if (this.showExterior) {
+      {   // 실물 모델은 외장이 늘 보이므로 붙인 방도 항상 외장 마감
         const cms = (d.model3d && d.model3d.catalogMats) || {};
         const ex = { ...(d.exterior || {}), corner: null, ...(cms.wall ? { catalog: cms.wall } : {}) };
         this._buildExterior({ ...d, outline: null, exteriorFaces: {}, exterior: ex,

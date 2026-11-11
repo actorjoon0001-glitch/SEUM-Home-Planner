@@ -15,6 +15,7 @@ import { openPhotoRender } from './photoRender.js';
 import { loadPanos, panosOf, openPano, panoRooms } from './pano.js';
 import { loadCatalogMaterials, catalogMaterials, catalogPick, catalogLabel } from './catalogMats.js';
 import { loadCatalogShowrooms, LEGACY_ROOM } from './catalog.js';
+import { fetchSite } from './siteMap.js';
 import { rotateRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 
 let _editor = null; // 썸네일 생성용 (클라우드 저장 시 사용)
@@ -2850,8 +2851,11 @@ async function mapboxFetchSite(addr) {
   return { image: cv.toDataURL('image/jpeg', 0.9), widthM, aspect: img.naturalHeight / img.naturalWidth, addr: g.features[0].place_name || addr };
 }
 // 주소 검색 — Mapbox 토큰이 있으면 Mapbox(브라우저 직접), 아니면 VWorld 프록시
-async function fetchSiteByAddress(addr) {
-  return mapboxToken() ? mapboxFetchSite(addr) : vworldFetchSite(addr);
+async function fetchSiteByAddress(addr, onStep) {
+  const site = mapboxToken() ? await mapboxFetchSite(addr) : await fetchSite(addr, onStep);
+  // 땅을 지금 집 중심에 맞춰 도면 좌표에 고정 (이후 집을 옮기면 땅 위에서 움직임)
+  const b = _viewer && _viewer._bounds ? _viewer._bounds() : null;
+  return { ...site, cx: b ? b.cx : 0, cy: b ? b.cz : 0 };
 }
 function siteState() { return store.design.site || { widthM: 30, aspect: 1, rot: 0, dx: 0, dy: 0 }; }
 function setSite(patch) {
@@ -2860,51 +2864,26 @@ function setSite(patch) {
 }
 function clearSite() { store.commit((d) => { d.site = null; }); if (_viewer) _viewer.dirty = true; }
 
-// 지번주소 → 좌표 → 위성 정지영상(dataURL) + 실제 가로폭(m) 계산 (VWorld 오픈API)
-// 프록시 base — 서울리전(Vercel)이 설정돼 있으면 그쪽, 아니면 Netlify 함수(미국·VWorld 막힘)
-function vworldBase() {
-  const p = (window.SEUM_CONFIG && window.SEUM_CONFIG.vworldProxy || '').replace(/\/$/, '');
-  return p ? `${p}/api/vworld` : '/.netlify/functions/vworld';
-}
-async function vworldFetchSite(addr) {
-  const EP = vworldBase();
-  const g = await fetch(`${EP}?type=geocode&address=${encodeURIComponent(addr)}`).then((r) => r.json());
-  if (!g.response || g.response.status !== 'OK' || !g.response.result) {
-    throw new Error('주소를 찾지 못했습니다. (지번 주소로 입력해 보세요)');
-  }
-  const pt = g.response.result.point; const lng = +pt.x, lat = +pt.y;
-  const zoom = 18, size = 1024;
-  const res = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); // m/픽셀
-  const widthM = Math.round(res * size * 10) / 10;
-  // 위성 이미지도 프록시 경유 → 캔버스 → dataURL (교차출처면 CORS 허용됨: 프록시가 * 헤더)
-  const imgU = `${EP}?type=image&lng=${lng}&lat=${lat}&zoom=${zoom}&size=${size}`;
-  const img = await new Promise((ok, no) => {
-    const im = new Image();
-    im.crossOrigin = 'anonymous';   // 다른 출처(vercel) 이미지도 텍스처로 쓰려면 필요
-    im.onload = () => ok(im);
-    im.onerror = () => no(new Error('위성 이미지를 불러오지 못했습니다.'));
-    im.src = imgU;
-  });
-  const cv = document.createElement('canvas'); cv.width = img.naturalWidth || size; cv.height = img.naturalHeight || size;
-  cv.getContext('2d').drawImage(img, 0, 0);
-  const image = cv.toDataURL('image/jpeg', 0.9);
-  return { image, widthM, aspect: (img.naturalHeight || size) / (img.naturalWidth || size), addr };
-}
-
 function openSiteDialog() {
   const body = document.createElement('div');
-  // 주소 자동검색: Mapbox 토큰(브라우저 직접) 또는 VWorld 서울프록시가 있으면 활성
-  const canSearch = !!(mapboxToken() || ((window.SEUM_CONFIG && window.SEUM_CONFIG.vworldProxy) || '').trim());
+  // 주소 자동검색: VWorld(고객 브라우저에서 바로) 또는 Mapbox
+  const canSearch = !!(mapboxToken() || vworldKey());
   function render() {
     const s = store.design.site;
     body.innerHTML = `
-      <p class="m-sub">고객 땅(필지)을 3D 도면 아래 지면으로 깔아 "이 땅에 이 집" 을 보여줍니다.</p>
-      <div class="fld"><span>지번 주소로 검색 ${canSearch ? '' : '<small style="color:#c8102e">(준비중 — 아래 이미지 업로드를 사용하세요)</small>'}</span>
+      <p class="m-sub">고객 땅의 지번을 넣으면 <b>위성 사진 + 필지 경계(노란 선)·이웃 지번</b>을 3D 바닥에 깔아 "이 땅에 이 집"을 바로 보여줍니다.</p>
+      <div class="fld"><span>지번 주소로 검색</span>
         <div style="display:flex;gap:6px">
-          <input id="site-addr" placeholder="예: 세종특별자치시 조치원읍 원리 123-4" style="flex:1" ${canSearch ? '' : 'disabled'}>
+          <input id="site-addr" placeholder="예: 경기도 김포시 통진읍 마송리 123-4" style="flex:1" ${canSearch ? '' : 'disabled'} value="${esc((s && s.query) || '')}">
           <button class="mini" id="site-search" ${canSearch ? '' : 'disabled'}>검색</button>
         </div>
+        <small id="site-step" class="muted"></small>
       </div>
+      ${s && s.parcel ? `<div class="site-parcel">
+        <div><span>지번</span><b>${esc(s.parcel.addr || s.addr || '')}</b></div>
+        <div><span>면적</span><b>${(s.parcel.areaM2 || 0).toLocaleString()}㎡ · ${((s.parcel.areaM2 || 0) / 3.305785).toFixed(1)}평</b> <small class="muted">(지적도 경계로 계산한 대략값)</small></div>
+        ${s.parcel.jiga ? `<div><span>공시지가</span><b>${Number(s.parcel.jiga).toLocaleString()}원/㎡</b></div>` : ''}
+      </div>` : ''}
       <div class="fld"><span>또는 위성/항공 사진 직접 올리기 (네이버지도·구글어스 캡처)</span>
         <input id="site-file" type="file" accept="image/*"></div>
       ${s && s.image ? `
@@ -2917,7 +2896,7 @@ function openSiteDialog() {
         <label class="fld"><span>좌우 이동 (mm)</span><input id="site-dx" type="number" step="500" value="${s.dx || 0}"></label>
         <label class="fld"><span>상하 이동 (mm)</span><input id="site-dy" type="number" step="500" value="${s.dy || 0}"></label>
       </div>
-      <p class="hint">가로폭(m)을 실제 땅 크기에 맞추면 집과 비율이 맞습니다. 3D에서 확인하며 회전·이동으로 앉히세요.</p>
+      <p class="hint">${s.parcel ? '주소로 불러온 땅은 실제 축척이 맞춰져 있어요. 3D에서 <b>집을 클릭해 끌면</b> 땅 위에서 옮겨지고, 초록 핸들로 돌릴 수 있어요.' : '가로폭(m)을 실제 땅 크기에 맞추면 집과 비율이 맞습니다. 3D에서 확인하며 회전·이동으로 앉히세요.'}</p>
       <button class="wide-btn danger-outline" id="site-clear">부지 지우기</button>
       ` : '<p class="hint">주소 검색하거나 이미지를 올리면 3D 바닥에 땅이 깔립니다.</p>'}`;
 
@@ -2925,13 +2904,20 @@ function openSiteDialog() {
     if (g('site-search')) g('site-search').onclick = async () => {
       const addr = g('site-addr').value.trim(); if (!addr) return;
       g('site-search').textContent = '검색중…'; g('site-search').disabled = true;
-      try { const site = await fetchSiteByAddress(addr); setSite(site); flash('부지를 불러왔습니다'); render(); }
-      catch (e) { alert('부지 검색 실패: ' + (e.message || e)); g('site-search').textContent = '검색'; g('site-search').disabled = false; }
+      const step = (t) => { const el = g('site-step'); if (el) el.textContent = t; };
+      try {
+        const site = await fetchSiteByAddress(addr, step);
+        setSite({ ...site, query: addr });
+        flash(site.parcel ? `${site.parcel.jibun} 필지를 불러왔어요` : '부지를 불러왔습니다 (지적도 없이 위성 사진만)');
+        render();
+        if (_viewer && !_viewer.active && _dash && _dash.onModeChange) _dash.onModeChange('3d');
+        if (_viewer) _viewer._needCam = true;
+      } catch (e) { step(''); alert('부지 검색 실패: ' + (e.message || e)); g('site-search').textContent = '검색'; g('site-search').disabled = false; }
     };
     if (g('site-file')) g('site-file').onchange = (e) => {
       const f = e.target.files[0]; if (!f) return;
       const fr = new FileReader();
-      fr.onload = () => { const im = new Image(); im.onload = () => { setSite({ image: fr.result, aspect: im.naturalHeight / im.naturalWidth }); flash('부지 이미지 적용됨'); render(); }; im.src = fr.result; };
+      fr.onload = () => { const im = new Image(); im.onload = () => { setSite({ image: fr.result, aspect: im.naturalHeight / im.naturalWidth, parcel: null, cx: null, cy: null }); flash('부지 이미지 적용됨'); render(); }; im.src = fr.result; };
       fr.readAsDataURL(f);
     };
     for (const [id, key] of [['site-w', 'widthM'], ['site-rot', 'rot'], ['site-dx', 'dx'], ['site-dy', 'dy']]) {

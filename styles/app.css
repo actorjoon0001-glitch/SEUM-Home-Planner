@@ -729,3 +729,6 @@ body {
 #finish-body .hidden { display: none !important; }
 /* 3D 방 그리기 — 크기 표시 */
 .draw3d-size { position: absolute; z-index: 6; pointer-events: none; background: #7c3aed; color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+/* 🛰️ 부지 — 필지 정보 */
+.site-parcel { margin: 4px 0 12px; padding: 10px 12px; border-radius: 10px; background: #fffbe6; border: 1px solid #f3e19a; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.site-parcel span { display: inline-block; width: 64px; color: #6b7079; }

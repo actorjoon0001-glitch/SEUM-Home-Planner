@@ -466,7 +466,15 @@ export class Viewer3D {
         new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
       ground.rotation.x = -Math.PI / 2;
       ground.rotation.z = -(site.rot || 0) * Math.PI / 180;   // 지면 회전
-      ground.position.set(site.dx || 0, -2, site.dy || 0);
+      // 땅은 도면 좌표에 고정(cx,cy = 불러올 때 집 중심) → 집을 끌어 옮기면 땅 위에서 움직임
+      const ax = site.cx != null ? site.cx - b.cx : 0, az = site.cy != null ? site.cy - b.cz : 0;
+      ground.position.set(ax + (site.dx || 0), -2, az + (site.dy || 0));
+      // 사진 밖은 잔디로 이어서 땅 끝이 허공에 뜨지 않게
+      const G = Math.max(wMM, hMM) * 6 + 300000;
+      const grass = new THREE.Mesh(new THREE.PlaneGeometry(G, G), TEX.groundMaterial(G));
+      grass.rotation.x = -Math.PI / 2; grass.position.y = -12; grass.receiveShadow = true;
+      grass.userData.isGround = true; grass.visible = !this.underside;
+      this.modelGroup.add(grass);
     } else {
       // 부지 이미지가 없으면 잔디 마당 — 지평선까지 넓게 깔고 안개로 자연스럽게 사라지게
       const G = M * 16 + 300000;

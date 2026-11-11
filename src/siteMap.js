@@ -26,21 +26,43 @@ function jsonp(url, timeoutMs = 9000) {
 }
 const domainQ = () => `&domain=${encodeURIComponent(location.origin)}`;
 
-// 주소 → 좌표 (지번 먼저, 안 되면 도로명)
+// 입력 다듬기 — '번지'·쉼표·여러 칸 공백 정리, '산 12' → '산12'
+function tidy(addr) {
+  return String(addr || '').replace(/번지/g, ' ').replace(/[,()]/g, ' ').replace(/산\s+(\d)/g, '산$1').replace(/\s+/g, ' ').trim();
+}
+// 주소 → 좌표
+//   1) 정확한 주소 변환(지번 → 도로명) 2) 통합검색(지번·도로명 주소 → 장소 이름) — 시·도를 빼거나 일부만 넣어도 찾음
 export async function geocode(addr) {
   const key = vworldKey();
   if (!key) throw new Error('VWorld 키가 설정되지 않았습니다 (config.js)');
+  const q = tidy(addr);
+  const tried = [];
   for (const type of ['PARCEL', 'ROAD']) {
-    const url = `https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=EPSG:4326&format=json&refine=true&simple=false&type=${type}&key=${key}${domainQ()}&address=${encodeURIComponent(addr)}`;
+    const url = `https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0&crs=EPSG:4326&format=json&refine=true&simple=false&type=${type}&key=${key}${domainQ()}&address=${encodeURIComponent(q)}`;
     const j = await jsonp(url);
     const r = j && j.response;
     if (r && r.status === 'OK' && r.result && r.result.point) {
-      const refined = (r.refined && r.refined.text) || addr;
+      const refined = (r.refined && r.refined.text) || q;
       return { lng: +r.result.point.x, lat: +r.result.point.y, addr: refined };
     }
     if (r && r.status === 'ERROR') throw new Error('VWorld 오류: ' + ((r.error && (r.error.text || r.error.code)) || '알 수 없음'));
+    tried.push(`${type === 'PARCEL' ? '지번' : '도로명'}:${(r && r.status) || '응답없음'}`);
   }
-  throw new Error('주소를 찾지 못했습니다. 지번까지 넣어 보세요 (예: ○○군 ○○면 ○○리 123-4)');
+  const searches = [['address', 'parcel', '지번검색'], ['address', 'road', '도로명검색'], ['place', '', '장소검색']];
+  for (const [type, cat, label] of searches) {
+    const url = `https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&size=5&page=1&format=json&type=${type}${cat ? `&category=${cat}` : ''}&key=${key}${domainQ()}&query=${encodeURIComponent(q)}`;
+    let r = null;
+    try { const j = await jsonp(url); r = j && j.response; } catch (e) { tried.push(`${label}:${e.message}`); continue; }
+    const items = (r && r.status === 'OK' && r.result && r.result.items) || [];
+    if (items.length && items[0].point) {
+      const it = items[0], ad = it.address || {};
+      const name = ad.parcel || ad.road || it.title || q;
+      return { lng: +it.point.x, lat: +it.point.y, addr: name, others: items.slice(1).map((x) => (x.address && (x.address.parcel || x.address.road)) || x.title).filter(Boolean) };
+    }
+    if (r && r.status === 'ERROR') tried.push(`${label}:오류(${(r.error && (r.error.text || r.error.code)) || ''})`);
+    else tried.push(`${label}:${(r && r.status) || '응답없음'}`);
+  }
+  throw new Error(`주소를 찾지 못했습니다. 시·군·읍면·리와 지번을 넣어 보세요 (예: 김포시 통진읍 마송리 123-4)\n\n입력: ${q}\n시도: ${tried.join(' · ')}`);
 }
 
 // 연속지적도(필지) — POINT 또는 BOX 로 조회. 반환 [{ jibun, addr, pnu, jiga, rings:[[ [lng,lat], … ]] }]

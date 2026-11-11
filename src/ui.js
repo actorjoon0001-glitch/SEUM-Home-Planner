@@ -2868,7 +2868,12 @@ function syncSiteBar() {
   const cur = bar.querySelector('.sb-cur');
   const txt = s.parcel ? `${s.parcel.addr || s.addr || ''} · ${(s.parcel.areaM2 || 0).toLocaleString()}㎡(${((s.parcel.areaM2 || 0) / 3.305785).toFixed(0)}평)` : (s.addr || '올린 사진');
   if (cur.textContent !== txt) cur.textContent = txt;
+  bar.querySelectorAll('.sb-tg').forEach((b) => { b.classList.toggle('on', !s[b.dataset.k]); b.classList.toggle('hidden', !s.vec); });
+  const src = bar.querySelector('.sb-src');
+  src.textContent = s.source ? `위성: ${s.source}${s.source !== 'VWorld' ? '(대체)' : ''}${s.srcZoom && s.srcZoom < 19 ? ' 저해상도' : ''}` : '';
+  src.title = s.srcNote ? 'VWorld 위성 사진 실패 이유: ' + s.srcNote : '';
   if (bar._wired) return;
+  bar.querySelectorAll('.sb-tg').forEach((b) => { b.onclick = () => { const k = b.dataset.k; setSite({ [k]: !(store.design.site || {})[k] }); }; });
   bar._wired = true;
   const q = bar.querySelector('.sb-q'), go = bar.querySelector('.sb-go');
   bar.onsubmit = async (e) => {

@@ -477,7 +477,7 @@ export class Viewer3D {
       this.modelGroup.add(grass);
       const pc = site.parcel;
       this._siteParcelLabel = pc ? `${pc.jibun}  ${(pc.areaM2 || 0).toLocaleString()}㎡ (${((pc.areaM2 || 0) / 3.305785).toFixed(0)}평)` : '';
-      if (site.vec) this._buildSiteOverlay(site.vec, ground.position, -(site.rot || 0) * Math.PI / 180);
+      if (site.vec) this._buildSiteOverlay(site.vec, ground.position, -(site.rot || 0) * Math.PI / 180, { cad: !site.hideCad, bld: !site.hideBld });
     } else {
       // 부지 이미지가 없으면 잔디 마당 — 지평선까지 넓게 깔고 안개로 자연스럽게 사라지게
       const G = M * 16 + 300000;
@@ -743,7 +743,7 @@ export class Viewer3D {
   }
   // ── 🛰️ 부지 3D 표시 — 내 필지 경계(노란 띠 + 경계 말뚝), 이웃 필지 선, 주변 건물(층수 높이), 지번 글씨
   //   vec: siteMap 결과 (사진 중심 기준 mm, x 동+ y 남+). 사진에 그리지 않아 확대해도 또렷함
-  _buildSiteOverlay(vec, pos, rotY) {
+  _buildSiteOverlay(vec, pos, rotY, show = { cad: true, bld: true }) {
     const g = new THREE.Group();
     g.position.set(pos.x, 0, pos.z); g.rotation.y = rotY;
     g.userData.isGround = true;   // 3D 내보내기 제외
@@ -756,7 +756,7 @@ export class Viewer3D {
     };
     // 내 필지 — 노란 띠(폭 15cm) + 모서리마다 빨강·흰 경계 말뚝
     const stakes = [];
-    for (const ring of vec.target || []) {
+    for (const ring of show.cad ? (vec.target || []) : []) {
       for (let i = 0; i < ring.length - 1; i++) strip(ring[i], ring[i + 1], 150, 24, 8);
       for (let i = 0; i < ring.length - 1; i++) stakes.push(ring[i]);
     }
@@ -778,7 +778,7 @@ export class Viewer3D {
     }
     // 이웃 필지 경계 — 가는 흰 선
     const lp = [];
-    for (const ring of vec.others || []) for (let i = 0; i < ring.length - 1; i++) lp.push(ring[i][0], 5, ring[i][1], ring[i + 1][0], 5, ring[i + 1][1]);
+    for (const ring of show.cad ? (vec.others || []) : []) for (let i = 0; i < ring.length - 1; i++) lp.push(ring[i][0], 5, ring[i][1], ring[i + 1][0], 5, ring[i + 1][1]);
     if (lp.length) {
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
       const ls = new THREE.LineSegments(lg, this._m3dCached('|site-others', () => new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })));
@@ -788,7 +788,7 @@ export class Viewer3D {
     const tgt = (vec.target || [])[0];
     const inside = (x, z, ring) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, zi] = ring[i], [xj, zj] = ring[j]; if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) c = !c; } return c; };
     const bg = [];
-    for (const bd of vec.buildings || []) {
+    for (const bd of show.bld ? (vec.buildings || []) : []) {
       const r = bd.r; if (!r || r.length < 4) continue;
       let cx = 0, cz = 0; for (const [x, z] of r) { cx += x; cz += z; } cx /= r.length; cz /= r.length;
       if (tgt && inside(cx, cz, tgt)) continue;
@@ -823,11 +823,11 @@ export class Viewer3D {
       sp.position.set(x, y, z); sp.renderOrder = main ? 20 : 10; sp.userData.isGround = true;
       g.add(sp);
     };
-    if (tgt && this._siteParcelLabel) {
+    if (show.cad && tgt && this._siteParcelLabel) {
       let minZ = Infinity, sx = 0; for (const [x, z] of tgt) { minZ = Math.min(minZ, z); sx += x; }
       label(this._siteParcelLabel, sx / tgt.length, minZ - 1500, 1500, true);
     }
-    for (const l of (vec.labels || []).slice(0, 80)) label(l.t, l.x, l.y, 300, false);
+    if (show.cad) for (const l of (vec.labels || []).slice(0, 80)) label(l.t, l.x, l.y, 300, false);
     this.modelGroup.add(g);
   }
 

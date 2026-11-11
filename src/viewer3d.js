@@ -10,13 +10,42 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { store } from './store.js';
-import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES, model3dSig } from './data.js';
+import { ROOM_TYPES, catalogOf, ATTIC_HEIGHT, EXTERIOR_MATERIALS, ROOF_TYPES, WINDOW_TYPES, outlineShapes, OPEN_ROOM_TYPES, model3dSig, model3dSigKeys } from './data.js';
 import { rotateRoomsInDesign, moveRoomsInDesign, syncOutlineToRooms } from './roomops.js';
 import * as TEX from './textures.js';
 import { catalogWallMaterial, setCatalogTexHook } from './catalogMats.js';
 TEX._useThree(THREE);   // textures.js 의 3D 재질 함수가 쓸 three 주입 (2D UI 는 three 의존 제거됨)
 
 const WALL_T = 100; // 벽 두께 mm
+
+// 실물 모델 벽 구멍(추가한 창·문) — 월드 좌표 상자 안의 실물 모델 면을 셰이더에서 잘라냄 (모든 재질이 같은 uniform 공유)
+const HOLE_MAX = 12;
+const HOLES = {
+  n: { value: 0 },
+  min: { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector3()) },
+  max: { value: Array.from({ length: HOLE_MAX }, () => new THREE.Vector3()) },
+};
+function patchHoleMaterial(mat) {
+  if (!mat || mat.userData.holePatched) return;
+  mat.userData.holePatched = true;
+  const prev = mat.onBeforeCompile, prevKey = mat.customProgramCacheKey;
+  mat.onBeforeCompile = function (sh, r) {
+    if (prev) prev.call(this, sh, r);
+    sh.uniforms.uHoleN = HOLES.n; sh.uniforms.uHoleMin = HOLES.min; sh.uniforms.uHoleMax = HOLES.max;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vHoleW;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvHoleW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vHoleW;\nuniform int uHoleN;\nuniform vec3 uHoleMin[${HOLE_MAX}];\nuniform vec3 uHoleMax[${HOLE_MAX}];`)
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+        for (int i = 0; i < ${HOLE_MAX}; i++) {
+          if (i >= uHoleN) break;
+          if (all(greaterThan(vHoleW, uHoleMin[i])) && all(lessThan(vHoleW, uHoleMax[i]))) discard;
+        }`);
+  };
+  mat.customProgramCacheKey = function () { return (prevKey ? prevKey.call(this) : '') + '|holes'; };
+  mat.needsUpdate = true;
+}
 const SKY_TOP = '#a9c6e3', SKY_HORIZON = '#e8eef3';   // 하늘 그라데이션 (지평선색 = 안개색)
 const HQ_KEY = 'seum_3d_hq';
 // 기본 밝기 — 눈부심 없이 편안한 톤 (하얀 벽·천장이 하얗게 날아가지 않게). 1 = 예전 밝기
@@ -405,6 +434,7 @@ export class Viewer3D {
 
   rebuild() {
     this.dirty = false;
+    HOLES.n.value = 0;   // 실물 모델 벽 구멍은 이번 빌드에서 다시 계산
     this._needsRender = true;
     // 실물 모델은 캐시해서 계속 재사용 → 아래 일괄 해제에 휩쓸리지 않게 먼저 떼어냄
     for (const e of Object.values(this._m3dCache || {})) if (e.node && e.node.parent) e.node.parent.remove(e.node);
@@ -473,6 +503,8 @@ export class Viewer3D {
         m3dNode.traverse((o) => this._m3dVis(o));   // 지붕·천장 토글 · 2층 걷어내기
         this._applyModel3dOptions(m3dNode, d);  // 제품 옵션(외장·띠·지붕·프레임·창틀·데크 색)
         house.add(m3dNode);
+        // 상담 중 추가한 방·창·문 — 실물 모델(외장·내장)은 그대로 두고 추가분만 덧그림
+        this._buildHybrid(d, b, H, F, m3d, root, house, m3dNode);
         // 상담 중 추가한 가구는 실물 모델 안에 함께 (모델에 가구가 이미 있는 제품은 도면 기본 가구 제외)
         const baseFurn = new Set((d.model3d && d.model3d.baseFurn) || []);
         for (const f of d.furniture) if (!baseFurn.has(f.id)) this._buildFurniture(f, b, H);
@@ -522,18 +554,47 @@ export class Viewer3D {
     // 여러 층을 한 모델에 담은 제품(2층 구조)은 어느 층을 편집 중이든 실물 모델 — 위치·크기 기준은 1층 도면
     const multi = Array.isArray(d.floors) && d.floors.length > 1 && m && m.floors > 1;
     const af = d.activeFloor || 0;
-    const baseRooms = multi && af !== 0 ? d.floors[0].rooms : d.rooms;
-    if (!m || !m.url || (af !== 0 && !multi) || !baseRooms.length) return { available: false };
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const r of baseRooms) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
+    const allRooms = multi && af !== 0 ? d.floors[0].rooms : d.rooms;
+    if (!m || !m.url || (af !== 0 && !multi) || !allRooms.length) return { available: false };
     const fit = Array.isArray(m.fit) ? m.fit : null, roof = d.roof || {};
+    const bbox = (rs) => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const r of rs) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
+      return { x0, y0, x1, y1 };
+    };
+    const fits = (bb) => !fit || (Math.abs(bb.x1 - bb.x0 - fit[0]) <= 60 && Math.abs(bb.y1 - bb.y0 - fit[1]) <= 60);
+    // 원래 방 = 앞쪽 baseCount 개. 상담 중 뒤에 붙인 방은 '추가한 방' → 실물 모델은 그대로 두고 그 방만 자동 생성
+    //   (baseCount 가 없는 예전 도면: 크기가 실물과 맞는 가장 긴 앞부분을 원래 방으로 봄)
+    let nBase = allRooms.length;
+    if (!multi && fit) {
+      if (Number.isInteger(m.baseCount) && m.baseCount >= 1 && m.baseCount <= allRooms.length) nBase = m.baseCount;
+      else for (let k = allRooms.length; k >= 1; k--) { if (fits(bbox(allRooms.slice(0, k)))) { nBase = k; break; } }
+    }
+    const baseRooms = allRooms.slice(0, nBase);
+    const bb = bbox(baseRooms);
     let reason = '';
-    if (fit && (Math.abs(x1 - x0 - fit[0]) > 60 || Math.abs(y1 - y0 - fit[1]) > 60)) reason = '도면 크기';
+    const extraOpenings = [];
+    if (!fits(bb)) reason = '도면 크기';
     else if (m.roofType && roof.type !== m.roofType) reason = '지붕 모양';
     else if (m.roofType && (roof.ridge === 'x' ? 'x' : 'z') !== (m.ridge || 'z')) reason = '용마루 방향';
-    else if (m.sig != null && model3dSig(d) !== m.sig) reason = '창·문 배치';
-    else if (this.faceMode || (d.exteriorFaces && Object.keys(d.exteriorFaces).length)) reason = '면별 외장재';
-    return { available: !reason, mismatch: !!reason, reason, url: m.url, label: m.label || '', ox: x0, oy: y0 };
+    else if (m.sig != null && model3dSig(d) !== m.sig) {
+      // 원래 창·문이 그대로 있고 새로 '추가'만 했으면 실물 모델 유지 + 추가한 창·문만 덧그림
+      //   (원래 창·문을 옮기거나 지우거나 크기를 바꾸면 실물과 달라지므로 자동 모델)
+      if (multi) reason = '창·문 배치';
+      else {
+        const left = new Map();
+        for (const k of String(m.sig).split('|')) if (k) left.set(k, (left.get(k) || 0) + 1);
+        for (const { key, o } of model3dSigKeys(d.rooms, d.openings)) {
+          const n = left.get(key) || 0;
+          if (n > 0) left.set(key, n - 1); else extraOpenings.push(o);
+        }
+        if ([...left.values()].some((n) => n > 0)) reason = '창·문 배치';
+      }
+    }
+    if (!reason && (this.faceMode || (d.exteriorFaces && Object.keys(d.exteriorFaces).length))) reason = '면별 외장재';
+    const extraRooms = multi ? [] : allRooms.slice(nBase);
+    return { available: !reason, mismatch: !!reason, reason, url: m.url, label: m.label || '', ox: bb.x0, oy: bb.y0,
+      baseBox: bb, baseRooms, extraRooms: reason ? [] : extraRooms, extraOpenings: reason ? [] : extraOpenings };
   }
 
   // 🏘️ 주택 비교 — 다른 제품(실물 모델)을 지금 집 동쪽에 4m 씩 띄워 나란히 세움. 해·시간·방위는 함께 적용
@@ -660,6 +721,111 @@ export class Viewer3D {
         : this._m3dCached(base.uuid + '|' + hit.set.key + '|' + hit.ch.id, () => this._m3dVariant(base, hit.ch));
     });
   }
+  // ── 실물 모델 + 추가한 방·창·문 (하이브리드) ─────────────────────────
+  //   · 실물 모델 밖에 붙인 방: 바닥·벽·외장·평지붕·난간·기초를 자동 생성 (외장은 실물 모델 외장/카탈로그 자재와 같게)
+  //   · 실물 모델 안에 그린 방: 칸막이 벽만 (실물 모델 벽과 겹치는 변은 생략)
+  //   · 추가한 창·문: 실물 모델 벽에 구멍을 내고(셰이더로 잘라냄) 창틀·유리·문짝 + 벽 두께 마감
+  _buildHybrid(d, b, H, F, m3d, root, house, node) {
+    HOLES.n.value = 0;
+    const rooms = m3d.extraRooms || [], ops = m3d.extraOpenings || [];
+    if (!rooms.length && !ops.length) return;
+    const bb = m3d.baseBox, TOL = 60;
+    const inBase = (r) => { const cx = r.x + r.w / 2, cy = r.y + r.d / 2; return cx > bb.x0 && cx < bb.x1 && cy > bb.y0 && cy < bb.y1; };
+    const outRooms = rooms.filter((r) => !inBase(r));
+    const inRooms = rooms.filter((r) => inBase(r) && !OPEN_ROOM_TYPES.includes(r.type));
+    // 안쪽 방: 실물 모델 외벽선·원래 방 경계와 겹치는 변은 이미 벽이 있으므로 생략
+    const lines = [];
+    for (const r of m3d.baseRooms) lines.push({ o: 0, v: r.y, a: r.x, b: r.x + r.w }, { o: 0, v: r.y + r.d, a: r.x, b: r.x + r.w },
+      { o: 1, v: r.x, a: r.y, b: r.y + r.d }, { o: 1, v: r.x + r.w, a: r.y, b: r.y + r.d });
+    const covered = (o, v, a, c) => lines.some((l) => l.o === o && Math.abs(l.v - v) <= TOL && Math.min(c, l.b) - Math.max(a, l.a) >= (c - a) * 0.6);
+    const inWalls = inRooms.map((r) => {
+      const open = new Set(Array.isArray(r.open) ? r.open : []);
+      if (covered(0, r.y, r.x, r.x + r.w)) open.add('n');
+      if (covered(0, r.y + r.d, r.x, r.x + r.w)) open.add('s');
+      if (covered(1, r.x, r.y, r.y + r.d)) open.add('w');
+      if (covered(1, r.x + r.w, r.y, r.y + r.d)) open.add('e');
+      return { ...r, open: [...open] };
+    });
+    if (inWalls.length) this._buildInteriorWalls({ ...d, rooms: inWalls }, b, H);
+    if (outRooms.length) {
+      for (const r of outRooms) this._buildRoom(r, b, H);
+      this._buildInteriorWalls({ ...d, rooms: outRooms }, b, H);
+      this._buildRailings({ ...d, rooms: outRooms }, b);
+      if (this.showExterior) {
+        const cms = (d.model3d && d.model3d.catalogMats) || {};
+        const ex = { ...(d.exterior || {}), corner: null, ...(cms.wall ? { catalog: cms.wall } : {}) };
+        this._buildExterior({ ...d, outline: null, exteriorFaces: {}, exterior: ex,
+          rooms: [...outRooms, ...m3d.baseRooms.map((r) => ({ ...r, _phantom: true }))] }, b, H);
+      }
+      if (this.showRoof) for (const r of outRooms) {
+        if (OPEN_ROOM_TYPES.includes(r.type)) continue;
+        this._buildRoof({ ...d, outline: null, rooms: [r], roof: { ...(d.roof || {}), type: 'flat' } }, b, H);
+      }
+      if (F > 0) { const mg = this.modelGroup; this.modelGroup = root; this._buildFoundation({ ...d, outline: null, rooms: outRooms }, b, F); this.modelGroup = mg; }
+    }
+    if (!ops.length) return;
+    // 추가한 창·문 — 실물 모델 벽을 찾아(광선) 두께만큼 구멍 + 창틀을 벽 두께 가운데에
+    house.updateMatrixWorld(true);
+    const holes = [];
+    const cx0 = (bb.x0 + bb.x1) / 2, cy0 = (bb.y0 + bb.y1) / 2;
+    for (const o of ops) {
+      const pl = this._openingWorld(o); if (!pl || pl.free) continue;
+      let nx = -pl.uy, ny = pl.ux;   // 벽 법선(도면) — 실물 모델 중심 반대쪽이 바깥
+      if ((pl.cx - cx0) * nx + (pl.cy - cy0) * ny < 0) { nx = -nx; ny = -ny; }
+      const yMid = (o.sill || 0) + (o.h || 1200) / 2 + 60;
+      const wall = this._m3dWallAt(node, house, b, pl, nx, ny, yMid, m3d.url);
+      const before = this.modelGroup.children.length;
+      this._buildOpening(o, b);
+      if (!wall) continue;   // 실물 모델 벽이 아닌 곳(추가한 방 벽) — 자동 벽에 이미 뚫림
+      const sMid = (wall.sIn + wall.sOut) / 2, depth = wall.sOut - wall.sIn;
+      for (const ch of this.modelGroup.children.slice(before)) { ch.position.x += nx * sMid; ch.position.z += ny * sMid; }
+      // 구멍 상자(집 좌표) → 월드 AABB
+      const [px, pz] = this._p(pl.cx, pl.cy, b);
+      const hw = (o.w || 900) / 2, hh = (o.h || 1200) / 2, s0 = wall.sIn - 40, s1 = wall.sOut + 40;
+      const mn = new THREE.Vector3(Infinity, Infinity, Infinity), mx = new THREE.Vector3(-Infinity, -Infinity, -Infinity), v = new THREE.Vector3();
+      for (const su of [-hw, hw]) for (const sv of [-hh, hh]) for (const sn of [s0, s1]) {
+        v.set(px + pl.ux * su + nx * sn, yMid + sv, pz + pl.uy * su + ny * sn); house.localToWorld(v); mn.min(v); mx.max(v);
+      }
+      holes.push([mn, mx]);
+      // 벽 두께 마감(창 둘레 안쪽 판) — 구멍으로 벽 속이 보이지 않게
+      const lin = new THREE.Group(); lin.position.set(px + nx * sMid, yMid, pz + ny * sMid); lin.rotation.y = -Math.atan2(pl.uy, pl.ux);
+      const lm = this._m3dCached('|hole-lining', () => new THREE.MeshStandardMaterial({ color: '#ebe8e2', roughness: 0.8 }));
+      const T = 18, W = o.w || 900, Hh = o.h || 1200;
+      for (const [w, h, x, y] of [[W, T, 0, Hh / 2 - T / 2], [W, T, 0, -Hh / 2 + T / 2], [T, Hh, -W / 2 + T / 2, 0], [T, Hh, W / 2 - T / 2, 0]]) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, depth), lm); m.position.set(x, y, 0); m.receiveShadow = true; lin.add(m);
+      }
+      this.modelGroup.add(lin);
+    }
+    if (!holes.length) return;
+    holes.length = Math.min(holes.length, HOLE_MAX);
+    holes.forEach(([mn, mx], i) => { HOLES.min.value[i].copy(mn); HOLES.max.value[i].copy(mx); });
+    HOLES.n.value = holes.length;
+    node.traverse((x) => { if (x.isMesh) for (const mt of Array.isArray(x.material) ? x.material : [x.material]) patchHoleMaterial(mt); });
+  }
+  // 창·문 자리에서 실물 모델 벽의 바깥면·안쪽면 찾기 (벽선 기준 바깥 +, 안 −) — 결과 캐시
+  _m3dWallAt(node, house, b, pl, nx, ny, yMid, url) {
+    const key = [url, Math.round(pl.cx), Math.round(pl.cy), nx.toFixed(2), ny.toFixed(2), Math.round(yMid), this.showRoof ? 1 : 0, this.hideUpper ? 1 : 0].join('|');
+    const c = this._wallHitCache || (this._wallHitCache = new Map());
+    if (c.has(key)) return c.get(key);
+    const [px, pz] = this._p(pl.cx, pl.cy, b), R = 1500;
+    const o = house.localToWorld(new THREE.Vector3(px + nx * R, yMid, pz + ny * R));
+    const t = house.localToWorld(new THREE.Vector3(px, yMid, pz));
+    const dir = t.clone().sub(o).normalize();
+    const rc = new THREE.Raycaster(o, dir, 0, R + 700);
+    const shown = (x) => { for (let p = x; p; p = p.parent) if (!p.visible) return false; return true; };
+    const hits = rc.intersectObject(node, true).filter((h) => shown(h.object) && !(h.object.material && h.object.material.transparent));
+    let res = null;
+    if (hits.length && hits[0].distance > R - 700) {
+      const tOut = hits[0].distance;
+      let tIn = tOut;
+      for (const h of hits) if (h.distance <= tOut + 450) tIn = h.distance;
+      res = { sOut: R - tOut, sIn: Math.min(R - tIn, R - tOut - 60) };
+    }
+    if (c.size > 400) c.clear();
+    c.set(key, res);
+    return res;
+  }
+
   // 구운 무늬 → 평균색 단색 재질
   _m3dFlat(orig) {
     const m = orig.clone(), img = orig.map.image;
@@ -1360,6 +1526,7 @@ export class Viewer3D {
     };
 
     for (const r of rooms) {
+      if (r._phantom) continue;   // 실물 모델 자리(바깥 판정용) — 외장은 실물 모델이 이미 가짐
       const open = Array.isArray(r.open) ? r.open : [];
       const wallH = r.type === 'attic' ? ATTIC_HEIGHT : ceilH;
       const cx = r.x + r.w / 2, cz = r.y + r.d / 2;

@@ -560,6 +560,8 @@ export class Viewer3D {
       this.modelGroup = root;
     }
     this._buildCompare(root, house, b);
+    // 땅 위에선 집 옆에 평수·가로×세로 치수 (부지 바 '집 치수'로 끄고 켬)
+    if (d.site && d.site.image && !d.site.hideDims) this._buildHouseDims(d, b, H, F);
     const ml = m3dNode && m3dNode.getObjectByName('m3dLights');
     this._modelLights = ml ? ml.children.filter((l) => l.isLight) : [];
     this._buildNightLights(d, b, F, H);
@@ -843,6 +845,67 @@ export class Viewer3D {
       label(this._siteParcelLabel, sx / tgt.length, minZ - 1500, 1500, true);
     }
     if (show.cad) for (const l of (vec.labels || []).slice(0, 80)) label(l.t, l.x, l.y, 300, false);
+    this.modelGroup.add(g);
+  }
+
+  // 화면에서 늘 같은 크기로 보이는 글씨 판 — kind: 'house'(빨강) · 'dim'(흰 바탕)
+  _textSprite(text, kind) {
+    const mat = this._m3dCached('|txt|' + kind + '|' + text, () => {
+      const house = kind === 'house', fs = house ? 28 : 22, pad = house ? 12 : 7;
+      const cv = document.createElement('canvas'), c2 = cv.getContext('2d');
+      const font = `${house ? 800 : 700} ${fs}px "Noto Sans KR", sans-serif`;
+      c2.font = font; cv.width = Math.ceil(c2.measureText(text).width + pad * 2); cv.height = fs + pad * 2;
+      c2.font = font; c2.textBaseline = 'middle'; c2.textAlign = 'center';
+      c2.fillStyle = house ? 'rgba(200,16,46,0.92)' : 'rgba(255,255,255,0.94)';
+      c2.beginPath(); c2.roundRect(0, 0, cv.width, cv.height, house ? 12 : 8); c2.fill();
+      c2.fillStyle = house ? '#fff' : '#23272e'; c2.fillText(text, cv.width / 2, cv.height / 2 + 1);
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+      const m = new THREE.SpriteMaterial({ map: t, sizeAttenuation: false, depthWrite: false, depthTest: false, transparent: true });
+      m.userData.aspect = cv.width / cv.height;
+      return m;
+    });
+    const sp = new THREE.Sprite(mat);
+    const h = kind === 'house' ? 0.032 : 0.024;
+    sp.scale.set(h * mat.userData.aspect, h, 1);
+    sp.renderOrder = 30; sp.userData.isGround = true;
+    return sp;
+  }
+  // 집 평수(2D 요약과 같은 계산) + 본채 가로·세로 치수선
+  _buildHouseDims(d, b, H, F) {
+    if (!d.rooms.length) return;
+    const g = new THREE.Group(); g.userData.isGround = true;
+    const sum = { in: 0, porch: 0, deck: 0 };
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const r of d.rooms) {
+      const a = (r.w * r.d) / 1e6;
+      if (r.type === 'porch') sum.porch += a;
+      else if (r.type === 'deck' || r.type === 'balcony') sum.deck += a;
+      else { sum.in += a; x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
+    }
+    if (!isFinite(x0)) for (const r of d.rooms) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.d); }
+    const py = (m2) => (m2 / 3.305).toFixed(1);
+    const parts = [`실내 ${py(sum.in)}평 (${sum.in.toFixed(1)}㎡)`];
+    if (sum.porch > 0) parts.push(`포치 ${py(sum.porch)}평`);
+    if (sum.deck > 0) parts.push(`데크 ${py(sum.deck)}평`);
+    if (parts.length > 1) parts.push(`합계 ${py(sum.in + sum.porch + sum.deck)}평`);
+    const [ax, az] = this._p(x0, y0, b), [bx, bz] = this._p(x1, y1, b);
+    // 집 위 평수
+    const top = this._textSprite('🏠 ' + parts.join(' · '), 'house');
+    top.position.set((ax + bx) / 2, F + H + 2600, (az + bz) / 2); g.add(top);
+    // 치수선 — 북쪽(가로)·서쪽(세로)으로 1.2m 띄워 땅 위에
+    const OFF = 1200, y = 40, parts3 = [];   // 치수선은 땅 위 (기초 높이와 무관)
+    const bar = (p, q) => {
+      const dx = q[0] - p[0], dz = q[1] - p[1], len = Math.hypot(dx, dz);
+      const geo = new THREE.BoxGeometry(len, 30, 45); geo.rotateY(-Math.atan2(dz, dx)); geo.translate((p[0] + q[0]) / 2, y, (p[1] + q[1]) / 2); parts3.push(geo);
+    };
+    const tick = (x, z, alongX) => { const geo = new THREE.BoxGeometry(alongX ? 45 : 700, 30, alongX ? 700 : 45); geo.translate(x, y, z); parts3.push(geo); };
+    bar([ax, az - OFF], [bx, az - OFF]); tick(ax, az - OFF, true); tick(bx, az - OFF, true);
+    bar([ax - OFF, az], [ax - OFF, bz]); tick(ax - OFF, az, false); tick(ax - OFF, bz, false);
+    const lm = new THREE.Mesh(mergeGeometries(parts3), this._m3dCached('|dim-line', () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 })));   // 집에 가려지게
+    lm.renderOrder = 25; lm.userData.isGround = true; g.add(lm); parts3.forEach((x) => x.dispose());
+    const mm = (v) => `${(v / 1000).toFixed(1)}m`;
+    const lw = this._textSprite(`가로 ${mm(x1 - x0)}`, 'dim'); lw.position.set((ax + bx) / 2, y + 200, az - OFF); g.add(lw);
+    const ld = this._textSprite(`세로 ${mm(y1 - y0)}`, 'dim'); ld.position.set(ax - OFF, y + 200, (az + bz) / 2); g.add(ld);
     this.modelGroup.add(g);
   }
 

@@ -309,11 +309,20 @@ export function openingOutline(pathIndex, edgeIndex, pos, winType = 'door') {
 
 // 저장본/구버전 도면 보정 (새 필드 기본값 채움)
 // 실물 모델(GLB)이 표현하는 창·문 배치 서명 — 창·문을 추가·이동·크기변경하면 달라짐 (색은 제외: 실물에서도 바꿔 칠함)
+// 개구부 한 개의 배치 키 (방 순서·벽·위치·종류·크기)
+function openingKey(o, idx) {
+  return [idx.get(o.roomId), o.side, Math.round(o.pos / 10), o.winType,
+    Math.round(o.w || 0), Math.round(o.h || 0), Math.round(o.sill || 0)].join(':');
+}
+// 1층 도면의 개구부별 키 목록 [{ key, o }] — 실물 모델 원래 배치와 비교해 '새로 추가된 창·문'만 골라낼 때
+export function model3dSigKeys(rooms, openings) {
+  const idx = new Map((rooms || []).map((r, i) => [r.id, i]));
+  return (openings || []).map((o) => ({ key: openingKey(o, idx), o }));
+}
 export function model3dSig(d) {
   const one = (rooms, openings) => {
     const idx = new Map((rooms || []).map((r, i) => [r.id, i]));
-    return (openings || []).map((o) => [idx.get(o.roomId), o.side, Math.round(o.pos / 10), o.winType,
-      Math.round(o.w || 0), Math.round(o.h || 0), Math.round(o.sill || 0)].join(':')).sort().join('|');
+    return (openings || []).map((o) => openingKey(o, idx)).sort().join('|');
   };
   // 여러 층 실물 모델(2층 구조) — 층마다 창·문 배치를 이어 붙임 (활성 층은 최상위 데이터가 최신)
   if (Array.isArray(d.floors) && d.floors.length > 1) {

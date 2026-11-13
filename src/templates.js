@@ -1022,7 +1022,8 @@ export function instantiateTemplate(id) {
   });
   if (design.model3d) {
     design.model3d.sig = model3dSig(design);   // 원래 창·문 배치 기억 → 추가한 창·문만 실물 모델 위에 덧그림
-    design.model3d.baseCount = design.rooms.length;   // 원래 방 개수 — 뒤에 붙인 방은 '추가한 방'으로 실물 모델 옆에 자동 생성
+    design.model3d.baseCount = design.rooms.length;
+    design.model3d.baseCounts = (design.floors || [{ rooms: design.rooms }]).map((f) => (f.rooms || []).length);   // 층별 원래 방 개수 (2층 모델)   // 원래 방 개수 — 뒤에 붙인 방은 '추가한 방'으로 실물 모델 옆에 자동 생성
     // 모델에 가구가 이미 있는 제품: 도면 기본 가구는 3D에서 숨김 (상담 중 새로 추가한 가구만 3D에 표시)
     if (design.model3d.ownFurniture) design.model3d.baseFurn = design.floors.flatMap((f) => f.furniture.map((x) => x.id));
   }

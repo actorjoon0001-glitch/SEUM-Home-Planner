@@ -1018,6 +1018,24 @@ export class Viewer3D {
         this._buildRoof({ ...d, outline: null, rooms: [r], roof: { ...(d.roof || {}), type: 'flat' } }, b, H);
       }
       if (F > 0 && h.floor === 0) { const mg = this.modelGroup; this.modelGroup = root; this._buildFoundation({ ...d, outline: null, rooms: outRooms }, b, F); this.modelGroup = mg; }
+      // 2층에 붙인 방이 아래층 밖으로 나가면 모서리에 철골 기둥 (공중에 떠 보이지 않게)
+      if (h.floor > 0) {
+        const below = Array.isArray(d.floors) && d.floors[0] ? ((d.activeFloor || 0) === 0 ? d.rooms : d.floors[0].rooms) || [] : [];
+        const under = (x, y) => below.some((r) => !OPEN_ROOM_TYPES.includes(r.type) && x > r.x - 50 && x < r.x + r.w + 50 && y > r.y - 50 && y < r.y + r.d + 50);
+        const postH = 60 + F + dy, S = 120, parts = [];
+        for (const r of outRooms) {
+          const ins = 100;
+          for (const [x, y] of [[r.x + ins, r.y + ins], [r.x + r.w - ins, r.y + ins], [r.x + ins, r.y + r.d - ins], [r.x + r.w - ins, r.y + r.d - ins]]) {
+            if (under(x, y)) continue;
+            const [px, pz] = this._p(x, y, b);
+            const geo = new THREE.BoxGeometry(S, postH, S); geo.translate(px, 60 - postH / 2, pz); parts.push(geo);
+          }
+        }
+        if (parts.length) {
+          const pm = new THREE.Mesh(mergeGeometries(parts), this._m3dCached('|post-steel', () => new THREE.MeshStandardMaterial({ color: '#2b2d31', roughness: 0.5, metalness: 0.4 })));
+          pm.castShadow = true; pm.receiveShadow = true; this.modelGroup.add(pm); parts.forEach((g) => g.dispose());
+        }
+      }
     }
     // 2층 창·문은 위에서 그룹째 올렸으므로 아래 창·문 계산에선 그만큼 빼서 놓음
     const lift = h.floor > 0 ? dy : 0;
@@ -1046,14 +1064,14 @@ export class Viewer3D {
       const yMid = sill + oh / 2 + 60 + dy;
       const wall = this._m3dWallNear(node, house, b, pl, nx, ny, yMid, m3d.url, w); if (!wall) continue;
       const isDoor = (WINDOW_TYPES[o.winType] || {}).glass === false || sill < 100;
-      const M = 150;                                                  // 창틀·몰딩·창대까지 덮는 여유
+      const M = 260;                                                  // 창틀·바깥 몰딩(서라운드)·창대까지 덮는 여유
       // 도면 수치가 실물과 조금 다를 수 있어 실물 모델 벽을 광선으로 훑어 실제 창 구멍 범위를 찾음
       const sc = this._m3dScanOpening(node, house, b, pl, nx, ny, o, dy, H, m3d.url);
       const floorY = 60 + dy;
       let u0 = -w / 2, u1 = w / 2, yo0 = floorY + sill, yo1 = floorY + sill + oh;
       if (sc) { u0 = sc.u0; u1 = sc.u1; yo0 = sc.y0; yo1 = sc.y1; }
       const doorish = isDoor || yo0 - floorY < 150;
-      const yBot = doorish ? floorY : Math.max(floorY, yo0 - M - 60), yTop = Math.min(yo1 + M + 40, floorY + H - 10);
+      const yBot = doorish ? floorY : Math.max(floorY, yo0 - M), yTop = Math.min(yo1 + M, floorY + H - 10);
       const ua = u0 - M, ub = u1 + M, uc = (ua + ub) / 2, hw = (ub - ua) / 2;
       // 숨김 상자 — 메움판보다 살짝 작게(틈 안 생기게), 바깥 몰딩·안쪽 문짝(열린 각도)까지
       toWorldBox(px, pz, pl, nx, ny, ua + 10, ub - 10, yBot + (doorish ? 0 : 10), yTop - 10,

@@ -1,0 +1,460 @@
+{
+ "name": "FOREST10-WG 10평 체류형 쉼터",
+ "templateId": "cat-forest10-wg",
+ "productType": "체류형 쉼터",
+ "ceilingHeight": 2400,
+ "foundationHeight": 300,
+ "wallThickness": 280,
+ "wallThicknessInt": 120,
+ "exterior": {
+  "material": "metal",
+  "color": "#f4f1ea",
+  "dir": "v"
+ },
+ "roof": {
+  "type": "gable",
+  "color": "#3a3f44",
+  "ridge": "x",
+  "rise": 300
+ },
+ "rooms": [
+  {
+   "id": "rmwow4vy311",
+   "type": "bedroom",
+   "name": "방",
+   "x": 0,
+   "y": 0,
+   "w": 2410,
+   "d": 3500
+  },
+  {
+   "id": "rmwow4vy312",
+   "type": "kitchen",
+   "name": "주방/거실",
+   "x": 2410,
+   "y": 0,
+   "w": 5850,
+   "d": 2140,
+   "open": [
+    "s",
+    "e"
+   ]
+  },
+  {
+   "id": "rmwow4vy313",
+   "type": "living",
+   "name": "거실",
+   "x": 2410,
+   "y": 2140,
+   "w": 4510,
+   "d": 1360,
+   "open": [
+    "n",
+    "e"
+   ]
+  },
+  {
+   "id": "rmwow4vy314",
+   "type": "entrance",
+   "name": "현관",
+   "x": 6920,
+   "y": 2140,
+   "w": 1340,
+   "d": 1360,
+   "open": [
+    "n",
+    "w",
+    "e"
+   ]
+  },
+  {
+   "id": "rmwow4vy315",
+   "type": "bath",
+   "name": "화장실",
+   "x": 8260,
+   "y": 0,
+   "w": 1740,
+   "d": 1290
+  },
+  {
+   "id": "rmwow4vy316",
+   "type": "bath",
+   "name": "세면대",
+   "x": 8260,
+   "y": 1290,
+   "w": 1740,
+   "d": 920,
+   "open": [
+    "w"
+   ]
+  },
+  {
+   "id": "rmwow4vy317",
+   "type": "bath",
+   "name": "샤워실",
+   "x": 8260,
+   "y": 2210,
+   "w": 1740,
+   "d": 1290
+  }
+ ],
+ "openings": [
+  {
+   "id": "ovqchblp",
+   "roomId": "rmwow4vy311",
+   "side": "w",
+   "pos": 2170,
+   "winType": "fixed",
+   "w": 1500,
+   "h": 1000,
+   "sill": 900,
+   "color": "#4a5560"
+  },
+  {
+   "id": "ozz2janw",
+   "roomId": "rmwow4vy311",
+   "side": "s",
+   "pos": 1300,
+   "winType": "fixed",
+   "w": 1000,
+   "h": 800,
+   "sill": 1100,
+   "color": "#4a5560"
+  },
+  {
+   "id": "oicqkc01",
+   "roomId": "rmwow4vy311",
+   "side": "e",
+   "pos": 730,
+   "winType": "swingDoor",
+   "w": 900,
+   "h": 2100,
+   "sill": 0,
+   "color": "#4a5560"
+  },
+  {
+   "id": "o7d0fzt9",
+   "roomId": "rmwow4vy312",
+   "side": "n",
+   "pos": 4290,
+   "winType": "double",
+   "w": 1400,
+   "h": 600,
+   "sill": 1100,
+   "color": "#4a5560"
+  },
+  {
+   "id": "o4zny6c0",
+   "roomId": "rmwow4vy313",
+   "side": "s",
+   "pos": 1890,
+   "winType": "balcony",
+   "w": 2000,
+   "h": 2100,
+   "sill": 100,
+   "color": "#4a5560"
+  },
+  {
+   "id": "o0xgd23e",
+   "roomId": "rmwow4vy314",
+   "side": "s",
+   "pos": 480,
+   "winType": "door",
+   "w": 900,
+   "h": 2100,
+   "sill": 0,
+   "color": "#4a5560"
+  },
+  {
+   "id": "o5lzf8a5",
+   "roomId": "rmwow4vy315",
+   "side": "n",
+   "pos": 760,
+   "winType": "double",
+   "w": 600,
+   "h": 500,
+   "sill": 1600,
+   "color": "#4a5560"
+  },
+  {
+   "id": "oes57c8l",
+   "roomId": "rmwow4vy315",
+   "side": "s",
+   "pos": 450,
+   "winType": "swingDoor",
+   "w": 700,
+   "h": 1900,
+   "sill": 0,
+   "color": "#4a5560"
+  },
+  {
+   "id": "o6d2pf9n",
+   "roomId": "rmwow4vy317",
+   "side": "n",
+   "pos": 450,
+   "winType": "swingDoor",
+   "w": 700,
+   "h": 1900,
+   "sill": 0,
+   "color": "#4a5560"
+  }
+ ],
+ "furniture": [
+  {
+   "id": "fmwow4vy37",
+   "catalogId": "sink",
+   "x": 6410,
+   "y": 580,
+   "rotation": 0
+  },
+  {
+   "id": "fmwow4vy38",
+   "catalogId": "fridge",
+   "x": 7810,
+   "y": 680,
+   "rotation": 0
+  },
+  {
+   "id": "fmwow4vy39",
+   "catalogId": "toilet",
+   "x": 9370,
+   "y": 720,
+   "rotation": 90
+  },
+  {
+   "id": "fmwow4vy310",
+   "catalogId": "basin",
+   "x": 9470,
+   "y": 1750,
+   "rotation": 90
+  }
+ ],
+ "customer": "",
+ "thumb": null,
+ "underlay": null,
+ "outline": null,
+ "slabThickness": 0,
+ "note": "",
+ "labels": [],
+ "view": null,
+ "site": null,
+ "floors": [
+  {
+   "name": "1층",
+   "rooms": [
+    {
+     "id": "rmwow4vy311",
+     "type": "bedroom",
+     "name": "방",
+     "x": 0,
+     "y": 0,
+     "w": 2410,
+     "d": 3500
+    },
+    {
+     "id": "rmwow4vy312",
+     "type": "kitchen",
+     "name": "주방/거실",
+     "x": 2410,
+     "y": 0,
+     "w": 5850,
+     "d": 2140,
+     "open": [
+      "s",
+      "e"
+     ]
+    },
+    {
+     "id": "rmwow4vy313",
+     "type": "living",
+     "name": "거실",
+     "x": 2410,
+     "y": 2140,
+     "w": 4510,
+     "d": 1360,
+     "open": [
+      "n",
+      "e"
+     ]
+    },
+    {
+     "id": "rmwow4vy314",
+     "type": "entrance",
+     "name": "현관",
+     "x": 6920,
+     "y": 2140,
+     "w": 1340,
+     "d": 1360,
+     "open": [
+      "n",
+      "w",
+      "e"
+     ]
+    },
+    {
+     "id": "rmwow4vy315",
+     "type": "bath",
+     "name": "화장실",
+     "x": 8260,
+     "y": 0,
+     "w": 1740,
+     "d": 1290
+    },
+    {
+     "id": "rmwow4vy316",
+     "type": "bath",
+     "name": "세면대",
+     "x": 8260,
+     "y": 1290,
+     "w": 1740,
+     "d": 920,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "id": "rmwow4vy317",
+     "type": "bath",
+     "name": "샤워실",
+     "x": 8260,
+     "y": 2210,
+     "w": 1740,
+     "d": 1290
+    }
+   ],
+   "furniture": [
+    {
+     "id": "fmwow4vy37",
+     "catalogId": "sink",
+     "x": 6410,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "id": "fmwow4vy38",
+     "catalogId": "fridge",
+     "x": 7810,
+     "y": 680,
+     "rotation": 0
+    },
+    {
+     "id": "fmwow4vy39",
+     "catalogId": "toilet",
+     "x": 9370,
+     "y": 720,
+     "rotation": 90
+    },
+    {
+     "id": "fmwow4vy310",
+     "catalogId": "basin",
+     "x": 9470,
+     "y": 1750,
+     "rotation": 90
+    }
+   ],
+   "openings": [
+    {
+     "id": "ovqchblp",
+     "roomId": "rmwow4vy311",
+     "side": "w",
+     "pos": 2170,
+     "winType": "fixed",
+     "w": 1500,
+     "h": 1000,
+     "sill": 900,
+     "color": "#4a5560"
+    },
+    {
+     "id": "ozz2janw",
+     "roomId": "rmwow4vy311",
+     "side": "s",
+     "pos": 1300,
+     "winType": "fixed",
+     "w": 1000,
+     "h": 800,
+     "sill": 1100,
+     "color": "#4a5560"
+    },
+    {
+     "id": "oicqkc01",
+     "roomId": "rmwow4vy311",
+     "side": "e",
+     "pos": 730,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0,
+     "color": "#4a5560"
+    },
+    {
+     "id": "o7d0fzt9",
+     "roomId": "rmwow4vy312",
+     "side": "n",
+     "pos": 4290,
+     "winType": "double",
+     "w": 1400,
+     "h": 600,
+     "sill": 1100,
+     "color": "#4a5560"
+    },
+    {
+     "id": "o4zny6c0",
+     "roomId": "rmwow4vy313",
+     "side": "s",
+     "pos": 1890,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 2100,
+     "sill": 100,
+     "color": "#4a5560"
+    },
+    {
+     "id": "o0xgd23e",
+     "roomId": "rmwow4vy314",
+     "side": "s",
+     "pos": 480,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0,
+     "color": "#4a5560"
+    },
+    {
+     "id": "o5lzf8a5",
+     "roomId": "rmwow4vy315",
+     "side": "n",
+     "pos": 760,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600,
+     "color": "#4a5560"
+    },
+    {
+     "id": "oes57c8l",
+     "roomId": "rmwow4vy315",
+     "side": "s",
+     "pos": 450,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0,
+     "color": "#4a5560"
+    },
+    {
+     "id": "o6d2pf9n",
+     "roomId": "rmwow4vy317",
+     "side": "n",
+     "pos": 450,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0,
+     "color": "#4a5560"
+    }
+   ],
+   "outline": null
+  }
+ ],
+ "activeFloor": 0
+}

@@ -1,5 +1,10 @@
 # FOREST10-WG (10평 체류형 쉼터) — 블렌더 디테일 모델 작업 지시서
 
+> 완료: `tools/blender/detail_forest10wg.py` 로 이 사양대로 만들어 `models/src/FOREST10-WG.blend` → `models/FOREST10-WG.glb` (템플릿 seum-forest10-wg).
+> 다시 만들기: `python tools/blender/plan_to_blend.py -- tools/blender/briefs/FOREST10-WG.plan.json models/src/FOREST10-WG-base.blend`
+> → `python tools/blender/detail_forest10wg.py -- models/src/FOREST10-WG-base.blend tools/blender/briefs/FOREST10-WG.plan.json models/src/FOREST10-WG.blend`
+> → `python tools/blender/blend_to_planner_glb.py -- models/src/FOREST10-WG.blend models --roof-z 2.69 --exclude-collection Backdrop`
+
 카탈로그 실사 사진을 보고 기존 디테일 모델(models/seum-shelter-10.glb, twin-10.glb, seum-15.glb 수준)처럼
 외부·내부를 실물과 비슷하게 만든다. **블렌더 MCP(포트 9876)로 사용자가 켜둔 블렌더 화면에서 직접 작업**해서
 사용자가 진행 과정을 볼 수 있게 한다. 단계마다 뷰포트 스크린샷으로 확인하고 짧게 보고.

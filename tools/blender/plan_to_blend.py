@@ -245,7 +245,8 @@ for i, a in enumerate(encl):
             else:
                 seg = None
             if not seg: continue
-            if s in (a.get('open') or []) or OPP[s] in (b.get('open') or []): continue
+            # 홈플래너와 같은 규칙: 두 방이 모두 이 면을 터놓았을 때만 벽 없음 (한쪽만 트임이면 막힌 쪽 벽이 남음)
+            if s in (a.get('open') or []) and OPP[s] in (b.get('open') or []): continue
             (sx0, sy0), (sx1, sy1) = seg
             parts.append(LineString([(sx0 / 1000, -sy0 / 1000), (sx1 / 1000, -sy1 / 1000)]).buffer(TI / 2, cap_style=2, join_style=2))
 walls_in = None

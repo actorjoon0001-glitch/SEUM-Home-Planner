@@ -148,7 +148,7 @@
    "roomId": "rmwow4vy313",
    "side": "s",
    "pos": 1890,
-   "winType": "balcony",
+   "winType": "slide",
    "w": 2000,
    "h": 2100,
    "sill": 100,

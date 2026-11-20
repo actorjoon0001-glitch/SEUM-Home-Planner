@@ -964,6 +964,84 @@ const T = [
       ],
     },
   },
+  {
+    // FOREST10-WG 10평 체류형 쉼터 — 카탈로그 CAD 도면 + 실사 사진(외부·내부) 기준 블렌더 디테일 모델
+    //  · 외장: 침실 구간 화이트 세로 골강판 + 나머지 그레이 벽돌무늬 패널, 그레이 트림, 완만한 박공(징크)
+    //  · 내부: 세이지그린 주방 · 서쪽 우드 슬랫벽+바테이블 · 간접조명 · 실링팬 · 세면 알코브(달걀 LED 거울)
+    //  · 블렌더: tools/blender/detail_forest10wg.py (사양: tools/blender/briefs/FOREST10-WG.md)
+    id: 'seum-forest10-wg',
+    photo: 'https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/forest10w/1783575974752_dt4l92.png?width=640&height=480&resize=cover&quality=70',
+    code: 'FOREST10-WG', catSlugs: ['forest10w01'],
+    title: '10평 체류형 쉼터',
+    category: '체류형 쉼터',
+    showroom: '서울마곡지사',
+    tags: ['카탈로그도면', 'FOREST10-WG', '10평', '체류형쉼터', '골강판', '박공지붕'],
+    base: {
+      name: 'FOREST10-WG 10평 체류형 쉼터',
+      productType: '체류형 쉼터',
+      ceilingHeight: 2400,
+      foundationHeight: 300,
+      wallThickness: 280,
+      wallThicknessInt: 120,
+      exterior: { material: 'metal', color: '#63666c', dir: 'h', corner: '#6b6e73' },
+      roof: { type: 'gable', color: '#3d4146', ridge: 'x', rise: 300 },
+      model3d: { url: 'models/FOREST10-WG.glb', fit: [10000, 4400], roofType: 'gable', ridge: 'x', label: '시뮬레이션', ownFurniture: true,
+        optionSets: [
+          { key: 'wall', label: '외장 (벽돌무늬 패널)', parts: ['외장_패널_그레이', '지붕_외장_패널_그레이'],
+            choices: [{ id: 'orig', label: '그레이', swatch: '#63666c' }, ...WALL_CHOICES.metal.filter((c) => c.id !== 'gray')] },
+          { key: 'accent', label: '외장 포인트 (세로 골강판)', parts: ['외장_골강판_화이트', '지붕_외장_골강판_화이트'],
+            choices: [{ id: 'orig', label: '화이트', swatch: '#e9e8e3' }, ...WALL_CHOICES.metal.filter((c) => c.id !== 'white')] },
+          { key: 'trim', label: '트림·몰딩', parts: ['외장_트림', '지붕_외장_트림', '외장_코너', '지붕_외장_코너', '창몰딩', '하부_스커트'],
+            choices: pick(['그레이', '#6b6e73'], ['black', 'charcoal', 'white', 'bronze']) },
+          { key: 'roof', label: '지붕 (징크)', parts: ['징크', '지붕_징크', '후레싱', '지붕_후레싱'],
+            choices: pick(['차콜', '#3d4146'], ['black', 'gray', 'brown', 'green', 'red']) },
+          { key: 'window', label: '창틀 (바깥)', parts: ['창틀', '창틀_실버'], choices: pick(['차콜', '#2f3237'], ['black', 'white', 'gray', 'bronze']) },
+          { key: 'door', label: '현관문', parts: ['현관문_우드'],
+            choices: [{ id: 'orig', label: '우드', swatch: '#8c6a4b' }, ...WALL_CHOICES.wood.filter((c) => c.id !== 'oak')] },
+          { key: 'deck', label: '데크', parts: ['데크'], choices: [{ id: 'orig', label: '다크브라운', swatch: '#55493e' },
+            RM('teak', '티크', '#6b4a2f', '#b98a5c'), RM('gray', '그레이', '#4d4c4a', '#8f8c86'), RM('charcoal', '차콜', '#222222', '#4d4b48')] },
+        ] },
+      rooms: [
+        { key: 'bed',  type: 'bedroom',  name: '방',       x: 0,    y: 0,    w: 2410, d: 3500 },
+        { key: 'kit',  type: 'kitchen',  name: '주방/거실', x: 2410, y: 0,    w: 5850, d: 2140, open: ['s', 'e'] },
+        { key: 'liv',  type: 'living',   name: '거실',     x: 2410, y: 2140, w: 4510, d: 1360, open: ['n', 'e'] },
+        { key: 'ent',  type: 'entrance', name: '현관',     x: 6920, y: 2140, w: 1340, d: 1360, open: ['n', 'w'] },
+        { key: 'wc',   type: 'bath',     name: '화장실',   x: 8260, y: 0,    w: 1740, d: 1290 },
+        { key: 'wash', type: 'bath',     name: '세면대',   x: 8260, y: 1290, w: 1740, d: 920, open: ['w'] },
+        { key: 'shw',  type: 'bath',     name: '샤워실',   x: 8260, y: 2210, w: 1740, d: 1290 },
+        { key: 'deck', type: 'deck',     name: '데크',     x: 5600, y: 3520, w: 3600, d: 880 },
+      ],
+      openings: [
+        { roomKey: 'bed', side: 'w', pos: 2170, winType: 'fixed',     w: 1500, h: 1000, sill: 900,  color: '#2f3237' },
+        { roomKey: 'bed', side: 's', pos: 1300, winType: 'fixed',     w: 1000, h: 800,  sill: 1100, color: '#2f3237' },
+        { roomKey: 'bed', side: 'e', pos: 730,  winType: 'swingDoor', w: 900,  h: 2100, color: '#f1f0ec' },
+        { roomKey: 'kit', side: 'n', pos: 4290, winType: 'double',    w: 1400, h: 600,  sill: 1100, color: '#2f3237' },
+        { roomKey: 'liv', side: 's', pos: 1890, winType: 'sliding',   w: 2000, h: 2100, sill: 100,  color: '#9ea3a8' },
+        { roomKey: 'ent', side: 's', pos: 480,  winType: 'door',      w: 900,  h: 2100, color: '#8c6a4b' },
+        { roomKey: 'wc',  side: 'n', pos: 760,  winType: 'double',    w: 600,  h: 500,  sill: 1600, color: '#2f3237' },
+        { roomKey: 'wc',  side: 's', pos: 450,  winType: 'swingDoor', w: 700,  h: 1900, color: '#f1f0ec' },
+        { roomKey: 'shw', side: 'n', pos: 450,  winType: 'swingDoor', w: 700,  h: 1900, color: '#f1f0ec' },
+      ],
+      furniture: [
+        // 3D 실물 모델(블렌더)의 가구 위치·크기 그대로 (중심 x·y, 폭 w·깊이 d mm)
+        { catalogId: 'bedQ',      x: 1250, y: 2305, w: 1540, d: 2050, rotation: 180 },
+        { catalogId: 'desk',      x: 2685, y: 2275, w: 1750, d: 390,  rotation: 270 },   // 슬랫벽 앞 바테이블
+        { catalogId: 'chair',     x: 3200, y: 1850, w: 400,  d: 400,  rotation: 90 },
+        { catalogId: 'chair',     x: 3200, y: 2650, w: 400,  d: 400,  rotation: 90 },
+        { catalogId: 'sconce',    x: 2460, y: 1700, rotation: 90, wallNormal: [1, 0] },
+        { catalogId: 'sconce',    x: 2460, y: 2900, rotation: 90, wallNormal: [1, 0] },
+        { catalogId: 'sofa3',     x: 3750, y: 570,  w: 2000, d: 800,  rotation: 0 },
+        { catalogId: 'rug',       x: 4300, y: 2150, w: 2000, d: 1600, rotation: 0 },
+        { catalogId: 'ceilfan',   x: 5000, y: 1600, rotation: 0 },
+        { catalogId: 'kbase12',   x: 5700, y: 450,  w: 1000, d: 600,  rotation: 0 },
+        { catalogId: 'sink',      x: 7205, y: 450,  w: 2010, d: 600,  rotation: 0 },
+        { catalogId: 'induction', x: 5750, y: 450,  w: 600,  d: 440,  rotation: 0 },
+        { catalogId: 'shelf',     x: 8030, y: 2815, w: 1030, d: 360,  rotation: 90 },    // 현관 신발장
+        { catalogId: 'toilet',    x: 9430, y: 720,  w: 400,  d: 650,  rotation: 90 },
+        { catalogId: 'basin',     x: 9600, y: 1750, w: 480,  d: 440,  rotation: 90 },
+      ],
+    },
+  },
 ];
 
 // 템플릿 목록 (썸네일/표시용 메타)

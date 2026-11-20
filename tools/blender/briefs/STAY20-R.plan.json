@@ -1,0 +1,956 @@
+{
+ "name": "STAY20-R 20평 전원주택",
+ "templateId": "seum-stay20-r",
+ "productType": "주택",
+ "ceilingHeight": 2400,
+ "foundationHeight": 450,
+ "wallThickness": 280,
+ "wallThicknessInt": 120,
+ "exterior": {
+  "material": "brick",
+  "color": "#a8654b",
+  "dir": "h",
+  "corner": "#3b2f28"
+ },
+ "roof": {
+  "type": "gable",
+  "color": "#4a4039",
+  "ridge": "z",
+  "rise": 1550
+ },
+ "model3d": {
+  "url": "models/STAY20-R.glb",
+  "fit": [
+   11600,
+   8200
+  ],
+  "roofType": "gable",
+  "ridge": "z",
+  "label": "시뮬레이션",
+  "ownFurniture": true,
+  "optionSets": [
+   {
+    "key": "wall",
+    "label": "정면 (벽돌)",
+    "parts": [
+     "외장_벽돌",
+     "지붕_외장_벽돌"
+    ],
+    "choices": [
+     {
+      "id": "orig",
+      "label": "레드 브릭",
+      "swatch": "#a35a48"
+     },
+     {
+      "id": "brown",
+      "label": "브라운 브릭",
+      "dark": "#3a2a22",
+      "light": "#8a6a55"
+     },
+     {
+      "id": "gray",
+      "label": "그레이 브릭",
+      "dark": "#4b4d50",
+      "light": "#a9a9a6"
+     },
+     {
+      "id": "white",
+      "label": "화이트 브릭",
+      "dark": "#9d9890",
+      "light": "#efebe4"
+     }
+    ]
+   },
+   {
+    "key": "side",
+    "label": "측·배면 (메탈)",
+    "parts": [
+     "외장_가로메탈",
+     "지붕_외장_가로메탈"
+    ],
+    "choices": [
+     {
+      "id": "orig",
+      "label": "화이트",
+      "swatch": "#eceae5"
+     },
+     {
+      "id": "beige",
+      "label": "베이지",
+      "dark": "#9a8d77",
+      "light": "#e3d9c6"
+     },
+     {
+      "id": "gray",
+      "label": "그레이",
+      "dark": "#53575d",
+      "light": "#a7abb1"
+     },
+     {
+      "id": "navy",
+      "label": "네이비",
+      "dark": "#1c2430",
+      "light": "#4d596c"
+     },
+     {
+      "id": "charcoal",
+      "label": "차콜",
+      "dark": "#1a1c1f",
+      "light": "#4a4d52"
+     },
+     {
+      "id": "brown",
+      "label": "브라운",
+      "dark": "#3b2a1f",
+      "light": "#7d5c45"
+     }
+    ]
+   },
+   {
+    "key": "trim",
+    "label": "트림·몰딩",
+    "parts": [
+     "외장_트림",
+     "지붕_외장_트림",
+     "창몰딩"
+    ],
+    "choices": [
+     {
+      "id": "orig",
+      "label": "다크브라운",
+      "swatch": "#3b2f28"
+     },
+     {
+      "id": "black",
+      "label": "블랙",
+      "color": "#161618"
+     },
+     {
+      "id": "charcoal",
+      "label": "차콜",
+      "color": "#2f3033"
+     },
+     {
+      "id": "white",
+      "label": "화이트",
+      "color": "#e9e9e6"
+     },
+     {
+      "id": "gray",
+      "label": "그레이",
+      "color": "#6b6f75"
+     }
+    ]
+   },
+   {
+    "key": "roof",
+    "label": "지붕",
+    "parts": [
+     "지붕재",
+     "지붕_지붕재",
+     "지붕_후레싱",
+     "후레싱"
+    ],
+    "choices": [
+     {
+      "id": "orig",
+      "label": "다크브라운",
+      "swatch": "#4a4039"
+     },
+     {
+      "id": "charcoal",
+      "label": "차콜",
+      "color": "#2f3033"
+     },
+     {
+      "id": "black",
+      "label": "블랙",
+      "color": "#161618"
+     },
+     {
+      "id": "gray",
+      "label": "그레이",
+      "color": "#6b6f75"
+     },
+     {
+      "id": "green",
+      "label": "그린",
+      "color": "#2e3b30"
+     },
+     {
+      "id": "red",
+      "label": "레드",
+      "color": "#6e2a22"
+     }
+    ]
+   },
+   {
+    "key": "window",
+    "label": "창틀 (바깥)",
+    "parts": [
+     "창틀"
+    ],
+    "choices": [
+     {
+      "id": "orig",
+      "label": "다크브라운",
+      "swatch": "#2a2422"
+     },
+     {
+      "id": "black",
+      "label": "블랙",
+      "color": "#161618"
+     },
+     {
+      "id": "white",
+      "label": "화이트",
+      "color": "#e9e9e6"
+     },
+     {
+      "id": "gray",
+      "label": "그레이",
+      "color": "#6b6f75"
+     },
+     {
+      "id": "bronze",
+      "label": "브론즈",
+      "color": "#4a3a2c"
+     }
+    ]
+   },
+   {
+    "key": "deck",
+    "label": "데크",
+    "parts": [
+     "데크"
+    ],
+    "choices": [
+     {
+      "id": "orig",
+      "label": "브라운",
+      "swatch": "#7a4e36"
+     },
+     {
+      "id": "teak",
+      "label": "티크",
+      "dark": "#6b4a2f",
+      "light": "#b98a5c"
+     },
+     {
+      "id": "gray",
+      "label": "그레이",
+      "dark": "#4d4c4a",
+      "light": "#8f8c86"
+     },
+     {
+      "id": "charcoal",
+      "label": "차콜",
+      "dark": "#222222",
+      "light": "#4d4b48"
+     }
+    ]
+   }
+  ],
+  "sig": "0:e:276:swingDoor:900:2100:0|0:n:143:double:1200:1000:1100|0:w:123:fixed:1200:800:1300|10:s:42:pocketDoor:700:2100:0|11:e:173:fixed:1200:800:1300|11:s:170:double:1700:1000:1100|11:w:60:swingDoor:900:2100:0|1:e:73:swingDoor:900:2100:0|1:s:143:double:1200:1000:1100|1:w:181:fixed:1200:800:1300|2:s:41:swingDoor:700:2000:0|3:n:229:double:1200:700:1050|5:n:74:glassSlide:1350:2100:0|5:s:86:door:900:2100:0|7:s:208:balcony:2500:2000:100|8:n:88:double:600:500:1700|8:s:107:swingDoor:700:2000:0",
+  "baseCount": 15,
+  "baseCounts": [
+   15
+  ],
+  "baseFurn": []
+ },
+ "rooms": [
+  {
+   "id": "rmwoyocet11",
+   "type": "bedroom",
+   "name": "침실1",
+   "x": 0,
+   "y": 0,
+   "w": 2640,
+   "d": 3260
+  },
+  {
+   "id": "rmwoyocet12",
+   "type": "bedroom",
+   "name": "침실2",
+   "x": 0,
+   "y": 3260,
+   "w": 2640,
+   "d": 3040
+  },
+  {
+   "id": "rmwoyocet13",
+   "type": "bath",
+   "name": "공용욕실",
+   "x": 2640,
+   "y": 0,
+   "w": 2320,
+   "d": 1740
+  },
+  {
+   "id": "rmwoyocet14",
+   "type": "kitchen",
+   "name": "주방",
+   "x": 4960,
+   "y": 0,
+   "w": 3380,
+   "d": 1740,
+   "open": [
+    "s"
+   ]
+  },
+  {
+   "id": "rmwoyocet15",
+   "type": "hall",
+   "name": "복도",
+   "x": 2640,
+   "y": 1740,
+   "w": 1550,
+   "d": 2840,
+   "open": [
+    "e"
+   ]
+  },
+  {
+   "id": "rmwoyocet16",
+   "type": "entrance",
+   "name": "현관",
+   "x": 2640,
+   "y": 4580,
+   "w": 1550,
+   "d": 1720
+  },
+  {
+   "id": "rmwoyocet17",
+   "type": "living",
+   "name": "거실(식당)",
+   "x": 4190,
+   "y": 1740,
+   "w": 4150,
+   "d": 2840,
+   "open": [
+    "n",
+    "w",
+    "s"
+   ]
+  },
+  {
+   "id": "rmwoyocet18",
+   "type": "living",
+   "name": "거실",
+   "x": 4190,
+   "y": 4580,
+   "w": 4150,
+   "d": 2420,
+   "open": [
+    "n"
+   ]
+  },
+  {
+   "id": "rmwoyocet19",
+   "type": "bath",
+   "name": "부부욕실",
+   "x": 8340,
+   "y": 1080,
+   "w": 1440,
+   "d": 2260
+  },
+  {
+   "id": "rmwoyocet20",
+   "type": "dress",
+   "name": "드레스룸",
+   "x": 9780,
+   "y": 1080,
+   "w": 1820,
+   "d": 1340,
+   "open": [
+    "s"
+   ]
+  },
+  {
+   "id": "rmwoyocet21",
+   "type": "dress",
+   "name": "파우더룸",
+   "x": 9780,
+   "y": 2420,
+   "w": 1820,
+   "d": 920,
+   "open": [
+    "n"
+   ]
+  },
+  {
+   "id": "rmwoyocet22",
+   "type": "bedroom",
+   "name": "안방",
+   "x": 8340,
+   "y": 3340,
+   "w": 3260,
+   "d": 2960
+  }
+ ],
+ "openings": [
+  {
+   "id": "o66jbvss",
+   "roomId": "rmwoyocet11",
+   "side": "n",
+   "pos": 1430,
+   "winType": "double",
+   "w": 1200,
+   "h": 1000,
+   "sill": 1100,
+   "color": "#2a2422"
+  },
+  {
+   "id": "oj5ag2v7",
+   "roomId": "rmwoyocet11",
+   "side": "w",
+   "pos": 1230,
+   "winType": "fixed",
+   "w": 1200,
+   "h": 800,
+   "sill": 1300,
+   "color": "#2a2422"
+  },
+  {
+   "id": "oko28z66",
+   "roomId": "rmwoyocet11",
+   "side": "e",
+   "pos": 2760,
+   "winType": "swingDoor",
+   "w": 900,
+   "h": 2100,
+   "sill": 0,
+   "color": "#ecebe7"
+  },
+  {
+   "id": "of3j2poa",
+   "roomId": "rmwoyocet12",
+   "side": "w",
+   "pos": 1810,
+   "winType": "fixed",
+   "w": 1200,
+   "h": 800,
+   "sill": 1300,
+   "color": "#2a2422"
+  },
+  {
+   "id": "orov7jsp",
+   "roomId": "rmwoyocet12",
+   "side": "s",
+   "pos": 1430,
+   "winType": "double",
+   "w": 1200,
+   "h": 1000,
+   "sill": 1100,
+   "color": "#2a2422"
+  },
+  {
+   "id": "oqz5jl09",
+   "roomId": "rmwoyocet12",
+   "side": "e",
+   "pos": 730,
+   "winType": "swingDoor",
+   "w": 900,
+   "h": 2100,
+   "sill": 0,
+   "color": "#ecebe7"
+  },
+  {
+   "id": "oz2y4tam",
+   "roomId": "rmwoyocet13",
+   "side": "s",
+   "pos": 410,
+   "winType": "swingDoor",
+   "w": 700,
+   "h": 2000,
+   "sill": 0,
+   "color": "#ecebe7"
+  },
+  {
+   "id": "o4zii12h",
+   "roomId": "rmwoyocet14",
+   "side": "n",
+   "pos": 2290,
+   "winType": "double",
+   "w": 1200,
+   "h": 700,
+   "sill": 1050,
+   "color": "#2a2422"
+  },
+  {
+   "id": "os4hodr6",
+   "roomId": "rmwoyocet16",
+   "side": "n",
+   "pos": 735,
+   "winType": "glassSlide",
+   "w": 1350,
+   "h": 2100,
+   "sill": 0,
+   "color": "#2a2422"
+  },
+  {
+   "id": "ohwbsaob",
+   "roomId": "rmwoyocet16",
+   "side": "s",
+   "pos": 860,
+   "winType": "door",
+   "w": 900,
+   "h": 2100,
+   "sill": 0,
+   "color": "#d9d9d6"
+  },
+  {
+   "id": "oqt1udvm",
+   "roomId": "rmwoyocet18",
+   "side": "s",
+   "pos": 2075,
+   "winType": "balcony",
+   "w": 2500,
+   "h": 2000,
+   "sill": 100,
+   "color": "#2a2422"
+  },
+  {
+   "id": "oxi6g7f2",
+   "roomId": "rmwoyocet19",
+   "side": "n",
+   "pos": 880,
+   "winType": "double",
+   "w": 600,
+   "h": 500,
+   "sill": 1700,
+   "color": "#2a2422"
+  },
+  {
+   "id": "oux8gq92",
+   "roomId": "rmwoyocet19",
+   "side": "s",
+   "pos": 1070,
+   "winType": "swingDoor",
+   "w": 700,
+   "h": 2000,
+   "sill": 0,
+   "color": "#ecebe7"
+  },
+  {
+   "id": "ofh2kl61",
+   "roomId": "rmwoyocet21",
+   "side": "s",
+   "pos": 420,
+   "winType": "pocketDoor",
+   "w": 700,
+   "h": 2100,
+   "sill": 0,
+   "color": "#ecebe7"
+  },
+  {
+   "id": "o8ju2ogk",
+   "roomId": "rmwoyocet22",
+   "side": "w",
+   "pos": 600,
+   "winType": "swingDoor",
+   "w": 900,
+   "h": 2100,
+   "sill": 0,
+   "color": "#ecebe7"
+  },
+  {
+   "id": "o9go4hi9",
+   "roomId": "rmwoyocet22",
+   "side": "e",
+   "pos": 1730,
+   "winType": "fixed",
+   "w": 1200,
+   "h": 800,
+   "sill": 1300,
+   "color": "#2a2422"
+  },
+  {
+   "id": "obv0v10q",
+   "roomId": "rmwoyocet22",
+   "side": "s",
+   "pos": 1700,
+   "winType": "double",
+   "w": 1700,
+   "h": 1000,
+   "sill": 1100,
+   "color": "#2a2422"
+  }
+ ],
+ "furniture": [],
+ "customer": "",
+ "thumb": null,
+ "underlay": null,
+ "outline": null,
+ "slabThickness": 0,
+ "note": "",
+ "labels": [],
+ "view": null,
+ "site": null,
+ "floors": [
+  {
+   "name": "1층",
+   "rooms": [
+    {
+     "id": "rmwoyocet11",
+     "type": "bedroom",
+     "name": "침실1",
+     "x": 0,
+     "y": 0,
+     "w": 2640,
+     "d": 3260
+    },
+    {
+     "id": "rmwoyocet12",
+     "type": "bedroom",
+     "name": "침실2",
+     "x": 0,
+     "y": 3260,
+     "w": 2640,
+     "d": 3040
+    },
+    {
+     "id": "rmwoyocet13",
+     "type": "bath",
+     "name": "공용욕실",
+     "x": 2640,
+     "y": 0,
+     "w": 2320,
+     "d": 1740
+    },
+    {
+     "id": "rmwoyocet14",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 4960,
+     "y": 0,
+     "w": 3380,
+     "d": 1740,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "id": "rmwoyocet15",
+     "type": "hall",
+     "name": "복도",
+     "x": 2640,
+     "y": 1740,
+     "w": 1550,
+     "d": 2840,
+     "open": [
+      "e"
+     ]
+    },
+    {
+     "id": "rmwoyocet16",
+     "type": "entrance",
+     "name": "현관",
+     "x": 2640,
+     "y": 4580,
+     "w": 1550,
+     "d": 1720
+    },
+    {
+     "id": "rmwoyocet17",
+     "type": "living",
+     "name": "거실(식당)",
+     "x": 4190,
+     "y": 1740,
+     "w": 4150,
+     "d": 2840,
+     "open": [
+      "n",
+      "w",
+      "s"
+     ]
+    },
+    {
+     "id": "rmwoyocet18",
+     "type": "living",
+     "name": "거실",
+     "x": 4190,
+     "y": 4580,
+     "w": 4150,
+     "d": 2420,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "id": "rmwoyocet19",
+     "type": "bath",
+     "name": "부부욕실",
+     "x": 8340,
+     "y": 1080,
+     "w": 1440,
+     "d": 2260
+    },
+    {
+     "id": "rmwoyocet20",
+     "type": "dress",
+     "name": "드레스룸",
+     "x": 9780,
+     "y": 1080,
+     "w": 1820,
+     "d": 1340,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "id": "rmwoyocet21",
+     "type": "dress",
+     "name": "파우더룸",
+     "x": 9780,
+     "y": 2420,
+     "w": 1820,
+     "d": 920,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "id": "rmwoyocet22",
+     "type": "bedroom",
+     "name": "안방",
+     "x": 8340,
+     "y": 3340,
+     "w": 3260,
+     "d": 2960
+    },
+    {
+     "id": "rmwoyocet23",
+     "type": "deck",
+     "name": "데크",
+     "x": 0,
+     "y": 6300,
+     "w": 4190,
+     "d": 1900,
+     "rail": [
+      "s",
+      "w"
+     ]
+    },
+    {
+     "id": "rmwoyocet24",
+     "type": "deck",
+     "name": "데크",
+     "x": 4190,
+     "y": 7000,
+     "w": 4150,
+     "d": 1200,
+     "rail": [
+      "s"
+     ]
+    },
+    {
+     "id": "rmwoyocet25",
+     "type": "deck",
+     "name": "데크",
+     "x": 8340,
+     "y": 6300,
+     "w": 3260,
+     "d": 1900,
+     "rail": [
+      "s",
+      "e"
+     ]
+    }
+   ],
+   "furniture": [],
+   "openings": [
+    {
+     "id": "o66jbvss",
+     "roomId": "rmwoyocet11",
+     "side": "n",
+     "pos": 1430,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 1100,
+     "color": "#2a2422"
+    },
+    {
+     "id": "oj5ag2v7",
+     "roomId": "rmwoyocet11",
+     "side": "w",
+     "pos": 1230,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300,
+     "color": "#2a2422"
+    },
+    {
+     "id": "oko28z66",
+     "roomId": "rmwoyocet11",
+     "side": "e",
+     "pos": 2760,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0,
+     "color": "#ecebe7"
+    },
+    {
+     "id": "of3j2poa",
+     "roomId": "rmwoyocet12",
+     "side": "w",
+     "pos": 1810,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300,
+     "color": "#2a2422"
+    },
+    {
+     "id": "orov7jsp",
+     "roomId": "rmwoyocet12",
+     "side": "s",
+     "pos": 1430,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 1100,
+     "color": "#2a2422"
+    },
+    {
+     "id": "oqz5jl09",
+     "roomId": "rmwoyocet12",
+     "side": "e",
+     "pos": 730,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0,
+     "color": "#ecebe7"
+    },
+    {
+     "id": "oz2y4tam",
+     "roomId": "rmwoyocet13",
+     "side": "s",
+     "pos": 410,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0,
+     "color": "#ecebe7"
+    },
+    {
+     "id": "o4zii12h",
+     "roomId": "rmwoyocet14",
+     "side": "n",
+     "pos": 2290,
+     "winType": "double",
+     "w": 1200,
+     "h": 700,
+     "sill": 1050,
+     "color": "#2a2422"
+    },
+    {
+     "id": "os4hodr6",
+     "roomId": "rmwoyocet16",
+     "side": "n",
+     "pos": 735,
+     "winType": "glassSlide",
+     "w": 1350,
+     "h": 2100,
+     "sill": 0,
+     "color": "#2a2422"
+    },
+    {
+     "id": "ohwbsaob",
+     "roomId": "rmwoyocet16",
+     "side": "s",
+     "pos": 860,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0,
+     "color": "#d9d9d6"
+    },
+    {
+     "id": "oqt1udvm",
+     "roomId": "rmwoyocet18",
+     "side": "s",
+     "pos": 2075,
+     "winType": "balcony",
+     "w": 2500,
+     "h": 2000,
+     "sill": 100,
+     "color": "#2a2422"
+    },
+    {
+     "id": "oxi6g7f2",
+     "roomId": "rmwoyocet19",
+     "side": "n",
+     "pos": 880,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1700,
+     "color": "#2a2422"
+    },
+    {
+     "id": "oux8gq92",
+     "roomId": "rmwoyocet19",
+     "side": "s",
+     "pos": 1070,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0,
+     "color": "#ecebe7"
+    },
+    {
+     "id": "ofh2kl61",
+     "roomId": "rmwoyocet21",
+     "side": "s",
+     "pos": 420,
+     "winType": "pocketDoor",
+     "w": 700,
+     "h": 2100,
+     "sill": 0,
+     "color": "#ecebe7"
+    },
+    {
+     "id": "o8ju2ogk",
+     "roomId": "rmwoyocet22",
+     "side": "w",
+     "pos": 600,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0,
+     "color": "#ecebe7"
+    },
+    {
+     "id": "o9go4hi9",
+     "roomId": "rmwoyocet22",
+     "side": "e",
+     "pos": 1730,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300,
+     "color": "#2a2422"
+    },
+    {
+     "id": "obv0v10q",
+     "roomId": "rmwoyocet22",
+     "side": "s",
+     "pos": 1700,
+     "winType": "double",
+     "w": 1700,
+     "h": 1000,
+     "sill": 1100,
+     "color": "#2a2422"
+    }
+   ],
+   "outline": null
+  }
+ ],
+ "activeFloor": 0
+}

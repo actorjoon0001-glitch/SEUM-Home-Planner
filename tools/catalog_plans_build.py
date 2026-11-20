@@ -68,6 +68,8 @@ def clean_floor(f, warn):
 
 entries, report = [], []
 # 집이 아닌 특수 시설 등 자동 3D 로 보여주기 어려운 도면
+# 도면 제목과 카탈로그 모델명이 다른데 도면 내용(다락 등)이 카탈로그 쪽이 맞는 경우
+CODE_OVERRIDE = {'stay10w': 'FOREST10-4-W'}
 SKIP = {'cube5-wd': '지상형 수영장 큐브 — 주거 도면이 아니라 자동 3D 제외'}
 for grp in groups:
     rep = grp[0]
@@ -78,6 +80,7 @@ for grp in groups:
     if rep in SKIP: report.append(f"SKIP {rep}: {SKIP[rep]}"); continue
     # 도면 제목(괄호 설명 빼고)에서 모델명 — 'FOREST6-G,B' 처럼 여러 모델(색상 변형)용이면 모델명마다 따로 템플릿
     raw = re.sub(r'\s+', '', re.sub(r'\(.*?\)', '', j.get('pdfTitle') or '')).upper() or re.sub(r'\s+', '', j.get('code') or '').upper()
+    if rep in CODE_OVERRIDE: raw = CODE_OVERRIDE[rep]
     m0 = re.match(r'^(.*-)([A-Z0-9]+(?:,[A-Z0-9]+)+)$', raw)
     codes = [m0.group(1) + v for v in m0.group(2).split(',')] if m0 else [raw]
     fix = lambda c: re.sub(r'^(FOREST|STAY|CUBE)-(?=\d)', r'\1', c)   # 'FOREST-10-E' → 'FOREST10-E'

@@ -67,16 +67,21 @@ def clean_floor(f, warn):
 
 
 entries, report = [], []
+# 집이 아닌 특수 시설 등 자동 3D 로 보여주기 어려운 도면
+SKIP = {'cube5-wd': '지상형 수영장 큐브 — 주거 도면이 아니라 자동 3D 제외'}
 for grp in groups:
     rep = grp[0]
     p = os.path.join(out_dir, rep + '.json')
     if not os.path.exists(p): report.append(f"MISSING {rep}"); continue
     j = json.load(open(p))
     warn = []
-    raw = re.sub(r'\s+', '', j.get('code') or j.get('pdfTitle') or '').upper()
-    # 'FOREST6-G,B' 처럼 한 도면이 여러 모델(색상 변형)용이면 모델명마다 따로 템플릿
+    if rep in SKIP: report.append(f"SKIP {rep}: {SKIP[rep]}"); continue
+    # 도면 제목(괄호 설명 빼고)에서 모델명 — 'FOREST6-G,B' 처럼 여러 모델(색상 변형)용이면 모델명마다 따로 템플릿
+    raw = re.sub(r'\s+', '', re.sub(r'\(.*?\)', '', j.get('pdfTitle') or '')).upper() or re.sub(r'\s+', '', j.get('code') or '').upper()
     m0 = re.match(r'^(.*-)([A-Z0-9]+(?:,[A-Z0-9]+)+)$', raw)
     codes = [m0.group(1) + v for v in m0.group(2).split(',')] if m0 else [raw]
+    fix = lambda c: re.sub(r'^(FOREST|STAY|CUBE)-(?=\d)', r'\1', c)   # 'FOREST-10-E' → 'FOREST10-E'
+    codes = [c if c in by_code else fix(c) for c in codes]
     # 도면 제목 모델명이 카탈로그에 없으면 이 PDF 를 올린 카탈로그 모델명으로
     known = [c for c in codes if c in by_code]
     if not known:
@@ -89,6 +94,15 @@ for grp in groups:
     ex = b.get('exterior') or {}
     exterior = {'material': ex.get('material') if ex.get('material') in EXT else 'metal', 'color': ex.get('color') or '#8d96a0'}
     if ex.get('dir') == 'v': exterior['dir'] = 'v'
+    # 세로 골 메탈(metalV) 질감은 우드 프린트라 색이 안 먹음 → 우드색이 아니면 가로 메탈을 세로로 시공
+    if exterior['material'] == 'metalV' and exterior['color'].lower() not in ('#b8773e', '#9c7244', '#c08f5a', '#7c5a36'):
+        exterior['material'] = 'metal'; exterior['dir'] = 'v'
+    # 천장보다 높은 고창(복층 거실 등)은 자동 3D 벽 위로 튀어나오므로 1층에선 뺌
+    H0 = int(b.get('ceilingHeight') or 2400)
+    for fi, f in enumerate(fl):
+        if fi > 0: continue
+        keep = [o for o in f['openings'] if (o.get('sill') or 0) + o['h'] <= H0 + 50]
+        if len(keep) != len(f['openings']): warn.append(f"고창 {len(f['openings']) - len(keep)}개 제외"); f['openings'] = keep
     if ex.get('corner'): exterior['corner'] = ex['corner']
     rf = b.get('roof') or {}
     roof = {'type': rf.get('type') if rf.get('type') in ROOF else 'flat', 'color': rf.get('color') or '#3a3f44'}
@@ -103,7 +117,10 @@ for grp in groups:
         category = j.get('category') if j.get('category') in ('체류형 쉼터', '주택', '농막', '특별모델') else pt
         tid = 'cat-' + re.sub(r'[^a-z0-9-]', '-', code.lower()).strip('-')
         if any(e['id'] == tid for e in entries): tid += '-' + rep
-        title = f"{code} {sub}".strip()
+        # 도면 제목의 괄호 설명(예: '(본사)')은 같은 모델명 다른 도면 구분용 꼬리표
+        mnote = re.search(r'\(([^)]+)\)', j.get('pdfTitle') or '')
+        code_note = mnote.group(1).strip() if mnote else None
+        title = f"{code} {sub}".strip() + (f" ({code_note})" if code_note else '')
         base = {'name': title, 'productType': pt, 'ceilingHeight': int(b.get('ceilingHeight') or 2400),
                 'foundationHeight': int(b.get('foundationHeight') or 300), 'wallThickness': int(b.get('wallThickness') or 280),
                 'exterior': exterior, 'roof': roof}
@@ -115,6 +132,7 @@ for grp in groups:
             'id': tid, 'title': title, 'category': category, 'showroom': showroom or '기타',
             'tags': ['카탈로그도면', code] + ([sub] if sub else []),
             'photo': thumb(cm.get('main_image')) if cm else None, 'code': code, 'catSlugs': grp,
+            **({'codeNote': code_note} if code_note else {}),
             'source': 'catalog-cad', 'confidence': j.get('confidence') or 'medium', 'base': base,
         })
         mism = [s for s in grp if s in models and re.sub(r'\s+', '', models[s]['name']).upper() != code]

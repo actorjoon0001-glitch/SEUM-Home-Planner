@@ -662,6 +662,9 @@ body {
 .dash-card .dc-pano { position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: rgba(0,0,0,.62); color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; backdrop-filter: blur(2px); }
 .dash-card .dc-pano span { font-size: 11px; color: #ffd36b; }
 .dash-card .dc-pano:hover { background: #c8102e; }
+/* 블렌더 실물 모델 표시 — 사진 왼쪽 위 */
+.dash-card .dc-real { position: absolute; left: 10px; top: 10px; z-index: 1; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 13px; background: #c8102e; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,.25); pointer-events: none; }
+.dash-card .dc-real span { font-size: 10.5px; padding: 1px 5px; border-radius: 7px; background: rgba(255,255,255,.22); }
 .vp-pano { background: #0f5b46 !important; color: #fff !important; }
 .pano-overlay { position: fixed; inset: 0; z-index: 9999; background: #0b0d10; color: #fff; }
 .pano-stage { position: absolute; inset: 0; overflow: hidden; }

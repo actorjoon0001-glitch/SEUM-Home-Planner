@@ -232,6 +232,12 @@ function projectCard(name, design, meta, onOpen, onDelete, { hard = false, onMov
     }
     card.appendChild(ph);
   }
+  // 🧊 블렌더 실물 모델이 들어간 도면 표시 (도면 자동 3D 가 아니라 디테일 작업된 시뮬레이션)
+  if (design && design.model3d && design.model3d.url) {
+    const rb = document.createElement('span'); rb.className = 'dc-real'; rb.title = '블렌더로 디테일 작업한 실물 3D 모델 (외장·내장·가구·조명 포함)';
+    rb.innerHTML = '<span>3D</span> 실물';
+    (card.querySelector('.dc-photo') || card).appendChild(rb);
+  }
   const cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.className = 'dc-thumb';
   card.appendChild(cv);
   try { drawPlanThumb(cv, design); } catch (e) { /* noop */ }

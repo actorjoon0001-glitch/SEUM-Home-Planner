@@ -378,13 +378,20 @@ async function renderDash() {
     for (const t of listTemplates()) {
       if (hidden.has(t.id)) continue;
       let d = null; try { d = instantiateTemplate(t.id); } catch (e) { /* noop */ }
-      const catRooms = (cat && t.code && cat.byCode[t.code.toUpperCase()]) || [];
+      // 카탈로그 도면에서 만든 템플릿은 그 PDF 를 올린 카탈로그 모델(같은 모델명)의 전시장만 — 같은 이름 다른 도면이 섞이지 않게
+      let catRooms = (cat && t.code && cat.byCode[t.code.toUpperCase()]) || [];
+      if (cat && cat.bySlug && Array.isArray(t.catSlugs) && t.catSlugs.length) {
+        const rows = t.catSlugs.map((sl) => cat.bySlug[sl]).filter(Boolean);
+        const same = rows.filter((r) => r.code === String(t.code || '').toUpperCase());
+        catRooms = [...new Set((same.length ? same : rows).flatMap((r) => r.showrooms))];
+      }
       const rooms = catRooms.length ? catRooms : [legacy(overrides[t.id] != null ? overrides[t.id] : t.showroom)];
       for (const sr of rooms) items.push({
         title: t.title, showroom: sr, data: d, photo: t.photo, code: t.code, codeNote: t.codeNote, tid: t.id,
         fromCatalog: catRooms.length > 0,
         apply: (room) => setBuiltinShowroom(t.id, room),
-        open: () => enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }),
+        // 전시장 도면은 완성된 집 모습으로 — 외장재·지붕을 켠 채로 열기
+        open: () => { enterEditor(() => { const nd = instantiateTemplate(t.id); if (nd) store.loadInto(nd); }); showExterior(); showRoof(); },
         del: admin ? () => adminAct(() => trashBuiltin(t.id), '휴지통으로 보냈어요') : null,
       });
     }

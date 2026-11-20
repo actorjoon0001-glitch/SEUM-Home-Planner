@@ -44,7 +44,7 @@ export const PRODUCT_TYPES = ['주택', '체류형 쉼터', '농막'];
 // metalness/roughness 로 3D 질감 표현, color 는 기본색(사용자가 변경 가능)
 // ---------------------------------------------------------------------------
 export const EXTERIOR_MATERIALS = {
-  metal:    { label: '메탈사이딩',   color: '#8d96a0', roughness: 0.35, metalness: 0.75 },
+  metal:    { label: '메탈사이딩',   color: '#8d96a0', roughness: 0.5,  metalness: 0.12 },   // 도장 강판 — 너무 금속처럼 반사하면 흰색·밝은색이 어둡게 보임
   metalV:   { label: '세로 메탈사이딩', color: '#b8773e', roughness: 0.45, metalness: 0.45 },   // 세로 골 강판(우드 프린트 등)
   cement:   { label: '시멘트사이딩', color: '#b8b2a7', roughness: 0.85, metalness: 0.05 },
   ceramic:  { label: '세라믹사이딩', color: '#d8d2c6', roughness: 0.5,  metalness: 0.1 },

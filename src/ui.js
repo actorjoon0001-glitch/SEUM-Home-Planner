@@ -406,15 +406,35 @@ async function renderDash() {
         });
       } catch (e) { /* 클라우드 미가용 → 내장만 */ }
     }
+    // '서울마곡지사'는 카탈로그에 전체 도면을 몰아 넣은 곳이라 다른 전시장과 겹침 → '전체 모델'로 바꿔 모델마다 한 장씩
+    //   같은 모델명(code)의 도면이 여러 개면 실물(블렌더) 모델 > 전시장 꼬리표 없는 도면 > 먼저 나온 도면 하나만
+    const ALL_ROOM = '전체 모델', DUP_ROOM = '서울마곡지사';
+    {
+      const pickOf = new Map();
+      const score = (it) => (it.data && it.data.model3d ? 2 : 0) + (it.codeNote ? 0 : 1);
+      for (const it of items) {
+        if (!it.tid || !it.code) continue;   // 카탈로그 모델만 (직접 만든·예전 기본 도면은 각 전시장·기타에 그대로)
+        const k = String(it.code).toUpperCase();
+        const cur = pickOf.get(k);
+        if (!cur || score(it) > score(cur)) pickOf.set(k, it);
+      }
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (items[i].showroom !== DUP_ROOM) continue;
+        if (items[i].code) items.splice(i, 1);           // 카탈로그 모델 → '전체 모델'에 한 장
+        else items[i] = { ...items[i], showroom: '기타' };   // 예전 기본 도면은 기타로
+      }
+      const all = [...pickOf.values()].map((it) => ({ ...it, showroom: ALL_ROOM }));
+      items.unshift(...all);
+    }
     // 전시장별 그룹핑 — 카드가 있는 전시장 + 사용자가 만든 빈 전시장까지 모두 노출
     // 각 전시장은 드롭 영역(section) → 카드를 끌어다 놓으면 그 전시장으로 이동
     const groups = {};
     for (const it of items) { const k = it.showroom || '기타'; (groups[k] = groups[k] || []).push(it); }
-    for (const k of known) { if (!(k in groups)) groups[k] = []; }   // 빈 전시장도 표시(이동 대상)
-    for (const k of (cat && cat.order) || []) { if (!(k in groups)) groups[k] = []; }   // 카탈로그 전시장은 비어도 표시
-    // 순서: 카탈로그 전시장(카탈로그 표시 순서) → 그 밖의 이름(가나다) → 기타
+    for (const k of known) { if (!(k in groups) && k !== DUP_ROOM) groups[k] = []; }   // 빈 전시장도 표시(이동 대상)
+    for (const k of (cat && cat.order) || []) { if (!(k in groups) && k !== DUP_ROOM) groups[k] = []; }   // 카탈로그 전시장은 비어도 표시
+    // 순서: 전체 모델 → 카탈로그 전시장(카탈로그 표시 순서) → 그 밖의 이름(가나다) → 기타
     const catOrder = (cat && cat.order) || [];
-    const roomRank = (k) => { const i = catOrder.indexOf(k); return i >= 0 ? i : (k === '기타' ? 1e6 : 1e3); };
+    const roomRank = (k) => { if (k === ALL_ROOM) return -1; const i = catOrder.indexOf(k); return i >= 0 ? i : (k === '기타' ? 1e6 : 1e3); };
     const dropInto = async (room) => {
       const it = _dragTpl; if (!it || !admin) return;
       const target = room === '기타' ? '' : room;

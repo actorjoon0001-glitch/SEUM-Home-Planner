@@ -3,7 +3,7 @@
 export const CATALOG_PLANS = [
  {
   "id": "cat-forest10-wg",
-  "title": "FOREST10-WG 10평 체류형 쉼터",
+  "title": "10평 체류형 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 제1전시장",
   "tags": [
@@ -230,7 +230,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest6-g",
-  "title": "FOREST6-G 6평 쉼터",
+  "title": "6평 쉼터",
   "category": "체류형 쉼터",
   "showroom": "안동전시장",
   "tags": [
@@ -369,7 +369,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest6-b",
-  "title": "FOREST6-B 6평 쉼터",
+  "title": "6평 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -508,7 +508,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay10-6-w",
-  "title": "STAY10-6-W 16평 전원주택 (본사)",
+  "title": "16평 전원주택 · 본사",
   "category": "주택",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -754,7 +754,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest10-g",
-  "title": "FOREST10-G 10평 쉼터",
+  "title": "10평 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 제1전시장",
   "tags": [
@@ -1015,7 +1015,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest10-w",
-  "title": "FOREST10-W 10평 쉼터",
+  "title": "10평 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -1276,7 +1276,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest6-m",
-  "title": "FOREST6-M 6평 체류형 쉼터",
+  "title": "6평 체류형 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -1431,7 +1431,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest10-bw",
-  "title": "FOREST10-BW 10평 쉼터",
+  "title": "10평 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -1648,7 +1648,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest6-o",
-  "title": "FOREST6-O 6평 쉼터",
+  "title": "6평 쉼터",
   "category": "체류형 쉼터",
   "showroom": "안동전시장",
   "tags": [
@@ -1785,7 +1785,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest10-e",
-  "title": "FOREST10-E 10평 체류형쉼터",
+  "title": "10평 체류형쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 제1전시장",
   "tags": [
@@ -1990,7 +1990,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-cube-h4-bk",
-  "title": "CUBE-H4-BK 4평 황토방",
+  "title": "4평 황토방",
   "category": "특별모델",
   "showroom": "안동전시장",
   "tags": [
@@ -2080,7 +2080,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay12-6-w",
-  "title": "STAY12-6-W 18평 전원주택",
+  "title": "18평 전원주택",
   "category": "주택",
   "showroom": "김포 제1전시장",
   "tags": [
@@ -2358,7 +2358,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest10-w-cube10w",
-  "title": "FOREST10-W 10평 쉼터 (강화전시장)",
+  "title": "10평 쉼터 · 강화전시장",
   "category": "체류형 쉼터",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -2576,7 +2576,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay14-5-3-gb",
-  "title": "STAY14.5-3-GB 14.5평/3평 전원주택",
+  "title": "14.5평/3평 전원주택",
   "category": "주택",
   "showroom": "강화전시장",
   "tags": [
@@ -2938,7 +2938,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay18-ub",
-  "title": "STAY18-UB 19평 전원주택",
+  "title": "19평 전원주택",
   "category": "주택",
   "showroom": "강화전시장",
   "tags": [
@@ -3268,7 +3268,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay20-r",
-  "title": "STAY20-R 20평 전원주택",
+  "title": "20평 전원주택",
   "category": "주택",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -3641,8 +3641,468 @@ export const CATALOG_PLANS = [
   }
  },
  {
+  "id": "cat-stay25-r",
+  "title": "25평 전원주택",
+  "category": "주택",
+  "showroom": "광주전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY25-R",
+   "25평 전원주택"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay25-r/1790557431302_nu32na.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY25-R",
+  "catSlugs": [
+   "stay25-r"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "STAY25-R 25평 전원주택",
+   "productType": "주택",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#8d96a0"
+   },
+   "roof": {
+    "type": "gable",
+    "color": "#5e442a",
+    "ridge": "z",
+    "rise": 1600
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "bed1",
+     "type": "bedroom",
+     "name": "침실1",
+     "x": 0,
+     "y": 0,
+     "w": 2640,
+     "d": 3940
+    },
+    {
+     "key": "bed2",
+     "type": "bedroom",
+     "name": "침실2",
+     "x": 0,
+     "y": 3940,
+     "w": 2640,
+     "d": 3360
+    },
+    {
+     "key": "bath1",
+     "type": "bath",
+     "name": "욕실",
+     "x": 2640,
+     "y": 0,
+     "w": 2320,
+     "d": 1730
+    },
+    {
+     "key": "hall",
+     "type": "hall",
+     "name": "복도",
+     "x": 2640,
+     "y": 1730,
+     "w": 1630,
+     "d": 3700,
+     "open": [
+      "e"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 2640,
+     "y": 5430,
+     "w": 1630,
+     "d": 1870
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 4960,
+     "y": 0,
+     "w": 3300,
+     "d": 1730,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "din",
+     "type": "living",
+     "name": "식당",
+     "x": 4270,
+     "y": 1730,
+     "w": 3990,
+     "d": 2760,
+     "open": [
+      "n",
+      "w",
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 4270,
+     "y": 4490,
+     "w": 3990,
+     "d": 2810,
+     "open": [
+      "n",
+      "s"
+     ]
+    },
+    {
+     "key": "util",
+     "type": "utility",
+     "name": "다용도실",
+     "x": 8260,
+     "y": 0,
+     "w": 1600,
+     "d": 2750
+    },
+    {
+     "key": "bath2",
+     "type": "bath",
+     "name": "부부욕실",
+     "x": 9860,
+     "y": 0,
+     "w": 1740,
+     "d": 2340
+    },
+    {
+     "key": "hall2",
+     "type": "hall",
+     "name": "복도",
+     "x": 8260,
+     "y": 2750,
+     "w": 1020,
+     "d": 1610,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "pdr",
+     "type": "dress",
+     "name": "욕실앞",
+     "x": 9860,
+     "y": 2340,
+     "w": 1740,
+     "d": 410,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "closet",
+     "type": "dress",
+     "name": "붙박이장",
+     "x": 9280,
+     "y": 2750,
+     "w": 1370,
+     "d": 1610,
+     "open": [
+      "n",
+      "e"
+     ]
+    },
+    {
+     "key": "dress",
+     "type": "dress",
+     "name": "드레스룸",
+     "x": 10650,
+     "y": 2750,
+     "w": 950,
+     "d": 1610,
+     "open": [
+      "n",
+      "w",
+      "s"
+     ]
+    },
+    {
+     "key": "bed3",
+     "type": "bedroom",
+     "name": "안방",
+     "x": 8260,
+     "y": 4360,
+     "w": 3340,
+     "d": 2940,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "deckL",
+     "type": "deck",
+     "name": "테라스(엠블럭)",
+     "x": 0,
+     "y": 7300,
+     "w": 2420,
+     "d": 700
+    },
+    {
+     "key": "porch",
+     "type": "porch",
+     "name": "포치(캐노피)",
+     "x": 2420,
+     "y": 7300,
+     "w": 1630,
+     "d": 700
+    },
+    {
+     "key": "livS",
+     "type": "living",
+     "name": "거실",
+     "x": 4050,
+     "y": 7300,
+     "w": 4430,
+     "d": 700,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "deckR",
+     "type": "deck",
+     "name": "테라스(엠블럭)",
+     "x": 8480,
+     "y": 7300,
+     "w": 3120,
+     "d": 700
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "bed1",
+     "side": "n",
+     "pos": 1400,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed1",
+     "side": "w",
+     "pos": 1400,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300
+    },
+    {
+     "roomKey": "bed1",
+     "side": "e",
+     "pos": 3420,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "w",
+     "pos": 2160,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300
+    },
+    {
+     "roomKey": "bed2",
+     "side": "s",
+     "pos": 1400,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed2",
+     "side": "e",
+     "pos": 510,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bath1",
+     "side": "s",
+     "pos": 410,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "n",
+     "pos": 885,
+     "winType": "glassSlide",
+     "w": 1350,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 860,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 1840,
+     "winType": "double",
+     "w": 1400,
+     "h": 700,
+     "sill": 1050
+    },
+    {
+     "roomKey": "livS",
+     "side": "s",
+     "pos": 2250,
+     "winType": "balcony",
+     "w": 2500,
+     "h": 2000,
+     "sill": 100
+    },
+    {
+     "roomKey": "util",
+     "side": "n",
+     "pos": 840,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "util",
+     "side": "s",
+     "pos": 500,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bath2",
+     "side": "n",
+     "pos": 1040,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath2",
+     "side": "s",
+     "pos": 1120,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "hall2",
+     "side": "s",
+     "pos": 510,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed3",
+     "side": "e",
+     "pos": 1740,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300
+    },
+    {
+     "roomKey": "bed3",
+     "side": "s",
+     "pos": 1790,
+     "winType": "double",
+     "w": 1700,
+     "h": 1000,
+     "sill": 1100
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "toilet",
+     "x": 3060,
+     "y": 660,
+     "rotation": 0
+    },
+    {
+     "catalogId": "basin",
+     "x": 3700,
+     "y": 480,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 5480,
+     "y": 640,
+     "rotation": 0
+    },
+    {
+     "catalogId": "sink18",
+     "x": 7330,
+     "y": 590,
+     "rotation": 0
+    },
+    {
+     "catalogId": "induction",
+     "x": 7880,
+     "y": 1470,
+     "rotation": 90
+    },
+    {
+     "catalogId": "washer",
+     "x": 9400,
+     "y": 670,
+     "rotation": 0
+    },
+    {
+     "catalogId": "basin",
+     "x": 10130,
+     "y": 1270,
+     "rotation": 270
+    },
+    {
+     "catalogId": "toilet",
+     "x": 10420,
+     "y": 1850,
+     "rotation": 270
+    }
+   ]
+  }
+ },
+ {
   "id": "cat-stay10-6-w-stay16w",
-  "title": "STAY10-6-W 16평 전원주택 (1전시장)",
+  "title": "16평 전원주택 · 1전시장",
   "category": "주택",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -4007,7 +4467,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay15-b",
-  "title": "STAY15-B 15평 전원주택",
+  "title": "15평 전원주택",
   "category": "주택",
   "showroom": "김포 제1전시장",
   "tags": [
@@ -4295,7 +4755,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-forest6-w",
-  "title": "FOREST6-W 6평 체류형 쉼터",
+  "title": "6평 체류형 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -4429,7 +4889,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay19-r",
-  "title": "STAY19-R 19평 전원주택",
+  "title": "19평 전원주택",
   "category": "주택",
   "showroom": "광주전시장",
   "tags": [
@@ -4761,7 +5221,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-cube-t4-k",
-  "title": "CUBE-T4-K 4평 화장실",
+  "title": "4평 화장실",
   "category": "특별모델",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -4973,7 +5433,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay13-w",
-  "title": "STAY13-W 13평 세컨하우스",
+  "title": "13평 세컨하우스",
   "category": "주택",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -5220,7 +5680,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-stay20-4-bw",
-  "title": "STAY20-4-BW 20평+포치4평 체류형 쉼터",
+  "title": "20평+포치4평 체류형 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 제1전시장",
   "tags": [
@@ -5612,8 +6072,271 @@ export const CATALOG_PLANS = [
   }
  },
  {
+  "id": "cat-forest10-wb",
+  "title": "10평 쉼터",
+  "category": "체류형 쉼터",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "FOREST10-WB",
+   "10평 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/forest10wb/1781840941798_tpzclb.png?width=640&height=480&resize=cover&quality=70",
+  "code": "FOREST10-WB",
+  "catSlugs": [
+   "forest10wb",
+   "forest10wbb"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "FOREST10-WB 10평 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea"
+   },
+   "roof": {
+    "type": "asymGable",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 600
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "bed",
+     "type": "bedroom",
+     "name": "방",
+     "x": 0,
+     "y": 0,
+     "w": 3040,
+     "d": 1960
+    },
+    {
+     "key": "bath",
+     "type": "bath",
+     "name": "욕실",
+     "x": 0,
+     "y": 1960,
+     "w": 2640,
+     "d": 1310
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 3040,
+     "y": 0,
+     "w": 3660,
+     "d": 2400,
+     "open": [
+      "s",
+      "w"
+     ]
+    },
+    {
+     "key": "hall",
+     "type": "hall",
+     "name": "복도",
+     "x": 2640,
+     "y": 1960,
+     "w": 400,
+     "d": 440,
+     "open": [
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 2640,
+     "y": 2400,
+     "w": 4060,
+     "d": 3300,
+     "open": [
+      "n",
+      "w"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 1000,
+     "y": 3270,
+     "w": 1040,
+     "d": 1690,
+     "open": [
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "livN",
+     "type": "living",
+     "name": "거실",
+     "x": 2040,
+     "y": 3270,
+     "w": 600,
+     "d": 1690,
+     "open": [
+      "w",
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "livW",
+     "type": "living",
+     "name": "거실",
+     "x": 1000,
+     "y": 4960,
+     "w": 1640,
+     "d": 740,
+     "open": [
+      "n",
+      "e"
+     ]
+    },
+    {
+     "key": "porch",
+     "type": "porch",
+     "name": "포치(합성데크)",
+     "x": 0,
+     "y": 3270,
+     "w": 1000,
+     "d": 2430
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "bed",
+     "side": "w",
+     "pos": 1090,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 900
+    },
+    {
+     "roomKey": "bed",
+     "side": "e",
+     "pos": 1400,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bath",
+     "side": "w",
+     "pos": 660,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath",
+     "side": "e",
+     "pos": 420,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 1810,
+     "winType": "double",
+     "w": 1500,
+     "h": 700,
+     "sill": 1100
+    },
+    {
+     "roomKey": "kit",
+     "side": "e",
+     "pos": 2000,
+     "winType": "fixed",
+     "w": 800,
+     "h": 1800,
+     "sill": 300
+    },
+    {
+     "roomKey": "liv",
+     "side": "e",
+     "pos": 2000,
+     "winType": "fixed",
+     "w": 1600,
+     "h": 700,
+     "sill": 1400
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1760,
+     "winType": "folding",
+     "w": 3000,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "livW",
+     "side": "s",
+     "pos": 950,
+     "winType": "fixed",
+     "w": 700,
+     "h": 2100,
+     "sill": 200
+    },
+    {
+     "roomKey": "ent",
+     "side": "w",
+     "pos": 980,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "toilet",
+     "x": 1340,
+     "y": 2830,
+     "rotation": 180
+    },
+    {
+     "catalogId": "basin",
+     "x": 2170,
+     "y": 2940,
+     "rotation": 180
+    },
+    {
+     "catalogId": "sink",
+     "x": 4410,
+     "y": 650,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 6090,
+     "y": 600,
+     "rotation": 0
+    }
+   ]
+  }
+ },
+ {
   "id": "cat-forest10-y",
-  "title": "FOREST10-Y 10평 체류형 쉼터",
+  "title": "10평 체류형 쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -5822,7 +6545,7 @@ export const CATALOG_PLANS = [
  },
  {
   "id": "cat-cube-h4-o",
-  "title": "CUBE-H4-O 4평 찜질방",
+  "title": "4평 찜질방",
   "category": "특별모델",
   "showroom": "김포 본사전시장",
   "tags": [
@@ -5911,8 +6634,1237 @@ export const CATALOG_PLANS = [
   }
  },
  {
+  "id": "cat-forest8-n",
+  "title": "8평 체류형 쉼터",
+  "category": "체류형 쉼터",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "FOREST8-N",
+   "8평 체류형 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/forest8-gr/1790756180503_dmwdtt.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "FOREST8-N",
+  "catSlugs": [
+   "forest8-gr"
+  ],
+  "source": "catalog-cad",
+  "confidence": "high",
+  "base": {
+   "name": "FOREST8-N 8평 체류형 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2300,
+   "foundationHeight": 150,
+   "wallThickness": 220,
+   "exterior": {
+    "material": "ceramic",
+    "color": "#8d96a0",
+    "corner": "#b8773e"
+   },
+   "roof": {
+    "type": "asymGable",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 800
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실/주방",
+     "x": 0,
+     "y": 0,
+     "w": 5920,
+     "d": 3300,
+     "open": [
+      "e"
+     ]
+    },
+    {
+     "key": "bath",
+     "type": "bath",
+     "name": "화장실",
+     "x": 5920,
+     "y": 0,
+     "w": 2080,
+     "d": 1680
+    },
+    {
+     "key": "liv2",
+     "type": "living",
+     "name": "거실",
+     "x": 5920,
+     "y": 1680,
+     "w": 1060,
+     "d": 1620,
+     "open": [
+      "w",
+      "e"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 6980,
+     "y": 1680,
+     "w": 1020,
+     "d": 1620,
+     "open": [
+      "w"
+     ]
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "liv",
+     "side": "n",
+     "pos": 3050,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "liv",
+     "side": "w",
+     "pos": 1650,
+     "winType": "fixed",
+     "w": 2000,
+     "h": 1400,
+     "sill": 900
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 3100,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 1800,
+     "sill": 100
+    },
+    {
+     "roomKey": "bath",
+     "side": "n",
+     "pos": 480,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath",
+     "side": "s",
+     "pos": 435,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "e",
+     "pos": 600,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "toilet",
+     "x": 6390,
+     "y": 740,
+     "rotation": 0
+    },
+    {
+     "catalogId": "basin",
+     "x": 7180,
+     "y": 450,
+     "rotation": 0
+    },
+    {
+     "catalogId": "washer",
+     "x": 7450,
+     "y": 1300,
+     "rotation": 90
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-stay10-4-w",
+  "title": "10평 포치2평 체류형 쉼터",
+  "category": "특별모델",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY10-4-W",
+   "10평 포치2평 체류형 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/cube-10w/1790751908443_qpglb3.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY10-4-W",
+  "catSlugs": [
+   "cube-10w"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "STAY10-4-W 10평 포치2평 체류형 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2300,
+   "foundationHeight": 150,
+   "wallThickness": 200,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea",
+    "dir": "v"
+   },
+   "roof": {
+    "type": "flat",
+    "color": "#f4f1ea"
+   },
+   "wallThicknessInt": 120,
+   "floors": [
+    {
+     "rooms": [
+      {
+       "key": "kit",
+       "type": "kitchen",
+       "name": "거실/주방",
+       "x": 0,
+       "y": 0,
+       "w": 5140,
+       "d": 1160,
+       "open": [
+        "s"
+       ]
+      },
+      {
+       "key": "liv",
+       "type": "living",
+       "name": "거실",
+       "x": 0,
+       "y": 1160,
+       "w": 6170,
+       "d": 1840,
+       "open": [
+        "n",
+        "e"
+       ]
+      },
+      {
+       "key": "bath",
+       "type": "bath",
+       "name": "화장실",
+       "x": 5140,
+       "y": 0,
+       "w": 1860,
+       "d": 1160
+      },
+      {
+       "key": "wash",
+       "type": "bath",
+       "name": "건식세면대",
+       "x": 6170,
+       "y": 1160,
+       "w": 830,
+       "d": 760,
+       "open": [
+        "w"
+       ]
+      },
+      {
+       "key": "cl",
+       "type": "dress",
+       "name": "붙박이장",
+       "x": 6170,
+       "y": 1920,
+       "w": 830,
+       "d": 1080
+      },
+      {
+       "key": "stairW",
+       "type": "porch",
+       "name": "외부계단",
+       "x": -1000,
+       "y": 0,
+       "w": 1000,
+       "d": 3000,
+       "rail": [
+        "w"
+       ]
+      }
+     ],
+     "openings": [
+      {
+       "roomKey": "kit",
+       "side": "n",
+       "pos": 4180,
+       "winType": "double",
+       "w": 1000,
+       "h": 600,
+       "sill": 1000
+      },
+      {
+       "roomKey": "liv",
+       "side": "w",
+       "pos": 1140,
+       "winType": "fixed",
+       "w": 400,
+       "h": 500,
+       "sill": 1850
+      },
+      {
+       "roomKey": "liv",
+       "side": "s",
+       "pos": 750,
+       "winType": "door",
+       "w": 900,
+       "h": 2100,
+       "sill": 0
+      },
+      {
+       "roomKey": "liv",
+       "side": "s",
+       "pos": 1650,
+       "winType": "fixed",
+       "w": 700,
+       "h": 2100,
+       "sill": 0
+      },
+      {
+       "roomKey": "liv",
+       "side": "s",
+       "pos": 5000,
+       "winType": "double",
+       "w": 1500,
+       "h": 1200,
+       "sill": 900
+      },
+      {
+       "roomKey": "bath",
+       "side": "e",
+       "pos": 650,
+       "winType": "fixed",
+       "w": 600,
+       "h": 600,
+       "sill": 1600
+      },
+      {
+       "roomKey": "bath",
+       "side": "s",
+       "pos": 560,
+       "winType": "pocketDoor",
+       "w": 1000,
+       "h": 2000,
+       "sill": 0
+      }
+     ],
+     "furniture": [
+      {
+       "catalogId": "sink18",
+       "x": 4180,
+       "y": 500,
+       "rotation": 0
+      },
+      {
+       "catalogId": "toilet",
+       "x": 6420,
+       "y": 650,
+       "rotation": 90
+      },
+      {
+       "catalogId": "basin",
+       "x": 6550,
+       "y": 1570,
+       "rotation": 90
+      },
+      {
+       "catalogId": "stairs",
+       "x": -500,
+       "y": 1900,
+       "rotation": 0
+      }
+     ],
+     "name": "1층"
+    },
+    {
+     "rooms": [
+      {
+       "key": "ter",
+       "type": "deck",
+       "name": "포치",
+       "x": 0,
+       "y": 0,
+       "w": 2000,
+       "d": 3000,
+       "rail": [
+        "n",
+        "s"
+       ]
+      },
+      {
+       "key": "r2",
+       "type": "room",
+       "name": "2층 방",
+       "x": 2000,
+       "y": 0,
+       "w": 5000,
+       "d": 3000
+      }
+     ],
+     "openings": [
+      {
+       "roomKey": "r2",
+       "side": "w",
+       "pos": 765,
+       "winType": "door",
+       "w": 900,
+       "h": 2100,
+       "sill": 0
+      },
+      {
+       "roomKey": "r2",
+       "side": "w",
+       "pos": 1950,
+       "winType": "fixed",
+       "w": 1470,
+       "h": 2100,
+       "sill": 0
+      },
+      {
+       "roomKey": "r2",
+       "side": "e",
+       "pos": 1700,
+       "winType": "fixed",
+       "w": 1200,
+       "h": 800,
+       "sill": 1300
+      },
+      {
+       "roomKey": "r2",
+       "side": "s",
+       "pos": 3000,
+       "winType": "double",
+       "w": 1500,
+       "h": 1200,
+       "sill": 900
+      }
+     ],
+     "furniture": [],
+     "name": "2층"
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-forest10-m",
+  "title": "10평 쉼터",
+  "category": "체류형 쉼터",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "FOREST10-M",
+   "10평 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/forest10-gr/1790754988184_keve1p.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "FOREST10-M",
+  "catSlugs": [
+   "forest10-gr",
+   "forest10m"
+  ],
+  "source": "catalog-cad",
+  "confidence": "high",
+  "base": {
+   "name": "FOREST10-M 10평 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 250,
+   "exterior": {
+    "material": "metal",
+    "color": "#a3d4c4",
+    "dir": "v"
+   },
+   "roof": {
+    "type": "flat",
+    "color": "#3a3f44"
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "bed",
+     "type": "bedroom",
+     "name": "안방",
+     "x": 0,
+     "y": 0,
+     "w": 2410,
+     "d": 3500
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방/거실",
+     "x": 2410,
+     "y": 0,
+     "w": 5850,
+     "d": 2150,
+     "open": [
+      "s",
+      "e"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 2410,
+     "y": 2150,
+     "w": 4490,
+     "d": 1350,
+     "open": [
+      "n",
+      "e"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 6900,
+     "y": 2150,
+     "w": 1360,
+     "d": 1350,
+     "open": [
+      "n",
+      "w"
+     ]
+    },
+    {
+     "key": "wc",
+     "type": "bath",
+     "name": "양변기실",
+     "x": 8260,
+     "y": 0,
+     "w": 1740,
+     "d": 1290
+    },
+    {
+     "key": "hallR",
+     "type": "hall",
+     "name": "복도",
+     "x": 8260,
+     "y": 1290,
+     "w": 780,
+     "d": 920,
+     "open": [
+      "w",
+      "e"
+     ]
+    },
+    {
+     "key": "wash",
+     "type": "bath",
+     "name": "건식세면대",
+     "x": 9040,
+     "y": 1290,
+     "w": 960,
+     "d": 920,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "shw",
+     "type": "bath",
+     "name": "샤워실",
+     "x": 8260,
+     "y": 2210,
+     "w": 1740,
+     "d": 1290
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "bed",
+     "side": "w",
+     "pos": 2170,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 900
+    },
+    {
+     "roomKey": "bed",
+     "side": "s",
+     "pos": 1300,
+     "winType": "fixed",
+     "w": 1000,
+     "h": 800,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed",
+     "side": "e",
+     "pos": 730,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 4290,
+     "winType": "double",
+     "w": 1400,
+     "h": 600,
+     "sill": 1100
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1890,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 2100,
+     "sill": 100
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 500,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "wc",
+     "side": "n",
+     "pos": 760,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1500
+    },
+    {
+     "roomKey": "wc",
+     "side": "s",
+     "pos": 440,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    },
+    {
+     "roomKey": "shw",
+     "side": "n",
+     "pos": 440,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "sink",
+     "x": 6340,
+     "y": 560,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 7850,
+     "y": 560,
+     "rotation": 0
+    },
+    {
+     "catalogId": "toilet",
+     "x": 9340,
+     "y": 730,
+     "rotation": 90
+    },
+    {
+     "catalogId": "basin",
+     "x": 9520,
+     "y": 1730,
+     "rotation": 90
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-forest10-w-forest10ww",
+  "title": "10평 쉼터 · 서울마곡지사",
+  "category": "체류형 쉼터",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "FOREST10-W",
+   "10평 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/forest10-w/1790757184845_vdehi1.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "FOREST10-W",
+  "catSlugs": [
+   "forest10ww"
+  ],
+  "codeNote": "서울마곡지사",
+  "source": "catalog-cad",
+  "confidence": "high",
+  "base": {
+   "name": "FOREST10-W 10평 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 200,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea",
+    "dir": "v",
+    "corner": "#2f3237"
+   },
+   "roof": {
+    "type": "shed",
+    "color": "#3a3f44",
+    "rise": 300
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 0,
+     "y": 0,
+     "w": 4400,
+     "d": 3300,
+     "open": [
+      "e"
+     ]
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 4400,
+     "y": 0,
+     "w": 1860,
+     "d": 2500,
+     "open": [
+      "w",
+      "s"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 4400,
+     "y": 2500,
+     "w": 1860,
+     "d": 800,
+     "open": [
+      "n",
+      "w"
+     ]
+    },
+    {
+     "key": "wc",
+     "type": "bath",
+     "name": "양변기실",
+     "x": 6260,
+     "y": 0,
+     "w": 1740,
+     "d": 1240
+    },
+    {
+     "key": "wash",
+     "type": "bath",
+     "name": "세면대",
+     "x": 6260,
+     "y": 1240,
+     "w": 1740,
+     "d": 820,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "shw",
+     "type": "bath",
+     "name": "샤워실",
+     "x": 6260,
+     "y": 2060,
+     "w": 1740,
+     "d": 1240
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "liv",
+     "side": "w",
+     "pos": 1550,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 900
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1100,
+     "winType": "fixed",
+     "w": 1000,
+     "h": 800,
+     "sill": 1100
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 3100,
+     "winType": "balcony",
+     "w": 1800,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "liv",
+     "side": "n",
+     "pos": 2980,
+     "winType": "fixed",
+     "w": 800,
+     "h": 800,
+     "sill": 1100
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 820,
+     "winType": "double",
+     "w": 1000,
+     "h": 600,
+     "sill": 1100
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 850,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "wc",
+     "side": "n",
+     "pos": 760,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1500
+    },
+    {
+     "roomKey": "wc",
+     "side": "s",
+     "pos": 470,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    },
+    {
+     "roomKey": "shw",
+     "side": "n",
+     "pos": 470,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "sink",
+     "x": 5000,
+     "y": 500,
+     "rotation": 0
+    },
+    {
+     "catalogId": "toilet",
+     "x": 7420,
+     "y": 670,
+     "rotation": 90
+    },
+    {
+     "catalogId": "basin",
+     "x": 7550,
+     "y": 1650,
+     "rotation": 90
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-stay16-b",
+  "title": "16평 전원주택",
+  "category": "주택",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY16-B",
+   "16평 전원주택"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay16-wd/1790755174494_pyzq0q.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY16-B",
+  "catSlugs": [
+   "stay16-wd"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "STAY-16-B 16평 전원주택",
+   "productType": "주택",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metalV",
+    "color": "#9c7244",
+    "dir": "v"
+   },
+   "roof": {
+    "type": "shed",
+    "color": "#3a3f44",
+    "rise": 300
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 0,
+     "y": 0,
+     "w": 1590,
+     "d": 1740
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 1590,
+     "y": 0,
+     "w": 3500,
+     "d": 2260,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "bath",
+     "type": "bath",
+     "name": "욕실",
+     "x": 5090,
+     "y": 0,
+     "w": 1570,
+     "d": 2260
+    },
+    {
+     "key": "bed1",
+     "type": "bedroom",
+     "name": "방1",
+     "x": 6660,
+     "y": 0,
+     "w": 3340,
+     "d": 2260
+    },
+    {
+     "key": "hallw",
+     "type": "hall",
+     "name": "거실(현관앞)",
+     "x": 0,
+     "y": 1740,
+     "w": 1590,
+     "d": 1860,
+     "open": [
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "hall",
+     "type": "hall",
+     "name": "식당/복도",
+     "x": 1590,
+     "y": 2260,
+     "w": 4850,
+     "d": 1340,
+     "open": [
+      "n",
+      "w",
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "corr",
+     "type": "hall",
+     "name": "복도",
+     "x": 6440,
+     "y": 2260,
+     "w": 1440,
+     "d": 1120,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "cl1",
+     "type": "dress",
+     "name": "붙박이장(방1)",
+     "x": 7880,
+     "y": 2260,
+     "w": 2120,
+     "d": 560,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "cl2",
+     "type": "dress",
+     "name": "붙박이장(방2)",
+     "x": 7880,
+     "y": 2820,
+     "w": 2120,
+     "d": 560,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 0,
+     "y": 3600,
+     "w": 3890,
+     "d": 3100,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "bed2",
+     "type": "bedroom",
+     "name": "방2",
+     "x": 6440,
+     "y": 3380,
+     "w": 3560,
+     "d": 3320
+    },
+    {
+     "key": "court",
+     "type": "deck",
+     "name": "중정데크",
+     "x": 3890,
+     "y": 3600,
+     "w": 2550,
+     "d": 3100
+    },
+    {
+     "key": "deckw",
+     "type": "deck",
+     "name": "데크(서측)",
+     "x": -1500,
+     "y": 0,
+     "w": 1500,
+     "d": 8700
+    },
+    {
+     "key": "decks",
+     "type": "deck",
+     "name": "데크(남측)",
+     "x": 0,
+     "y": 6700,
+     "w": 10000,
+     "d": 2000,
+     "rail": [
+      "s",
+      "e"
+     ]
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "ent",
+     "side": "w",
+     "pos": 1080,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 905,
+     "winType": "glassSlide",
+     "w": 1250,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 1790,
+     "winType": "double",
+     "w": 1200,
+     "h": 600,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bath",
+     "side": "n",
+     "pos": 1060,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath",
+     "side": "s",
+     "pos": 1130,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed1",
+     "side": "n",
+     "pos": 1560,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed1",
+     "side": "s",
+     "pos": 570,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "hallw",
+     "side": "w",
+     "pos": 1010,
+     "winType": "fixed",
+     "w": 700,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "hall",
+     "side": "s",
+     "pos": 3600,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 2050,
+     "sill": 50
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1945,
+     "winType": "balcony",
+     "w": 2600,
+     "h": 2050,
+     "sill": 50
+    },
+    {
+     "roomKey": "liv",
+     "side": "e",
+     "pos": 1470,
+     "winType": "fixed",
+     "w": 2700,
+     "h": 2050,
+     "sill": 50
+    },
+    {
+     "roomKey": "bed2",
+     "side": "n",
+     "pos": 790,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "s",
+     "pos": 1780,
+     "winType": "double",
+     "w": 2000,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed2",
+     "side": "e",
+     "pos": 1890,
+     "winType": "fixed",
+     "w": 1300,
+     "h": 800,
+     "sill": 1300
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "fridge",
+     "x": 2170,
+     "y": 680,
+     "rotation": 0
+    },
+    {
+     "catalogId": "induction",
+     "x": 3100,
+     "y": 590,
+     "rotation": 0
+    },
+    {
+     "catalogId": "sink18",
+     "x": 4730,
+     "y": 1090,
+     "rotation": 90
+    },
+    {
+     "catalogId": "basin",
+     "x": 5370,
+     "y": 1280,
+     "rotation": 270
+    },
+    {
+     "catalogId": "toilet",
+     "x": 5610,
+     "y": 1850,
+     "rotation": 270
+    }
+   ]
+  }
+ },
+ {
   "id": "cat-forest8-y",
-  "title": "FOREST8-Y 8평 체류형쉼터",
+  "title": "8평 체류형쉼터",
   "category": "체류형 쉼터",
   "showroom": "김포 제1전시장",
   "tags": [
@@ -6070,6 +8022,2524 @@ export const CATALOG_PLANS = [
      "x": 7100,
      "y": 2700,
      "rotation": 180
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-stay18-wr",
+  "title": "18평 전원주택",
+  "category": "주택",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY18-WR",
+   "18평 전원주택"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay-18wb/1782115609184_eyqdwj.png?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY18-WR",
+  "catSlugs": [
+   "stay-18wb"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "STAY-18-WR 18평 전원주택",
+   "productType": "주택",
+   "ceilingHeight": 2400,
+   "foundationHeight": 300,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "ceramic",
+    "color": "#f4f1ea",
+    "corner": "#a8654b"
+   },
+   "roof": {
+    "type": "shed",
+    "color": "#3a3f44",
+    "rise": 600
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "mbath",
+     "type": "bath",
+     "name": "부부욕실",
+     "x": 0,
+     "y": 500,
+     "w": 1640,
+     "d": 1740
+    },
+    {
+     "key": "bed1a",
+     "type": "bedroom",
+     "name": "침실1(붙박이장)",
+     "x": 0,
+     "y": 2240,
+     "w": 1640,
+     "d": 1400,
+     "open": [
+      "e"
+     ]
+    },
+    {
+     "key": "bed1",
+     "type": "bedroom",
+     "name": "침실1",
+     "x": 1640,
+     "y": 500,
+     "w": 3300,
+     "d": 3140,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "util",
+     "type": "utility",
+     "name": "다용도실",
+     "x": 4940,
+     "y": 0,
+     "w": 1800,
+     "d": 2440
+    },
+    {
+     "key": "cbath",
+     "type": "bath",
+     "name": "공용욕실",
+     "x": 6740,
+     "y": 0,
+     "w": 1600,
+     "d": 2440
+    },
+    {
+     "key": "bed2",
+     "type": "bedroom",
+     "name": "침실2",
+     "x": 8340,
+     "y": 500,
+     "w": 2840,
+     "d": 3060
+    },
+    {
+     "key": "hall",
+     "type": "hall",
+     "name": "복도",
+     "x": 4940,
+     "y": 2440,
+     "w": 3400,
+     "d": 1120,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 3040,
+     "y": 3640,
+     "w": 1900,
+     "d": 3440,
+     "open": [
+      "e"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 4940,
+     "y": 3560,
+     "w": 4300,
+     "d": 3520,
+     "open": [
+      "n",
+      "w"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 9240,
+     "y": 3560,
+     "w": 1940,
+     "d": 1780
+    },
+    {
+     "key": "porch",
+     "type": "porch",
+     "name": "포치(3평)",
+     "x": 0,
+     "y": 3640,
+     "w": 3040,
+     "d": 3440,
+     "rail": [
+      "w"
+     ]
+    },
+    {
+     "key": "deck1",
+     "type": "deck",
+     "name": "데크(1평)",
+     "x": 9240,
+     "y": 5340,
+     "w": 1940,
+     "d": 1740
+    },
+    {
+     "key": "deck5",
+     "type": "deck",
+     "name": "데크(5평)",
+     "x": 0,
+     "y": 7080,
+     "w": 11180,
+     "d": 1360
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "mbath",
+     "side": "n",
+     "pos": 890,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1500
+    },
+    {
+     "roomKey": "mbath",
+     "side": "s",
+     "pos": 1130,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed1",
+     "side": "n",
+     "pos": 1500,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed1",
+     "side": "e",
+     "pos": 2540,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed1",
+     "side": "s",
+     "pos": 650,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 100
+    },
+    {
+     "roomKey": "util",
+     "side": "n",
+     "pos": 1200,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "util",
+     "side": "s",
+     "pos": 1300,
+     "winType": "pocketDoor",
+     "w": 800,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "cbath",
+     "side": "n",
+     "pos": 820,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "cbath",
+     "side": "s",
+     "pos": 1050,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "n",
+     "pos": 1350,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed2",
+     "side": "w",
+     "pos": 2540,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "w",
+     "pos": 1900,
+     "winType": "double",
+     "w": 1500,
+     "h": 700,
+     "sill": 1100
+    },
+    {
+     "roomKey": "kit",
+     "side": "s",
+     "pos": 1540,
+     "winType": "fixed",
+     "w": 700,
+     "h": 2000,
+     "sill": 100
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 2390,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 2100,
+     "sill": 100
+    },
+    {
+     "roomKey": "ent",
+     "side": "w",
+     "pos": 850,
+     "winType": "glassSlide",
+     "w": 1350,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 740,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "sink",
+     "x": 3470,
+     "y": 5650,
+     "rotation": 270
+    },
+    {
+     "catalogId": "fridge",
+     "x": 3560,
+     "y": 4150,
+     "rotation": 270
+    },
+    {
+     "catalogId": "toilet",
+     "x": 780,
+     "y": 1120,
+     "rotation": 270
+    },
+    {
+     "catalogId": "basin",
+     "x": 490,
+     "y": 1780,
+     "rotation": 270
+    },
+    {
+     "catalogId": "basin",
+     "x": 6980,
+     "y": 2010,
+     "rotation": 270
+    },
+    {
+     "catalogId": "washer",
+     "x": 5460,
+     "y": 1960,
+     "rotation": 270
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-forest10-w-forest10wwww",
+  "title": "10평 쉼터 · 서울마곡지사2",
+  "category": "체류형 쉼터",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "FOREST10-W",
+   "10평 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/forest10-w/1790757184845_vdehi1.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "FOREST10-W",
+  "catSlugs": [
+   "forest10wwww"
+  ],
+  "codeNote": "서울마곡지사2",
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "FOREST10-W 10평 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 200,
+   "exterior": {
+    "material": "cement",
+    "color": "#f4f1ea",
+    "dir": "v"
+   },
+   "roof": {
+    "type": "asymGable",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 600
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "거실/주방",
+     "x": 0,
+     "y": 0,
+     "w": 8260,
+     "d": 2070,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 0,
+     "y": 2070,
+     "w": 6880,
+     "d": 1230,
+     "open": [
+      "n",
+      "e"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 6880,
+     "y": 2070,
+     "w": 1380,
+     "d": 1230,
+     "open": [
+      "n",
+      "w"
+     ]
+    },
+    {
+     "key": "bath",
+     "type": "bath",
+     "name": "욕실",
+     "x": 8260,
+     "y": 0,
+     "w": 1740,
+     "d": 3300
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "kit",
+     "side": "w",
+     "pos": 1500,
+     "winType": "double",
+     "w": 1000,
+     "h": 900,
+     "sill": 1000
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 3900,
+     "winType": "double",
+     "w": 1000,
+     "h": 900,
+     "sill": 950
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 6850,
+     "winType": "double",
+     "w": 1300,
+     "h": 600,
+     "sill": 1100
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1700,
+     "winType": "double",
+     "w": 1400,
+     "h": 900,
+     "sill": 1000
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 4800,
+     "winType": "double",
+     "w": 3000,
+     "h": 900,
+     "sill": 1000
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 520,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bath",
+     "side": "n",
+     "pos": 760,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath",
+     "side": "w",
+     "pos": 1600,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "fridge",
+     "x": 5700,
+     "y": 550,
+     "rotation": 0
+    },
+    {
+     "catalogId": "sink18",
+     "x": 7030,
+     "y": 500,
+     "rotation": 0
+    },
+    {
+     "catalogId": "toilet",
+     "x": 9400,
+     "y": 850,
+     "rotation": 90
+    },
+    {
+     "catalogId": "basin",
+     "x": 9600,
+     "y": 1680,
+     "rotation": 90
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-stay16-c",
+  "title": "16평 전원주택",
+  "category": "주택",
+  "showroom": "안동전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY16-C",
+   "16평 전원주택"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay16dg/1782884572040_dr2mns.png?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY16-C",
+  "catSlugs": [
+   "stay16dg"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "STAY16-C 16평 전원주택",
+   "productType": "주택",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#444b54"
+   },
+   "roof": {
+    "type": "shed",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 300
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 0,
+     "y": 0,
+     "w": 1590,
+     "d": 1740
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 1590,
+     "y": 0,
+     "w": 3500,
+     "d": 2260,
+     "open": [
+      "s",
+      "w"
+     ]
+    },
+    {
+     "key": "bath",
+     "type": "bath",
+     "name": "욕실",
+     "x": 5090,
+     "y": 0,
+     "w": 1570,
+     "d": 2260
+    },
+    {
+     "key": "bed1",
+     "type": "bedroom",
+     "name": "침실1",
+     "x": 6660,
+     "y": 0,
+     "w": 3340,
+     "d": 2260
+    },
+    {
+     "key": "hallW",
+     "type": "hall",
+     "name": "복도",
+     "x": 0,
+     "y": 1740,
+     "w": 1590,
+     "d": 520,
+     "open": [
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "din",
+     "type": "living",
+     "name": "거실(식당)",
+     "x": 0,
+     "y": 2260,
+     "w": 3890,
+     "d": 1290,
+     "open": [
+      "n",
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "hallC",
+     "type": "hall",
+     "name": "복도",
+     "x": 3890,
+     "y": 2260,
+     "w": 2550,
+     "d": 1290,
+     "open": [
+      "n",
+      "w",
+      "e"
+     ]
+    },
+    {
+     "key": "hallE",
+     "type": "hall",
+     "name": "복도",
+     "x": 6440,
+     "y": 2260,
+     "w": 1440,
+     "d": 1120,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "closet",
+     "type": "dress",
+     "name": "붙박이장(빌트인)",
+     "x": 7880,
+     "y": 2260,
+     "w": 2120,
+     "d": 1120
+    },
+    {
+     "key": "bed2",
+     "type": "bedroom",
+     "name": "침실2",
+     "x": 6440,
+     "y": 3380,
+     "w": 3560,
+     "d": 3320
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 0,
+     "y": 3550,
+     "w": 3890,
+     "d": 3150,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "court",
+     "type": "deck",
+     "name": "데크(2평)",
+     "x": 3890,
+     "y": 3550,
+     "w": 2550,
+     "d": 3150
+    },
+    {
+     "key": "deckS",
+     "type": "deck",
+     "name": "데크(6평)",
+     "x": 0,
+     "y": 6700,
+     "w": 10000,
+     "d": 2000,
+     "rail": [
+      "s",
+      "e"
+     ]
+    },
+    {
+     "key": "deckW",
+     "type": "deck",
+     "name": "데크(4평)",
+     "x": -1500,
+     "y": 0,
+     "w": 1500,
+     "d": 8700
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "ent",
+     "side": "w",
+     "pos": 1080,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 905,
+     "winType": "glassSlide",
+     "w": 1250,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "din",
+     "side": "w",
+     "pos": 490,
+     "winType": "fixed",
+     "w": 700,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 1790,
+     "winType": "double",
+     "w": 1200,
+     "h": 600,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bath",
+     "side": "n",
+     "pos": 1060,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath",
+     "side": "s",
+     "pos": 1160,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed1",
+     "side": "n",
+     "pos": 1560,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed1",
+     "side": "s",
+     "pos": 580,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "n",
+     "pos": 800,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "e",
+     "pos": 1890,
+     "winType": "fixed",
+     "w": 1300,
+     "h": 800,
+     "sill": 1300
+    },
+    {
+     "roomKey": "bed2",
+     "side": "s",
+     "pos": 1780,
+     "winType": "double",
+     "w": 2000,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "hallC",
+     "side": "s",
+     "pos": 1300,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 2050,
+     "sill": 50
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1945,
+     "winType": "balcony",
+     "w": 2600,
+     "h": 2050,
+     "sill": 50
+    },
+    {
+     "roomKey": "liv",
+     "side": "e",
+     "pos": 1490,
+     "winType": "fixed",
+     "w": 2700,
+     "h": 2050,
+     "sill": 50
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "fridge",
+     "x": 2150,
+     "y": 620,
+     "rotation": 0
+    },
+    {
+     "catalogId": "induction",
+     "x": 3040,
+     "y": 500,
+     "rotation": 0
+    },
+    {
+     "catalogId": "sink18",
+     "x": 4730,
+     "y": 1250,
+     "rotation": 90
+    },
+    {
+     "catalogId": "basin",
+     "x": 5380,
+     "y": 1280,
+     "rotation": 270
+    },
+    {
+     "catalogId": "toilet",
+     "x": 5620,
+     "y": 1880,
+     "rotation": 270
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-stay19-wb",
+  "title": "19평 전원주택",
+  "category": "주택",
+  "showroom": "안동전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY19-WB",
+   "19평 전원주택"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay19wb/1782892509226_04t70t.png?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY19-WB",
+  "catSlugs": [
+   "stay19wb"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "STAY19-WB 19평 전원주택",
+   "productType": "주택",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea",
+    "dir": "v"
+   },
+   "roof": {
+    "type": "gable",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 850
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "bath",
+     "type": "bath",
+     "name": "욕실",
+     "x": 0,
+     "y": 0,
+     "w": 1840,
+     "d": 2360
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 0,
+     "y": 2360,
+     "w": 2780,
+     "d": 1340,
+     "open": [
+      "n",
+      "e"
+     ]
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 1840,
+     "y": 0,
+     "w": 5720,
+     "d": 2360,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "din",
+     "type": "living",
+     "name": "식당",
+     "x": 2780,
+     "y": 2360,
+     "w": 4780,
+     "d": 1340,
+     "open": [
+      "n",
+      "w",
+      "s"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 2780,
+     "y": 3700,
+     "w": 4780,
+     "d": 3700,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "porch",
+     "type": "porch",
+     "name": "포치",
+     "x": 0,
+     "y": 3700,
+     "w": 2780,
+     "d": 3700
+    },
+    {
+     "key": "bed1",
+     "type": "bedroom",
+     "name": "방",
+     "x": 7560,
+     "y": 0,
+     "w": 3040,
+     "d": 2320
+    },
+    {
+     "key": "util",
+     "type": "utility",
+     "name": "다용도실",
+     "x": 7560,
+     "y": 2320,
+     "w": 1120,
+     "d": 1320
+    },
+    {
+     "key": "bath2",
+     "type": "bath",
+     "name": "부부욕실",
+     "x": 8680,
+     "y": 2320,
+     "w": 1920,
+     "d": 1320
+    },
+    {
+     "key": "bed2",
+     "type": "bedroom",
+     "name": "안방",
+     "x": 7560,
+     "y": 3640,
+     "w": 3040,
+     "d": 3760
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "bath",
+     "side": "n",
+     "pos": 1030,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath",
+     "side": "e",
+     "pos": 1950,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 1180,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 2110,
+     "winType": "double",
+     "w": 2200,
+     "h": 700,
+     "sill": 1100
+    },
+    {
+     "roomKey": "liv",
+     "side": "w",
+     "pos": 2120,
+     "winType": "fixed",
+     "w": 2000,
+     "h": 600,
+     "sill": 1400
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 2500,
+     "winType": "balcony",
+     "w": 3000,
+     "h": 2100,
+     "sill": 100
+    },
+    {
+     "roomKey": "bed1",
+     "side": "n",
+     "pos": 1860,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 600,
+     "sill": 1400
+    },
+    {
+     "roomKey": "bed1",
+     "side": "e",
+     "pos": 1270,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 1000
+    },
+    {
+     "roomKey": "bed1",
+     "side": "w",
+     "pos": 1800,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "util",
+     "side": "w",
+     "pos": 660,
+     "winType": "swingDoor",
+     "w": 800,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "bath2",
+     "side": "e",
+     "pos": 660,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath2",
+     "side": "s",
+     "pos": 1190,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "w",
+     "pos": 520,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "s",
+     "pos": 1410,
+     "winType": "double",
+     "w": 1700,
+     "h": 1000,
+     "sill": 1000
+    },
+    {
+     "roomKey": "bed2",
+     "side": "e",
+     "pos": 2180,
+     "winType": "fixed",
+     "w": 2000,
+     "h": 600,
+     "sill": 1400
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "basin",
+     "x": 530,
+     "y": 1350,
+     "rotation": 270
+    },
+    {
+     "catalogId": "toilet",
+     "x": 630,
+     "y": 1920,
+     "rotation": 270
+    },
+    {
+     "catalogId": "induction",
+     "x": 2840,
+     "y": 540,
+     "rotation": 0
+    },
+    {
+     "catalogId": "sink",
+     "x": 4460,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 6150,
+     "y": 680,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 7050,
+     "y": 680,
+     "rotation": 0
+    },
+    {
+     "catalogId": "toilet",
+     "x": 9180,
+     "y": 2730,
+     "rotation": 0
+    },
+    {
+     "catalogId": "basin",
+     "x": 9880,
+     "y": 2630,
+     "rotation": 0
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-forest10-ub",
+  "title": "10평 쉼터",
+  "category": "체류형 쉼터",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "FOREST10-UB",
+   "10평 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/forest10bb/1782102593981_3f6qvo.png?width=640&height=480&resize=cover&quality=70",
+  "code": "FOREST10-UB",
+  "catSlugs": [
+   "forest10bb"
+  ],
+  "source": "catalog-cad",
+  "confidence": "high",
+  "base": {
+   "name": "FOREST10-UB 10평 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2400,
+   "foundationHeight": 300,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea",
+    "dir": "v"
+   },
+   "roof": {
+    "type": "gable",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 300
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "bed",
+     "type": "bedroom",
+     "name": "방",
+     "x": 0,
+     "y": 0,
+     "w": 2410,
+     "d": 3500
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방/거실",
+     "x": 2410,
+     "y": 0,
+     "w": 5850,
+     "d": 2140,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 2410,
+     "y": 2140,
+     "w": 4490,
+     "d": 1360,
+     "open": [
+      "n",
+      "e"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 6900,
+     "y": 2140,
+     "w": 1360,
+     "d": 1360,
+     "open": [
+      "n",
+      "w"
+     ]
+    },
+    {
+     "key": "wc",
+     "type": "bath",
+     "name": "화장실",
+     "x": 8260,
+     "y": 0,
+     "w": 1740,
+     "d": 1290
+    },
+    {
+     "key": "wash",
+     "type": "bath",
+     "name": "세면대",
+     "x": 8260,
+     "y": 1290,
+     "w": 1740,
+     "d": 920,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "shw",
+     "type": "bath",
+     "name": "샤워실",
+     "x": 8260,
+     "y": 2210,
+     "w": 1740,
+     "d": 1290
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "bed",
+     "side": "w",
+     "pos": 2170,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 900
+    },
+    {
+     "roomKey": "bed",
+     "side": "s",
+     "pos": 1300,
+     "winType": "fixed",
+     "w": 1000,
+     "h": 800,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed",
+     "side": "e",
+     "pos": 730,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 4290,
+     "winType": "double",
+     "w": 1400,
+     "h": 600,
+     "sill": 1000
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1890,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 2100,
+     "sill": 100
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 500,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "wc",
+     "side": "n",
+     "pos": 760,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1300
+    },
+    {
+     "roomKey": "wc",
+     "side": "s",
+     "pos": 430,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    },
+    {
+     "roomKey": "shw",
+     "side": "n",
+     "pos": 430,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 1900,
+     "sill": 0
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "sink",
+     "x": 6400,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 7900,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "toilet",
+     "x": 9230,
+     "y": 740,
+     "rotation": 90
+    },
+    {
+     "catalogId": "basin",
+     "x": 9520,
+     "y": 1760,
+     "rotation": 90
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-stay20-wb",
+  "title": "20평 전원주택",
+  "category": "주택",
+  "showroom": "안동전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY20-WB",
+   "20평 전원주택"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay20wb/1782885978411_u3dz48.png?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY20-WB",
+  "catSlugs": [
+   "stay20wb"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "STAY20-WB 20평 전원주택",
+   "productType": "주택",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea"
+   },
+   "roof": {
+    "type": "gable",
+    "color": "#5e442a",
+    "ridge": "z",
+    "rise": 1580
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "bed1",
+     "type": "bedroom",
+     "name": "침실1",
+     "x": 0,
+     "y": 0,
+     "w": 2640,
+     "d": 3260
+    },
+    {
+     "key": "bed2",
+     "type": "bedroom",
+     "name": "침실2",
+     "x": 0,
+     "y": 3260,
+     "w": 2640,
+     "d": 3040
+    },
+    {
+     "key": "bath1",
+     "type": "bath",
+     "name": "공용욕실",
+     "x": 2640,
+     "y": 0,
+     "w": 2320,
+     "d": 1740
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 4960,
+     "y": 0,
+     "w": 3520,
+     "d": 1080,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "din",
+     "type": "kitchen",
+     "name": "주방/식당",
+     "x": 4960,
+     "y": 1080,
+     "w": 3300,
+     "d": 2420,
+     "open": [
+      "n",
+      "w",
+      "s"
+     ]
+    },
+    {
+     "key": "hall",
+     "type": "hall",
+     "name": "복도",
+     "x": 2640,
+     "y": 1740,
+     "w": 2320,
+     "d": 1760,
+     "open": [
+      "e",
+      "s"
+     ]
+    },
+    {
+     "key": "hall2",
+     "type": "hall",
+     "name": "복도",
+     "x": 2640,
+     "y": 3500,
+     "w": 1630,
+     "d": 1080,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 2640,
+     "y": 4580,
+     "w": 1630,
+     "d": 1720
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 4270,
+     "y": 3500,
+     "w": 3990,
+     "d": 2800,
+     "open": [
+      "n",
+      "s"
+     ]
+    },
+    {
+     "key": "livS",
+     "type": "living",
+     "name": "거실(돌출)",
+     "x": 4050,
+     "y": 6300,
+     "w": 4430,
+     "d": 700,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "bath2",
+     "type": "bath",
+     "name": "부부욕실",
+     "x": 8260,
+     "y": 1080,
+     "w": 1520,
+     "d": 2260
+    },
+    {
+     "key": "dress",
+     "type": "dress",
+     "name": "드레스룸",
+     "x": 9780,
+     "y": 1080,
+     "w": 1820,
+     "d": 1340
+    },
+    {
+     "key": "pw1",
+     "type": "dress",
+     "name": "파우더 통로",
+     "x": 9780,
+     "y": 2420,
+     "w": 860,
+     "d": 920,
+     "open": [
+      "s",
+      "e"
+     ]
+    },
+    {
+     "key": "pw2",
+     "type": "dress",
+     "name": "파우더룸",
+     "x": 10640,
+     "y": 2420,
+     "w": 960,
+     "d": 920,
+     "open": [
+      "w"
+     ]
+    },
+    {
+     "key": "bed3",
+     "type": "bedroom",
+     "name": "안방",
+     "x": 8260,
+     "y": 3340,
+     "w": 3340,
+     "d": 2960,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "deckL",
+     "type": "deck",
+     "name": "데크",
+     "x": 0,
+     "y": 6300,
+     "w": 4050,
+     "d": 700
+    },
+    {
+     "key": "deckR",
+     "type": "deck",
+     "name": "데크",
+     "x": 8480,
+     "y": 6300,
+     "w": 3120,
+     "d": 700
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "bed1",
+     "side": "n",
+     "pos": 1430,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed1",
+     "side": "w",
+     "pos": 1230,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300
+    },
+    {
+     "roomKey": "bed1",
+     "side": "e",
+     "pos": 2760,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "w",
+     "pos": 1810,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300
+    },
+    {
+     "roomKey": "bed2",
+     "side": "s",
+     "pos": 1430,
+     "winType": "double",
+     "w": 1200,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed2",
+     "side": "e",
+     "pos": 730,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bath1",
+     "side": "s",
+     "pos": 410,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 2290,
+     "winType": "double",
+     "w": 1200,
+     "h": 700,
+     "sill": 1050
+    },
+    {
+     "roomKey": "ent",
+     "side": "n",
+     "pos": 885,
+     "winType": "glassSlide",
+     "w": 1350,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "s",
+     "pos": 860,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "livS",
+     "side": "s",
+     "pos": 2215,
+     "winType": "balcony",
+     "w": 2500,
+     "h": 2000,
+     "sill": 100
+    },
+    {
+     "roomKey": "bath2",
+     "side": "n",
+     "pos": 960,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1700
+    },
+    {
+     "roomKey": "bath2",
+     "side": "s",
+     "pos": 1140,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "dress",
+     "side": "s",
+     "pos": 420,
+     "winType": "pocketDoor",
+     "w": 700,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed3",
+     "side": "e",
+     "pos": 1730,
+     "winType": "fixed",
+     "w": 1200,
+     "h": 800,
+     "sill": 1300
+    },
+    {
+     "roomKey": "bed3",
+     "side": "s",
+     "pos": 1780,
+     "winType": "double",
+     "w": 1700,
+     "h": 1000,
+     "sill": 1100
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "toilet",
+     "x": 3150,
+     "y": 750,
+     "rotation": 0
+    },
+    {
+     "catalogId": "basin",
+     "x": 3740,
+     "y": 490,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 5490,
+     "y": 680,
+     "rotation": 0
+    },
+    {
+     "catalogId": "sink18",
+     "x": 7300,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "induction",
+     "x": 7910,
+     "y": 1490,
+     "rotation": 90
+    },
+    {
+     "catalogId": "toilet",
+     "x": 8800,
+     "y": 2910,
+     "rotation": 270
+    },
+    {
+     "catalogId": "basin",
+     "x": 8540,
+     "y": 2290,
+     "rotation": 270
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-stay16-w",
+  "title": "16평 전원주택",
+  "category": "주택",
+  "showroom": "김포 본사전시장",
+  "tags": [
+   "카탈로그도면",
+   "STAY16-W",
+   "16평 전원주택"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay16-w/1793779278067_2zmkcx.webp?width=640&height=480&resize=cover&quality=70",
+  "code": "STAY16-W",
+  "catSlugs": [
+   "stay16-w"
+  ],
+  "source": "catalog-cad",
+  "confidence": "high",
+  "base": {
+   "name": "STAY-16-W 16평 전원주택",
+   "productType": "주택",
+   "ceilingHeight": 2400,
+   "foundationHeight": 400,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea",
+    "dir": "v",
+    "corner": "#b8773e"
+   },
+   "roof": {
+    "type": "gable",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 900
+   },
+   "wallThicknessInt": 120,
+   "rooms": [
+    {
+     "key": "bath",
+     "type": "bath",
+     "name": "욕실",
+     "x": 0,
+     "y": 0,
+     "w": 1740,
+     "d": 2340
+    },
+    {
+     "key": "van",
+     "type": "bath",
+     "name": "건식세면대",
+     "x": 0,
+     "y": 2340,
+     "w": 1740,
+     "d": 820,
+     "open": [
+      "e"
+     ]
+    },
+    {
+     "key": "kit",
+     "type": "kitchen",
+     "name": "주방",
+     "x": 1740,
+     "y": 0,
+     "w": 5320,
+     "d": 1690,
+     "open": [
+      "s"
+     ]
+    },
+    {
+     "key": "util",
+     "type": "utility",
+     "name": "다용도실",
+     "x": 7060,
+     "y": 0,
+     "w": 2540,
+     "d": 1690
+    },
+    {
+     "key": "hall",
+     "type": "hall",
+     "name": "홀",
+     "x": 1740,
+     "y": 1690,
+     "w": 6320,
+     "d": 1470,
+     "open": [
+      "n",
+      "w",
+      "s"
+     ]
+    },
+    {
+     "key": "ent",
+     "type": "entrance",
+     "name": "현관",
+     "x": 8060,
+     "y": 1690,
+     "w": 1540,
+     "d": 1470
+    },
+    {
+     "key": "bed1",
+     "type": "bedroom",
+     "name": "방1",
+     "x": 0,
+     "y": 3160,
+     "w": 2840,
+     "d": 2840
+    },
+    {
+     "key": "liv",
+     "type": "living",
+     "name": "거실",
+     "x": 2840,
+     "y": 3160,
+     "w": 3920,
+     "d": 2840,
+     "open": [
+      "n"
+     ]
+    },
+    {
+     "key": "bed2",
+     "type": "bedroom",
+     "name": "방2",
+     "x": 6760,
+     "y": 3160,
+     "w": 2840,
+     "d": 2840
+    },
+    {
+     "key": "porch",
+     "type": "porch",
+     "name": "포치(7평)",
+     "x": 0,
+     "y": 6000,
+     "w": 9600,
+     "d": 2500,
+     "rail": [
+      "s",
+      "w"
+     ]
+    },
+    {
+     "key": "deck",
+     "type": "deck",
+     "name": "데크(4평)",
+     "x": 9600,
+     "y": 0,
+     "w": 1500,
+     "d": 8500,
+     "rail": [
+      "e"
+     ]
+    }
+   ],
+   "openings": [
+    {
+     "roomKey": "bath",
+     "side": "n",
+     "pos": 980,
+     "winType": "double",
+     "w": 600,
+     "h": 500,
+     "sill": 1600
+    },
+    {
+     "roomKey": "bath",
+     "side": "s",
+     "pos": 1290,
+     "winType": "swingDoor",
+     "w": 700,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "kit",
+     "side": "n",
+     "pos": 3080,
+     "winType": "double",
+     "w": 1800,
+     "h": 700,
+     "sill": 900
+    },
+    {
+     "roomKey": "util",
+     "side": "n",
+     "pos": 1200,
+     "winType": "double",
+     "w": 1000,
+     "h": 900,
+     "sill": 1200
+    },
+    {
+     "roomKey": "util",
+     "side": "s",
+     "pos": 460,
+     "winType": "swingDoor",
+     "w": 800,
+     "h": 2000,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "w",
+     "pos": 735,
+     "winType": "glassSlide",
+     "w": 1350,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "ent",
+     "side": "e",
+     "pos": 860,
+     "winType": "door",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed1",
+     "side": "n",
+     "pos": 2310,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed1",
+     "side": "w",
+     "pos": 1510,
+     "winType": "fixed",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed1",
+     "side": "s",
+     "pos": 1530,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "liv",
+     "side": "s",
+     "pos": 1960,
+     "winType": "balcony",
+     "w": 2000,
+     "h": 2100,
+     "sill": 100
+    },
+    {
+     "roomKey": "bed2",
+     "side": "n",
+     "pos": 530,
+     "winType": "swingDoor",
+     "w": 900,
+     "h": 2100,
+     "sill": 0
+    },
+    {
+     "roomKey": "bed2",
+     "side": "s",
+     "pos": 1310,
+     "winType": "double",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    },
+    {
+     "roomKey": "bed2",
+     "side": "e",
+     "pos": 1510,
+     "winType": "fixed",
+     "w": 1500,
+     "h": 1000,
+     "sill": 1100
+    }
+   ],
+   "furniture": [
+    {
+     "catalogId": "fridge",
+     "x": 2150,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "fridge",
+     "x": 2740,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "sink",
+     "x": 4830,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "induction",
+     "x": 6720,
+     "y": 580,
+     "rotation": 0
+    },
+    {
+     "catalogId": "washer",
+     "x": 9000,
+     "y": 1320,
+     "rotation": 90
+    },
+    {
+     "catalogId": "toilet",
+     "x": 750,
+     "y": 1810,
+     "rotation": 270
+    },
+    {
+     "catalogId": "basin",
+     "x": 480,
+     "y": 1200,
+     "rotation": 270
+    },
+    {
+     "catalogId": "basin",
+     "x": 480,
+     "y": 2760,
+     "rotation": 270
+    }
+   ]
+  }
+ },
+ {
+  "id": "cat-forest10-4-w",
+  "title": "10평 체류형 쉼터",
+  "category": "체류형 쉼터",
+  "showroom": "김포 제1전시장",
+  "tags": [
+   "카탈로그도면",
+   "FOREST10-4-W",
+   "10평 체류형 쉼터"
+  ],
+  "photo": "https://aypugjvzvwinnmpquguj.supabase.co/storage/v1/render/image/public/model-images/stay10w/1782114436080_yiwsmy.png?width=640&height=480&resize=cover&quality=70",
+  "code": "FOREST10-4-W",
+  "catSlugs": [
+   "stay10w"
+  ],
+  "source": "catalog-cad",
+  "confidence": "medium",
+  "base": {
+   "name": "FOREST10-4-W 10평 체류형 쉼터",
+   "productType": "체류형 쉼터",
+   "ceilingHeight": 2400,
+   "foundationHeight": 150,
+   "wallThickness": 280,
+   "exterior": {
+    "material": "metal",
+    "color": "#f4f1ea",
+    "dir": "v"
+   },
+   "roof": {
+    "type": "gable",
+    "color": "#3a3f44",
+    "ridge": "x",
+    "rise": 500
+   },
+   "wallThicknessInt": 120,
+   "floors": [
+    {
+     "rooms": [
+      {
+       "key": "liv",
+       "type": "living",
+       "name": "거실",
+       "x": 0,
+       "y": 0,
+       "w": 4920,
+       "d": 2420,
+       "open": [
+        "e",
+        "s"
+       ]
+      },
+      {
+       "key": "ent",
+       "type": "entrance",
+       "name": "현관",
+       "x": 0,
+       "y": 2420,
+       "w": 1630,
+       "d": 1080,
+       "open": [
+        "n",
+        "e"
+       ]
+      },
+      {
+       "key": "liv2",
+       "type": "living",
+       "name": "거실",
+       "x": 1630,
+       "y": 2420,
+       "w": 4190,
+       "d": 1080,
+       "open": [
+        "n",
+        "w",
+        "e"
+       ]
+      },
+      {
+       "key": "hall",
+       "type": "hall",
+       "name": "거실",
+       "x": 4920,
+       "y": 1640,
+       "w": 900,
+       "d": 780,
+       "open": [
+        "n",
+        "w",
+        "s",
+        "e"
+       ]
+      },
+      {
+       "key": "stair",
+       "type": "hall",
+       "name": "계단/온수기",
+       "x": 4920,
+       "y": 0,
+       "w": 1660,
+       "d": 1640,
+       "open": [
+        "s",
+        "w"
+       ]
+      },
+      {
+       "key": "kit",
+       "type": "kitchen",
+       "name": "주방",
+       "x": 5820,
+       "y": 1640,
+       "w": 4180,
+       "d": 1860,
+       "open": [
+        "w",
+        "n"
+       ]
+      },
+      {
+       "key": "wc",
+       "type": "bath",
+       "name": "화장실",
+       "x": 6580,
+       "y": 0,
+       "w": 1100,
+       "d": 1640
+      },
+      {
+       "key": "wash",
+       "type": "bath",
+       "name": "세면대",
+       "x": 7680,
+       "y": 0,
+       "w": 980,
+       "d": 1640,
+       "open": [
+        "s"
+       ]
+      },
+      {
+       "key": "shw",
+       "type": "bath",
+       "name": "샤워실",
+       "x": 8660,
+       "y": 0,
+       "w": 1340,
+       "d": 1640
+      },
+      {
+       "key": "deck",
+       "type": "deck",
+       "name": "데크",
+       "x": -900,
+       "y": 0,
+       "w": 900,
+       "d": 3500
+      }
+     ],
+     "openings": [
+      {
+       "roomKey": "liv",
+       "side": "n",
+       "pos": 2700,
+       "winType": "double",
+       "w": 3000,
+       "h": 1000,
+       "sill": 900
+      },
+      {
+       "roomKey": "liv",
+       "side": "w",
+       "pos": 1430,
+       "winType": "fixed",
+       "w": 1500,
+       "h": 700,
+       "sill": 1100
+      },
+      {
+       "roomKey": "ent",
+       "side": "s",
+       "pos": 1080,
+       "winType": "door",
+       "w": 900,
+       "h": 2100,
+       "sill": 0
+      },
+      {
+       "roomKey": "liv2",
+       "side": "s",
+       "pos": 1990,
+       "winType": "balcony",
+       "w": 2500,
+       "h": 2100,
+       "sill": 100
+      },
+      {
+       "roomKey": "kit",
+       "side": "s",
+       "pos": 2330,
+       "winType": "double",
+       "w": 1500,
+       "h": 600,
+       "sill": 1050
+      },
+      {
+       "roomKey": "wc",
+       "side": "s",
+       "pos": 690,
+       "winType": "swingDoor",
+       "w": 700,
+       "h": 1700,
+       "sill": 0
+      },
+      {
+       "roomKey": "shw",
+       "side": "s",
+       "pos": 410,
+       "winType": "swingDoor",
+       "w": 700,
+       "h": 1700,
+       "sill": 0
+      },
+      {
+       "roomKey": "shw",
+       "side": "e",
+       "pos": 930,
+       "winType": "double",
+       "w": 600,
+       "h": 500,
+       "sill": 1200
+      }
+     ],
+     "furniture": [
+      {
+       "catalogId": "toilet",
+       "x": 7100,
+       "y": 650,
+       "rotation": 0
+      },
+      {
+       "catalogId": "basin",
+       "x": 8170,
+       "y": 530,
+       "rotation": 0
+      },
+      {
+       "catalogId": "fridge",
+       "x": 6200,
+       "y": 2870,
+       "rotation": 180
+      },
+      {
+       "catalogId": "sink",
+       "x": 7920,
+       "y": 2920,
+       "rotation": 180
+      }
+     ],
+     "name": "1층"
+    },
+    {
+     "rooms": [
+      {
+       "key": "attic",
+       "type": "attic",
+       "name": "다락",
+       "x": 5820,
+       "y": 0,
+       "w": 4180,
+       "d": 3500,
+       "open": [
+        "w"
+       ],
+       "rail": [
+        "w"
+       ]
+      }
+     ],
+     "openings": [
+      {
+       "roomKey": "attic",
+       "side": "n",
+       "pos": 2780,
+       "winType": "fixed",
+       "w": 1200,
+       "h": 800,
+       "sill": 300
+      },
+      {
+       "roomKey": "attic",
+       "side": "e",
+       "pos": 1750,
+       "winType": "fixed",
+       "w": 2000,
+       "h": 700,
+       "sill": 300
+      },
+      {
+       "roomKey": "attic",
+       "side": "s",
+       "pos": 2330,
+       "winType": "fixed",
+       "w": 1500,
+       "h": 700,
+       "sill": 300
+      }
+     ],
+     "furniture": [],
+     "name": "다락"
     }
    ]
   }

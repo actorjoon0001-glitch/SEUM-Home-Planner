@@ -123,7 +123,8 @@ for grp in groups:
         # 도면 제목의 괄호 설명(예: '(본사)')은 같은 모델명 다른 도면 구분용 꼬리표
         mnote = re.search(r'\(([^)]+)\)', j.get('pdfTitle') or '')
         code_note = mnote.group(1).strip() if mnote else None
-        title = f"{code} {sub}".strip() + (f" ({code_note})" if code_note else '')
+        title = f"{code} {sub}".strip() + (f" ({code_note})" if code_note else '')   # 도면 이름(편집기)
+        card = (sub or code) + (f" · {code_note}" if code_note else '')              # 카드엔 모델명이 따로 위에 있으므로 설명만
         base = {'name': title, 'productType': pt, 'ceilingHeight': int(b.get('ceilingHeight') or 2400),
                 'foundationHeight': int(b.get('foundationHeight') or 300), 'wallThickness': int(b.get('wallThickness') or 280),
                 'exterior': exterior, 'roof': roof}
@@ -132,7 +133,7 @@ for grp in groups:
         else: base.update(fl[0])
         showroom = ((cm.get('showrooms') or [None])[0]) if cm else None
         entries.append({
-            'id': tid, 'title': title, 'category': category, 'showroom': showroom or '기타',
+            'id': tid, 'title': card, 'category': category, 'showroom': showroom or '기타',
             'tags': ['카탈로그도면', code] + ([sub] if sub else []),
             'photo': thumb(cm.get('main_image')) if cm else None, 'code': code, 'catSlugs': grp,
             **({'codeNote': code_note} if code_note else {}),

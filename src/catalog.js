@@ -28,16 +28,17 @@ export function loadCatalogShowrooms(force) {
   if (_roomsLoading && !force) return _roomsLoading;
   _roomsLoading = Promise.all([
     catalogGet('showrooms?select=name,display_order,is_active&order=display_order.asc'),
-    catalogGet('models?select=name,showrooms'),
+    catalogGet('models?select=name,slug,showrooms'),
   ]).then(([srs, models]) => {
     const order = (srs || []).filter((s) => s && s.name && s.is_active !== false).map((s) => s.name.trim());
-    const byCode = {};
+    const byCode = {}, bySlug = {};
+    for (const m of models || []) if (m.slug) bySlug[m.slug] = { code: String(m.name || '').trim().toUpperCase(), showrooms: (Array.isArray(m.showrooms) ? m.showrooms : []).map((r) => String(r || '').trim()).filter(Boolean) };
     for (const m of models || []) {
       const code = String(m.name || '').trim().toUpperCase(); if (!code) continue;
       const set = byCode[code] || (byCode[code] = []);
       for (const r of Array.isArray(m.showrooms) ? m.showrooms : []) { const n = String(r || '').trim(); if (n && !set.includes(n)) set.push(n); }
     }
-    _rooms = { order, byCode };
+    _rooms = { order, byCode, bySlug };
     return _rooms;
   }).catch(() => null).finally(() => { _roomsLoading = null; });
   return _roomsLoading;

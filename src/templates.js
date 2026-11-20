@@ -2,6 +2,7 @@
 // 상담 시작 시 자주 쓰는 도면을 바로 불러올 수 있도록 미리 정의.
 // rooms 는 key 로 식별하고, openings 가 roomKey 로 참조 → instantiate 시 실제 id 생성.
 import { normalize, rid, fid, WINDOW_TYPES, model3dSig, FURNITURE_CATALOG, OPEN_ROOM_TYPES } from './data.js';
+import { CATALOG_PLANS } from './catalogPlans.js';
 
 // ---------------------------------------------------------------------------
 // 실물 모델(블렌더) 제품 옵션 — tools/blender/plan_to_blend.py 로 만든 모델 공용
@@ -966,9 +967,15 @@ const T = [
 ];
 
 // 템플릿 목록 (썸네일/표시용 메타)
+// 온라인 카탈로그 CAD 도면에서 옮긴 전시장 도면 (실물 블렌더 모델이 이미 있는 모델명은 빼고)
+{
+  const have = new Set(T.map((t) => t.code).filter(Boolean));
+  for (const c of CATALOG_PLANS) if (!have.has(c.code)) T.push(c);
+}
+
 export function listTemplates() {
   return T.map((t) => ({ id: t.id, title: t.title, tags: t.tags, category: t.category || '주택', showroom: t.showroom || null, real: !!(t.base && t.base.model3d),
-    photo: t.photo || null, code: t.code || null, codeNote: t.codeNote || null }));
+    photo: t.photo || null, code: t.code || null, codeNote: t.codeNote || null, catSlugs: t.catSlugs || null }));
 }
 
 // 템플릿을 실제 편집 가능한 도면 객체로 인스턴스화 (새 id 부여)
